@@ -1,9 +1,9 @@
+use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
-    Aes256Gcm, Nonce
+    Aes256Gcm, Nonce,
 };
-use aes_gcm::aead::generic_array::GenericArray;
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -35,10 +35,10 @@ fn get_current_validator(block_number: u64) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EncryptedData {
-    data_id: String,            // Unique data ID
-    label: String,              // Public label/description (optional, visible to all)
-    encrypted_payload: String,  // Base64 encoded ciphertext (encrypted JSON)
-    encryption_hint: String,    // SHA256 hash of PIN for verification
+    data_id: String,           // Unique data ID
+    label: String,             // Public label/description (optional, visible to all)
+    encrypted_payload: String, // Base64 encoded ciphertext (encrypted JSON)
+    encryption_hint: String,   // SHA256 hash of PIN for verification
     timestamp: i64,
     signature: String,
     public_key: String,
@@ -49,7 +49,7 @@ impl EncryptedData {
     fn derive_key_from_pin(pin: &str) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(pin.as_bytes());
-        hasher.update(b"goud_chain_salt_v1");  // Add salt
+        hasher.update(b"goud_chain_salt_v1"); // Add salt
         let result = hasher.finalize();
         let mut key = [0u8; 32];
         key.copy_from_slice(&result);
@@ -74,7 +74,8 @@ impl EncryptedData {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt
-        let ciphertext = cipher.encrypt(nonce, json_data.as_bytes())
+        let ciphertext = cipher
+            .encrypt(nonce, json_data.as_bytes())
             .expect("Encryption failed");
 
         // Combine nonce + ciphertext and encode as base64
@@ -95,7 +96,9 @@ impl EncryptedData {
         let cipher = Aes256Gcm::new(key);
 
         // Decode base64
-        let combined = general_purpose::STANDARD.decode(&self.encrypted_payload).ok()?;
+        let combined = general_purpose::STANDARD
+            .decode(&self.encrypted_payload)
+            .ok()?;
         if combined.len() < 12 {
             return None;
         }
@@ -110,12 +113,7 @@ impl EncryptedData {
     }
 
     // Create new encrypted data entry
-    fn new(
-        label: String,
-        json_data: String,
-        pin: &str,
-        signing_key: &SigningKey,
-    ) -> Self {
+    fn new(label: String, json_data: String, pin: &str, signing_key: &SigningKey) -> Self {
         let data_id = Uuid::new_v4().to_string();
         let timestamp = Utc::now().timestamp();
         let public_key = hex::encode(signing_key.verifying_key().to_bytes());
@@ -125,13 +123,7 @@ impl EncryptedData {
         let encryption_hint = Self::hash_pin(pin);
 
         // Create message to sign
-        let message = format!(
-            "{}{}{}{}",
-            data_id,
-            label,
-            encrypted_payload,
-            timestamp
-        );
+        let message = format!("{}{}{}{}", data_id, label, encrypted_payload, timestamp);
         let signature = signing_key.sign(message.as_bytes());
 
         EncryptedData {
@@ -149,10 +141,7 @@ impl EncryptedData {
     fn verify(&self) -> bool {
         let message = format!(
             "{}{}{}{}",
-            self.data_id,
-            self.label,
-            self.encrypted_payload,
-            self.timestamp
+            self.data_id, self.label, self.encrypted_payload, self.timestamp
         );
 
         match hex::decode(&self.public_key) {
@@ -162,7 +151,9 @@ impl EncryptedData {
                         if let Ok(sig_bytes) = hex::decode(&self.signature) {
                             if let Ok(sig_array) = sig_bytes.try_into() {
                                 let signature = Signature::from_bytes(&sig_array);
-                                return verifying_key.verify(message.as_bytes(), &signature).is_ok();
+                                return verifying_key
+                                    .verify(message.as_bytes(), &signature)
+                                    .is_ok();
                             }
                         }
                     }
@@ -177,9 +168,7 @@ impl EncryptedData {
     fn hash(&self) -> String {
         let content = format!(
             "{}{}{}",
-            self.data_id,
-            self.encrypted_payload,
-            self.timestamp
+            self.data_id, self.encrypted_payload, self.timestamp
         );
         let mut hasher = Sha256::new();
         hasher.update(content.as_bytes());
@@ -251,11 +240,7 @@ impl Block {
     fn calculate_hash(&self) -> String {
         let content = format!(
             "{}{}{}{}{}",
-            self.index,
-            self.timestamp,
-            self.merkle_root,
-            self.previous_hash,
-            self.validator
+            self.index, self.timestamp, self.merkle_root, self.previous_hash, self.validator
         );
         let mut hasher = Sha256::new();
         hasher.update(content.as_bytes());
@@ -271,7 +256,7 @@ struct Blockchain {
     #[serde(skip)]
     pending_data: Vec<EncryptedData>,
     #[serde(skip)]
-    node_signing_key: Option<SigningKey>,  // For signing data
+    node_signing_key: Option<SigningKey>, // For signing data
 }
 
 impl Blockchain {
@@ -281,7 +266,7 @@ impl Blockchain {
         let genesis_data = EncryptedData::new(
             "Genesis Block".to_string(),
             "{\"message\": \"Goud Chain initialized\", \"timestamp\": \"2025-01-01\"}".to_string(),
-            "0000",  // Genesis PIN
+            "0000", // Genesis PIN
             &signing_key,
         );
 
@@ -329,7 +314,10 @@ impl Blockchain {
             validator,
         );
 
-        println!("✅ Block {} created by {} in <1s", block_number, new_block.validator);
+        println!(
+            "✅ Block {} created by {} in <1s",
+            block_number, new_block.validator
+        );
 
         self.chain.push(new_block.clone());
         self.pending_data.clear();
@@ -398,8 +386,10 @@ impl Blockchain {
             // Validate validator authorization
             let expected_validator = get_current_validator(current.index);
             if current.validator != expected_validator {
-                println!("❌ Invalid validator at block {}: expected {}, got {}",
-                         i, expected_validator, current.validator);
+                println!(
+                    "❌ Invalid validator at block {}: expected {}, got {}",
+                    i, expected_validator, current.validator
+                );
                 return false;
             }
         }
@@ -432,7 +422,8 @@ impl Blockchain {
         if new_chain.len() > self.chain.len() && temp_blockchain.is_valid() {
             println!(
                 "🔄 Replacing chain (length: {} > {})",
-                new_chain.len(), self.chain.len()
+                new_chain.len(),
+                self.chain.len()
             );
             self.chain = new_chain;
             return true;
@@ -454,7 +445,8 @@ impl Blockchain {
             if let Ok(mut blockchain) = serde_json::from_str::<Blockchain>(&content) {
                 blockchain.node_id = node_id;
                 blockchain.pending_data = Vec::new();
-                blockchain.node_signing_key = Some(SigningKey::from_bytes(&rand::random::<[u8; 32]>()));
+                blockchain.node_signing_key =
+                    Some(SigningKey::from_bytes(&rand::random::<[u8; 32]>()));
                 println!(
                     "📂 Blockchain loaded from disk (length: {} blocks)",
                     blockchain.chain.len()
@@ -466,7 +458,6 @@ impl Blockchain {
         Blockchain::new(node_id)
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum P2PMessage {
@@ -536,7 +527,6 @@ impl P2PNode {
             });
         }
     }
-
 
     fn request_chain_from_peers(&self) {
         let peers = self.peers.lock().unwrap().clone();
@@ -743,12 +733,7 @@ fn main() {
 
                     if let Some(key) = signing_key {
                         // Create encrypted data entry
-                        let data_entry = EncryptedData::new(
-                            req.label,
-                            req.data,
-                            &req.pin,
-                            &key,
-                        );
+                        let data_entry = EncryptedData::new(req.label, req.data, &req.pin, &key);
 
                         let data_id = data_entry.data_id.clone();
 
@@ -768,28 +753,44 @@ fn main() {
                                         "message": "Data encrypted and stored successfully",
                                         "data_id": data_id,
                                         "block_number": block.index
-                                    }).to_string()
-                                ).with_header(
-                                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                                    })
+                                    .to_string(),
+                                )
+                                .with_header(
+                                    tiny_http::Header::from_bytes(
+                                        &b"Content-Type"[..],
+                                        &b"application/json"[..],
+                                    )
+                                    .unwrap(),
                                 );
                                 request.respond(add_cors_headers(response)).ok();
                             }
                         } else {
                             let response = Response::from_string(
-                                serde_json::json!({"error": "Failed to add data"}).to_string()
-                            ).with_status_code(400)
+                                serde_json::json!({"error": "Failed to add data"}).to_string(),
+                            )
+                            .with_status_code(400)
                             .with_header(
-                                tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                                tiny_http::Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"application/json"[..],
+                                )
+                                .unwrap(),
                             );
                             request.respond(add_cors_headers(response)).ok();
                         }
                     }
                 } else {
                     let response = Response::from_string(
-                        serde_json::json!({"error": "Invalid request"}).to_string()
-                    ).with_status_code(400)
+                        serde_json::json!({"error": "Invalid request"}).to_string(),
+                    )
+                    .with_status_code(400)
                     .with_header(
-                        tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                        tiny_http::Header::from_bytes(
+                            &b"Content-Type"[..],
+                            &b"application/json"[..],
+                        )
+                        .unwrap(),
                     );
                     request.respond(add_cors_headers(response)).ok();
                 }
@@ -812,11 +813,15 @@ fn main() {
                     }
                 }
 
-                let response = Response::from_string(
-                    serde_json::json!({"data": all_data}).to_string()
-                ).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
-                );
+                let response =
+                    Response::from_string(serde_json::json!({"data": all_data}).to_string())
+                        .with_header(
+                            tiny_http::Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"application/json"[..],
+                            )
+                            .unwrap(),
+                        );
                 request.respond(add_cors_headers(response)).ok();
             }
 
@@ -846,26 +851,43 @@ fn main() {
                                     "label": data.label,
                                     "decrypted_data": decrypted,
                                     "timestamp": data.timestamp
-                                }).to_string()
-                            ).with_header(
-                                tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                                })
+                                .to_string(),
+                            )
+                            .with_header(
+                                tiny_http::Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"application/json"[..],
+                                )
+                                .unwrap(),
                             );
                             request.respond(add_cors_headers(response)).ok();
                         } else {
                             let response = Response::from_string(
-                                serde_json::json!({"error": "Invalid PIN or access denied"}).to_string()
-                            ).with_status_code(403)
+                                serde_json::json!({"error": "Invalid PIN or access denied"})
+                                    .to_string(),
+                            )
+                            .with_status_code(403)
                             .with_header(
-                                tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                                tiny_http::Header::from_bytes(
+                                    &b"Content-Type"[..],
+                                    &b"application/json"[..],
+                                )
+                                .unwrap(),
                             );
                             request.respond(add_cors_headers(response)).ok();
                         }
                     } else {
                         let response = Response::from_string(
-                            serde_json::json!({"error": "Data not found"}).to_string()
-                        ).with_status_code(404)
+                            serde_json::json!({"error": "Data not found"}).to_string(),
+                        )
+                        .with_status_code(404)
                         .with_header(
-                            tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                            tiny_http::Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"application/json"[..],
+                            )
+                            .unwrap(),
                         );
                         request.respond(add_cors_headers(response)).ok();
                     }
@@ -876,7 +898,8 @@ fn main() {
                 let chain = blockchain.lock().unwrap();
                 let json = serde_json::to_string_pretty(&*chain).unwrap();
                 let response = Response::from_string(json).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
                 );
                 request.respond(add_cors_headers(response)).ok();
             }
@@ -890,9 +913,12 @@ fn main() {
                         "peers": peers,
                         "count": peers.len(),
                         "reputation": *reputation
-                    }).to_string()
-                ).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                    })
+                    .to_string(),
+                )
+                .with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
                 );
                 request.respond(add_cors_headers(response)).ok();
             }
@@ -900,20 +926,26 @@ fn main() {
             (Method::Get, "/sync") => {
                 p2p.request_chain_from_peers();
                 let response = Response::from_string(
-                    serde_json::json!({"message": "Syncing with peers..."}).to_string()
-                ).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
+                    serde_json::json!({"message": "Syncing with peers..."}).to_string(),
+                )
+                .with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                        .unwrap(),
                 );
                 request.respond(add_cors_headers(response)).ok();
             }
 
             _ => {
-                let response = Response::from_string(
-                    serde_json::json!({"error": "Not found"}).to_string()
-                ).with_status_code(404)
-                .with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
-                );
+                let response =
+                    Response::from_string(serde_json::json!({"error": "Not found"}).to_string())
+                        .with_status_code(404)
+                        .with_header(
+                            tiny_http::Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"application/json"[..],
+                            )
+                            .unwrap(),
+                        );
                 request.respond(add_cors_headers(response)).ok();
             }
         }

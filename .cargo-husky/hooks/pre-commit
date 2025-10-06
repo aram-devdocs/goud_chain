@@ -5,7 +5,10 @@ echo "Running Rust formatting..."
 cargo fmt
 
 # Re-add any formatted files that were staged
-git diff --name-only --cached | grep '\.rs$' | xargs -r git add
+STAGED_RS_FILES=$(git diff --name-only --cached | grep '\.rs$' || true)
+if [ -n "$STAGED_RS_FILES" ]; then
+    echo "$STAGED_RS_FILES" | xargs git add
+fi
 
 echo "Running Clippy..."
 cargo clippy -- -D warnings || {
