@@ -198,12 +198,90 @@ cargo run
 - Blockchain: Changes to `src/` auto-recompile and restart
 - Uses `nodemon` for dashboard, `cargo-watch` for Rust code
 
+## Module Architecture
+
+Goud Chain follows a **clean, layered architecture** with **zero circular dependencies**:
+
+![Module Dependency Graph](docs/module-structure.png)
+
+### Layer Structure
+
+```
+Layer 0: Foundation     → constants, types
+Layer 1: Utilities      → crypto, config
+Layer 2: Business Logic → domain
+Layer 3: Persistence    → storage
+Layer 4: Network/P2P    → network
+Layer 5: Presentation   → api
+Entry Point             → main
+```
+
+**Dependency Rules:**
+- ✅ Modules can only depend on **lower layers**
+- ✅ No circular dependencies (enforced by tests)
+- ✅ Foundation layer has **zero** internal dependencies
+
+**Module Responsibilities:**
+
+| Module | Purpose | Dependencies |
+|--------|---------|--------------|
+| **constants** | Magic numbers, strings, config values | None |
+| **types** | Error types, API request/response types | None |
+| **crypto** | Encryption, signatures, key derivation | constants, types |
+| **config** | Environment variable configuration | constants |
+| **domain** | Block, Blockchain, EncryptedData | constants, crypto, types |
+| **storage** | File persistence, load/save blockchain | constants, crypto, domain, types |
+| **network** | P2P messaging, peer management | constants, domain, storage, types |
+| **api** | HTTP handlers, middleware, routing | All modules |
+| **main** | Entry point, orchestration | api, config, network, storage |
+
+### Automated Quality Checks
+
+Every commit automatically:
+1. ✅ **Tests for circular dependencies** - Prevents architectural decay
+2. ✅ **Validates layer hierarchy** - Enforces clean architecture
+3. ✅ **Regenerates dependency graph** - Visual documentation always up-to-date
+
+See [`tests/module_dependencies.rs`](tests/module_dependencies.rs) for implementation.
+
 ## Project Structure
 
 ```
 goud_chain/
 ├── src/
-│   └── main.rs              # Blockchain core (~850 lines)
+│   ├── main.rs              # Entry point (94 lines)
+│   ├── config.rs            # Configuration management
+│   ├── constants.rs         # All magic numbers/strings
+│   ├── types/               # Error & API types
+│   │   ├── mod.rs
+│   │   ├── errors.rs        # Custom error enum
+│   │   └── api.rs           # Request/response types
+│   ├── crypto/              # Encryption & signatures
+│   │   ├── mod.rs
+│   │   ├── encryption.rs    # AES-256-GCM
+│   │   └── signature.rs     # Ed25519
+│   ├── domain/              # Business logic
+│   │   ├── mod.rs
+│   │   ├── encrypted_data.rs
+│   │   ├── block.rs
+│   │   └── blockchain.rs
+│   ├── storage/             # Persistence layer
+│   │   └── mod.rs
+│   ├── network/             # P2P networking
+│   │   ├── mod.rs
+│   │   ├── messages.rs
+│   │   └── p2p.rs
+│   └── api/                 # HTTP API
+│       ├── mod.rs
+│       ├── handlers.rs
+│       └── middleware.rs
+├── tests/
+│   └── module_dependencies.rs  # Circular dependency prevention
+├── scripts/
+│   └── generate_module_graph.sh  # Auto-generate dependency PNG
+├── docs/
+│   ├── module-structure.png     # Generated dependency graph
+│   └── module-structure.dot     # GraphViz source
 ├── dashboard/
 │   ├── index.html           # Web UI (~520 lines)
 │   ├── server.js            # Dashboard server

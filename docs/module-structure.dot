@@ -1,0 +1,68 @@
+digraph ModuleDependencies {
+    // Graph styling - Top to Bottom for clean layer visualization
+    rankdir=TB;
+    node [shape=box, style="rounded,filled", fontname="Arial Bold", fontsize=16, width=2.2, height=1.0];
+    edge [fontname="Arial", fontsize=11, color="#555555", penwidth=1.5];
+    splines=polyline;
+    nodesep=1.0;
+    ranksep=1.5;
+    bgcolor="#ffffff";
+
+    // Entry point (Dark Gray) - at the top
+    main [label="main\n(entry)", fillcolor="#37474f", fontcolor="white", shape="ellipse", width=2.0, height=2.0];
+
+    // Layer 5: Presentation (Yellow)
+    api [label="api\n(Layer 5)", fillcolor="#ffca28", fontcolor="white"];
+
+    // Layer 4: Network (Pink)
+    network [label="network\n(Layer 4)", fillcolor="#ec407a", fontcolor="white"];
+
+    // Layer 3: Persistence (Purple)
+    storage [label="storage\n(Layer 3)", fillcolor="#ab47bc", fontcolor="white"];
+
+    // Layer 2: Business (Orange)
+    domain [label="domain\n(Layer 2)", fillcolor="#ffa726", fontcolor="white"];
+
+    // Layer 1: Utilities (Blue)
+    crypto [label="crypto\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
+    config [label="config\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
+
+    // Layer 0: Foundation (Green) - at the bottom
+    constants [label="constants\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
+    types [label="types\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
+
+    // Enforce strict top-to-bottom layering
+    {rank=same; constants; types;}
+    {rank=same; crypto; config;}
+    {rank=same; domain;}
+    {rank=same; storage;}
+    {rank=same; network;}
+    {rank=same; api;}
+
+    // Invisible edges to force horizontal alignment within layers
+    constants -> types [style=invis];
+    crypto -> config [style=invis];
+
+    api -> constants;
+    api -> domain;
+    api -> network;
+    api -> storage;
+    api -> types;
+    crypto -> constants;
+    crypto -> types;
+    domain -> constants;
+    domain -> crypto;
+    domain -> types;
+    network -> constants;
+    network -> domain;
+    network -> storage;
+    network -> types;
+    storage -> constants;
+    storage -> crypto;
+    storage -> domain;
+    storage -> types;
+    main -> api;
+    main -> config;
+    main -> network;
+    main -> storage;
+}

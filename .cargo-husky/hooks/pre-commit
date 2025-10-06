@@ -16,7 +16,7 @@ cargo clippy -- -D warnings || {
     exit 1
 }
 
-echo "Running Rust tests..."
+echo "Running Rust tests (including circular dependency checks)..."
 cargo test || {
     echo "Error: Tests failed."
     exit 1
@@ -27,6 +27,16 @@ cargo build || {
     echo "Error: Build failed."
     exit 1
 }
+
+echo "Generating module dependency graph..."
+./scripts/generate_module_graph.sh || {
+    echo "Warning: Failed to generate module graph (non-fatal)"
+}
+
+# Stage the module graph if it changed
+if [ -f "docs/module-structure.png" ]; then
+    git add docs/module-structure.png docs/module-structure.dot
+fi
 
 # Dashboard checks
 echo "Running dashboard tests..."

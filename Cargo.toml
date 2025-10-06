@@ -17,6 +17,9 @@ rand = "0.8"
 hex = "0.4"
 base64 = "0.21"
 aes-gcm = "0.10"  # For PIN-based encryption
+thiserror = "2.0"  # For custom error types
+tracing = "0.1"  # For structured logging
+tracing-subscriber = "0.3"  # For logging initialization
 
 # Pin to avoid edition2024 requirement
 [dependencies.base64ct]
