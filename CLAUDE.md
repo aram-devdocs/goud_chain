@@ -58,20 +58,102 @@ cargo clippy
 
 ### Code Organization
 
+**Layered Architecture:**
+This project follows a strict layered architecture to prevent circular dependencies and maintain clean separation of concerns. Dependencies flow **unidirectionally** from higher layers to lower layers.
+
+**The Layer Hierarchy:**
+```
+Layer 0: Foundation     → Pure data types, constants (no internal dependencies)
+Layer 1: Utilities      → Reusable helpers (crypto, config)
+Layer 2: Business Logic → Core domain models and rules
+Layer 3: Persistence    → Data storage and retrieval
+Layer 4: Infrastructure → Network, external integrations
+Layer 5: Presentation   → API, user interfaces
+Entry Point             → Application startup and orchestration
+```
+
+**Key Principles:**
+
+1. **Unidirectional Dependencies:**
+   - Lower layers NEVER import from higher layers
+   - Each layer can only depend on layers below it
+   - Foundation layer (Layer 0) has ZERO internal dependencies
+   - This prevents circular dependencies and keeps code testable
+
+2. **Layer Responsibilities:**
+   - **Foundation (Layer 0):** Constants, configuration values, pure type definitions (errors, API types)
+     - No business logic, no external dependencies
+     - Changes here affect all layers, so keep minimal and stable
+
+   - **Utilities (Layer 1):** Reusable tools that don't depend on business logic
+     - Cryptography (encryption, signatures, hashing)
+     - Configuration management
+     - Pure functions that can be used anywhere
+
+   - **Business Logic (Layer 2):** Core domain models
+     - Blockchain structure, blocks, encrypted data
+     - Validation rules, consensus logic
+     - Uses utilities for crypto/hashing but knows nothing about storage or networking
+
+   - **Persistence (Layer 3):** Storage and retrieval
+     - File I/O, database operations
+     - Serialization/deserialization
+     - Uses business models to know what to store
+
+   - **Infrastructure (Layer 4):** External communication
+     - P2P networking, message passing
+     - Can depend on persistence for syncing data
+     - Uses business logic to validate received data
+
+   - **Presentation (Layer 5):** External interfaces
+     - HTTP API, command-line interfaces
+     - Orchestrates all lower layers
+     - Never contains business logic
+
+3. **When Adding New Code:**
+   - **Ask:** "Which layer does this belong to?"
+   - **Check:** "Does this create a circular dependency?" (run tests to verify)
+   - **Validate:** Add new module to dependency tests if it's a top-level module
+   - **Document:** Layer assignment should be obvious from module placement
+
+4. **Circular Dependency Prevention:**
+   - Automated tests detect cycles using depth-first search
+   - Tests run on every commit via pre-commit hooks
+   - If a cycle is detected, the commit is blocked
+   - To fix: move shared code to a lower layer or extract to a new utility module
+
+5. **Magic Numbers and Strings:**
+   - ALL magic values go in the foundation layer (constants module)
+   - Never hardcode timeouts, ports, file paths, cryptographic parameters
+   - Use semantic constant names: `CHECKPOINT_INTERVAL` not `100`
+   - This makes configuration changes safe and centralized
+
+6. **Type Safety:**
+   - Define custom error types in foundation layer
+   - Use `Result<T, E>` everywhere, never panic in library code
+   - Avoid string-based errors; use typed enums
+   - Make invalid states unrepresentable with Rust's type system
+
 **Modularity:**
 - Extract reusable logic into separate functions/modules
 - Keep functions focused on single responsibilities
-- As the codebase grows, split into modules: `crypto`, `consensus`, `p2p`, `storage`, `api`
+- Each module should have a clear, single purpose
 
 **DRY (Don't Repeat Yourself):**
-- Abstract common patterns (e.g., hash calculation, serialization)
+- Abstract common patterns (e.g., CORS headers, response builders)
 - Use traits for shared behavior across types
 - Create helper functions for repeated operations
+- If you copy-paste code more than once, extract it
 
 **Atomic Operations:**
 - Ensure blockchain state changes are atomic (add block + clear pending data together)
 - Use transactions or locks to prevent partial state updates
 - File persistence should be atomic (write to temp file, then rename)
+
+**Visual Documentation:**
+- Module dependency graph auto-generates on every commit
+- Review the graph to spot architectural issues
+- If the graph looks messy, the architecture needs refactoring
 
 ### Blockchain-Specific Principles
 
