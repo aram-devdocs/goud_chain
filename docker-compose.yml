@@ -1,0 +1,65 @@
+services:
+  dashboard:
+    build: ./dashboard
+    container_name: goud_dashboard
+    ports:
+      - "8080:8080"
+    networks:
+      - goud_network
+
+  node1:
+    build: .
+    container_name: goud_node1
+    environment:
+      - NODE_ID=node1
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node2:9000,node3:9000
+    ports:
+      - "8081:8080"
+      - "9001:9000"
+    volumes:
+      - node1_data:/data
+    networks:
+      - goud_network
+
+  node2:
+    build: .
+    container_name: goud_node2
+    environment:
+      - NODE_ID=node2
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node1:9000,node3:9000
+    ports:
+      - "8082:8080"
+      - "9002:9000"
+    volumes:
+      - node2_data:/data
+    networks:
+      - goud_network
+
+  node3:
+    build: .
+    container_name: goud_node3
+    environment:
+      - NODE_ID=node3
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node1:9000,node2:9000
+    ports:
+      - "8083:8080"
+      - "9003:9000"
+    volumes:
+      - node3_data:/data
+    networks:
+      - goud_network
+
+networks:
+  goud_network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:

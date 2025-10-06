@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goud Chain - Encrypted Blockchain</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <div x-data="blockchainApp()" x-init="init()" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gray-800 border-b border-gray-700">
+            <div class="container mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-blue-400">🔗 Goud Chain</h1>
+                        <p class="text-gray-400 text-sm">Encrypted Blockchain PoC</p>
+                    </div>
+                    <button @click="loadData(); loadChain()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Info Banner -->
+        <section class="bg-blue-900/30 border-b border-blue-700">
+            <div class="container mx-auto px-6 py-3">
+                <div class="flex items-center gap-4 text-sm">
+                    <span class="text-blue-400 font-bold">⚡ Instant Blocks</span>
+                    <span class="text-gray-400">|</span>
+                    <span>🔐 AES-256-GCM Encryption</span>
+                    <span class="text-gray-400">|</span>
+                    <span>🎯 Proof of Authority</span>
+                    <span class="text-gray-400">|</span>
+                    <span>⏱️ &lt;1s Block Time</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab Navigation -->
+        <section class="container mx-auto px-6 py-4">
+            <div class="flex gap-4 border-b border-gray-700">
+                <button @click="activeTab = 'submit'"
+                        :class="activeTab === 'submit' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
+                        class="px-4 py-2 border-b-2 transition">
+                    📝 Submit Data
+                </button>
+                <button @click="activeTab = 'data'"
+                        :class="activeTab === 'data' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
+                        class="px-4 py-2 border-b-2 transition">
+                    📦 Encrypted Data
+                </button>
+                <button @click="activeTab = 'blockchain'"
+                        :class="activeTab === 'blockchain' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
+                        class="px-4 py-2 border-b-2 transition">
+                    ⛓️ Blockchain Explorer
+                </button>
+            </div>
+        </section>
+
+        <!-- Submit Data Tab -->
+        <section x-show="activeTab === 'submit'" class="container mx-auto px-6 py-8">
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h2 class="text-2xl font-bold mb-4">Submit Encrypted JSON Data</h2>
+                    <p class="text-gray-400 text-sm mb-6">
+                        Store any JSON data on the blockchain. Your data is encrypted with a PIN and can only be decrypted with the correct PIN.
+                    </p>
+
+                    <div class="space-y-4">
+                        <!-- Label -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">
+                                Label <span class="text-gray-500">(public, visible to all)</span>
+                            </label>
+                            <input x-model="form.label" type="text" placeholder="e.g., 'Customer Database' or 'API Keys'"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">This label helps you identify your data later</p>
+                        </div>
+
+                        <!-- Mode Toggle -->
+                        <div class="flex items-center gap-4 pb-2">
+                            <button @click="inputMode = 'form'; syncFormToJSON()"
+                                    :class="inputMode === 'form' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-700'"
+                                    class="px-4 py-2 rounded transition text-sm">
+                                📋 Form Builder
+                            </button>
+                            <button @click="inputMode = 'json'; syncJSONToForm()"
+                                    :class="inputMode === 'json' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-700'"
+                                    class="px-4 py-2 rounded transition text-sm">
+                                📝 Raw JSON
+                            </button>
+                        </div>
+
+                        <!-- Form Builder Mode -->
+                        <div x-show="inputMode === 'form'" class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-sm font-medium">
+                                    Fields <span class="text-gray-500">(will be encrypted)</span>
+                                </label>
+                                <button @click="addField()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition">
+                                    + Add Field
+                                </button>
+                            </div>
+
+                            <div x-show="formFields.length === 0" class="bg-gray-700/50 rounded p-4 text-center text-gray-400 text-sm">
+                                No fields yet. Click "Add Field" to start building your data.
+                            </div>
+
+                            <div class="space-y-2">
+                                <template x-for="(field, index) in formFields" :key="index">
+                                    <div class="bg-gray-700 rounded p-3 space-y-2">
+                                        <div class="grid grid-cols-12 gap-2">
+                                            <!-- Key -->
+                                            <div class="col-span-4">
+                                                <input x-model="field.key" type="text" placeholder="Key (e.g., api_key)"
+                                                       @input="updateJSONFromForm()"
+                                                       class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            </div>
+
+                                            <!-- Type -->
+                                            <div class="col-span-2">
+                                                <select x-model="field.type" @change="updateJSONFromForm()"
+                                                        class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    <option value="string">Text</option>
+                                                    <option value="number">Number</option>
+                                                    <option value="boolean">Boolean</option>
+                                                </select>
+                                            </div>
+
+                                            <!-- Value -->
+                                            <div class="col-span-5">
+                                                <input x-show="field.type !== 'boolean'" x-model="field.value"
+                                                       :type="field.type === 'number' ? 'number' : 'text'"
+                                                       placeholder="Value"
+                                                       @input="updateJSONFromForm()"
+                                                       class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <select x-show="field.type === 'boolean'" x-model="field.value" @change="updateJSONFromForm()"
+                                                        class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    <option value="true">true</option>
+                                                    <option value="false">false</option>
+                                                </select>
+                                            </div>
+
+                                            <!-- Delete -->
+                                            <div class="col-span-1 flex items-center">
+                                                <button @click="removeField(index)" class="text-red-400 hover:text-red-300 text-sm">
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- JSON Preview -->
+                            <div class="bg-gray-900 rounded p-3 border border-gray-600">
+                                <p class="text-xs text-gray-500 mb-1">JSON Preview:</p>
+                                <pre class="text-xs text-green-400 font-mono" x-text="form.data || '{}'"></pre>
+                            </div>
+                        </div>
+
+                        <!-- Raw JSON Mode -->
+                        <div x-show="inputMode === 'json'">
+                            <label class="block text-sm font-medium mb-2">
+                                JSON Data <span class="text-gray-500">(encrypted, requires PIN to decrypt)</span>
+                            </label>
+                            <textarea x-model="form.data"
+                                      placeholder='{"api_key": "secret123", "database": "prod"}'
+                                      class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 h-48 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      @input="validateJSON()"></textarea>
+                            <div class="flex items-center justify-between mt-1">
+                                <p class="text-xs text-gray-500">Enter any valid JSON object</p>
+                                <span x-show="jsonValid" class="text-xs text-green-400">✓ Valid JSON</span>
+                                <span x-show="!jsonValid && form.data" class="text-xs text-red-400">✗ Invalid JSON</span>
+                            </div>
+                        </div>
+
+                        <!-- PIN -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">
+                                PIN <span class="text-gray-500">(for encryption/decryption)</span>
+                            </label>
+                            <input x-model="form.pin" type="password" placeholder="Enter a PIN"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-yellow-400 mt-1">⚠️ Remember this PIN - you'll need it to decrypt your data!</p>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button @click="submitData()"
+                                :disabled="!isFormValid()"
+                                :class="isFormValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-600 cursor-not-allowed'"
+                                class="w-full px-6 py-3 rounded-lg transition text-lg font-bold">
+                            🔐 Encrypt & Submit to Blockchain
+                        </button>
+                    </div>
+
+                    <!-- Result Message -->
+                    <div x-show="submitResult" class="mt-4 p-4 rounded"
+                         :class="submitResult.includes('✅') ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'">
+                        <p class="text-sm" x-html="submitResult"></p>
+                    </div>
+                </div>
+
+                <!-- How It Works -->
+                <div class="mt-6 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                    <h3 class="font-bold mb-2">How it works:</h3>
+                    <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                        <li>Your JSON data is encrypted with AES-256-GCM using your PIN</li>
+                        <li>The encrypted data is signed with Ed25519</li>
+                        <li>A block is created instantly by the current validator (&lt;1s)</li>
+                        <li>The block is added to the blockchain with Merkle tree verification</li>
+                        <li>Only someone with the correct PIN can decrypt the data</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <!-- Encrypted Data Tab -->
+        <section x-show="activeTab === 'data'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">Encrypted Data Entries</h2>
+
+            <div x-show="allData.length === 0" class="bg-gray-800 rounded-lg p-12 text-center border border-gray-700">
+                <p class="text-gray-400">No encrypted data yet. Submit some data to get started!</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+                <template x-for="item in allData" :key="item.data_id">
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-bold text-blue-400" x-text="item.label"></h3>
+                                <p class="text-xs text-gray-400">
+                                    ID: <code class="text-gray-500" x-text="item.data_id.substring(0, 8) + '...'"></code>
+                                    • Block #<span x-text="item.block_number"></span>
+                                    • Validator: <span x-text="item.validator"></span>
+                                </p>
+                                <p class="text-xs text-gray-500 mt-1" x-text="new Date(item.timestamp * 1000).toLocaleString()"></p>
+                            </div>
+                        </div>
+
+                        <!-- Encrypted Status -->
+                        <div class="bg-gray-700/50 rounded p-3 mb-3">
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="text-yellow-400">🔒 Encrypted</span>
+                                <span class="text-gray-500">|</span>
+                                <span class="text-gray-400">Requires PIN to decrypt</span>
+                            </div>
+                        </div>
+
+                        <!-- Decrypt Section -->
+                        <div x-show="!decryptedData[item.data_id]">
+                            <button @click="decryptData(item.data_id)"
+                                    class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition">
+                                🔓 Decrypt with PIN
+                            </button>
+                        </div>
+
+                        <!-- Decrypted Data -->
+                        <div x-show="decryptedData[item.data_id]" class="bg-green-900/20 border border-green-700 rounded p-4">
+                            <p class="text-green-400 text-sm font-bold mb-2">✅ Decrypted Data:</p>
+                            <pre class="bg-gray-900 rounded p-3 overflow-x-auto text-xs" x-text="JSON.stringify(JSON.parse(decryptedData[item.data_id] || '{}'), null, 2)"></pre>
+                            <button @click="delete decryptedData[item.data_id]"
+                                    class="mt-2 bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-xs transition">
+                                Hide
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+        <!-- Blockchain Explorer Tab -->
+        <section x-show="activeTab === 'blockchain'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">Blockchain Explorer</h2>
+
+            <div class="space-y-4">
+                <template x-for="block in blocks" :key="block.index">
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                        <!-- Block Header -->
+                        <div class="bg-gray-700/50 px-6 py-4 flex items-center justify-between cursor-pointer"
+                             @click="expandedBlock === block.index ? expandedBlock = null : expandedBlock = block.index">
+                            <div>
+                                <h3 class="font-bold text-blue-400">Block #<span x-text="block.index"></span></h3>
+                                <p class="text-xs text-gray-400">
+                                    Validator: <span x-text="block.validator"></span>
+                                    • <span x-text="block.encrypted_data.length"></span> entries
+                                    • <span x-text="new Date(block.timestamp * 1000).toLocaleString()"></span>
+                                </p>
+                            </div>
+                            <button class="text-gray-400">
+                                <span x-show="expandedBlock !== block.index">▼</span>
+                                <span x-show="expandedBlock === block.index">▲</span>
+                            </button>
+                        </div>
+
+                        <!-- Block Details -->
+                        <div x-show="expandedBlock === block.index" class="px-6 py-4 space-y-3">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span class="text-gray-500">Hash:</span>
+                                    <code class="block text-xs text-blue-400 mt-1 break-all" x-text="block.hash"></code>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Previous Hash:</span>
+                                    <code class="block text-xs text-gray-400 mt-1 break-all" x-text="block.previous_hash"></code>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Merkle Root:</span>
+                                    <code class="block text-xs text-gray-400 mt-1 break-all" x-text="block.merkle_root"></code>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Timestamp:</span>
+                                    <code class="block text-xs text-gray-400 mt-1" x-text="block.timestamp"></code>
+                                </div>
+                            </div>
+
+                            <!-- Encrypted Data in Block -->
+                            <div class="mt-4">
+                                <h4 class="text-sm font-bold mb-2">Encrypted Data in this Block:</h4>
+                                <div class="space-y-2">
+                                    <template x-for="data in block.encrypted_data" :key="data.data_id">
+                                        <div class="bg-gray-700/50 rounded p-3 text-sm">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-mono text-blue-400" x-text="data.label"></span>
+                                                <span class="text-gray-500 text-xs">🔒 Encrypted</span>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mt-1">ID: <span x-text="data.data_id.substring(0, 16) + '...'"></span></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function blockchainApp() {
+            return {
+                activeTab: 'submit',
+                inputMode: 'form',
+                allData: [],
+                blocks: [],
+                decryptedData: {},
+                submitResult: '',
+                jsonValid: false,
+                expandedBlock: null,
+                formFields: [],
+                form: {
+                    label: '',
+                    data: '',
+                    pin: ''
+                },
+
+                init() {
+                    this.loadData();
+                    this.loadChain();
+                    setInterval(() => {
+                        this.loadData();
+                        this.loadChain();
+                    }, 5000);
+                },
+
+                validateJSON() {
+                    try {
+                        if (this.form.data.trim()) {
+                            JSON.parse(this.form.data);
+                            this.jsonValid = true;
+                        } else {
+                            this.jsonValid = false;
+                        }
+                    } catch (e) {
+                        this.jsonValid = false;
+                    }
+                },
+
+                addField() {
+                    this.formFields.push({
+                        key: '',
+                        value: '',
+                        type: 'string'
+                    });
+                },
+
+                removeField(index) {
+                    this.formFields.splice(index, 1);
+                    this.updateJSONFromForm();
+                },
+
+                updateJSONFromForm() {
+                    const obj = {};
+                    this.formFields.forEach(field => {
+                        if (field.key) {
+                            let value = field.value;
+                            if (field.type === 'number') {
+                                value = parseFloat(value) || 0;
+                            } else if (field.type === 'boolean') {
+                                value = value === 'true';
+                            }
+                            obj[field.key] = value;
+                        }
+                    });
+                    this.form.data = JSON.stringify(obj, null, 2);
+                    this.validateJSON();
+                },
+
+                syncFormToJSON() {
+                    // When switching to form mode, try to parse existing JSON into form fields
+                    if (this.form.data) {
+                        try {
+                            const obj = JSON.parse(this.form.data);
+                            this.formFields = Object.entries(obj).map(([key, value]) => {
+                                let type = 'string';
+                                if (typeof value === 'number') type = 'number';
+                                else if (typeof value === 'boolean') type = 'boolean';
+
+                                return {
+                                    key: key,
+                                    value: type === 'boolean' ? value.toString() : value,
+                                    type: type
+                                };
+                            });
+                        } catch (e) {
+                            // If JSON is invalid, start fresh
+                            this.formFields = [];
+                        }
+                    }
+                },
+
+                syncJSONToForm() {
+                    // Ensure JSON is in sync when switching to JSON mode
+                    this.validateJSON();
+                },
+
+                isFormValid() {
+                    if (!this.form.label || !this.form.pin) return false;
+
+                    if (this.inputMode === 'form') {
+                        // In form mode, need at least one field with a key
+                        return this.formFields.some(f => f.key.trim() !== '');
+                    } else {
+                        // In JSON mode, need valid JSON
+                        return this.jsonValid;
+                    }
+                },
+
+                async loadData() {
+                    try {
+                        const res = await fetch('http://localhost:8081/data/list');
+                        const data = await res.json();
+                        this.allData = data.data.reverse();
+                    } catch (e) {
+                        console.error('Failed to load data:', e);
+                    }
+                },
+
+                async loadChain() {
+                    try {
+                        const res = await fetch('http://localhost:8081/chain');
+                        const data = await res.json();
+                        this.blocks = data.chain.reverse();
+                    } catch (e) {
+                        console.error('Failed to load blockchain:', e);
+                    }
+                },
+
+                async submitData() {
+                    // Ensure JSON is up to date from form mode
+                    if (this.inputMode === 'form') {
+                        this.updateJSONFromForm();
+                    }
+
+                    if (!this.isFormValid()) {
+                        alert('Please fill in all fields with valid data');
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch('http://localhost:8081/data/submit', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(this.form)
+                        });
+
+                        const data = await res.json();
+                        if (data.error) {
+                            this.submitResult = `❌ ${data.error}`;
+                        } else {
+                            this.submitResult = `✅ Data encrypted and stored on blockchain!<br>
+                                Data ID: <code>${data.data_id.substring(0, 8)}...</code><br>
+                                Block: #${data.block_number}<br>
+                                Status: Encrypted & Immutable`;
+
+                            // Reset form
+                            this.form = {label: '', data: '', pin: ''};
+                            this.formFields = [];
+                            this.jsonValid = false;
+
+                            // Reload data
+                            setTimeout(() => {
+                                this.loadData();
+                                this.loadChain();
+                            }, 1000);
+                        }
+                    } catch (e) {
+                        this.submitResult = `❌ Error: ${e.message}`;
+                    }
+                },
+
+                async decryptData(dataId) {
+                    const pin = prompt('Enter PIN to decrypt:');
+                    if (!pin) return;
+
+                    try {
+                        const res = await fetch('http://localhost:8081/data/decrypt', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({data_id: dataId, pin: pin})
+                        });
+
+                        const data = await res.json();
+                        if (data.error) {
+                            alert(`❌ ${data.error}`);
+                        } else {
+                            this.decryptedData[dataId] = data.decrypted_data;
+                        }
+                    } catch (e) {
+                        alert(`❌ Error: ${e.message}`);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

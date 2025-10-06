@@ -1,0 +1,222 @@
+#!/bin/bash
+
+set -e
+
+COMMAND=${1:-up}
+shift || true
+
+case "$COMMAND" in
+  up|start)
+    echo "🚀 Starting Goud Chain network with dashboard..."
+    echo ""
+    echo "🌐 Dashboard: http://localhost:8080"
+    echo "📡 Node 1: http://localhost:8081"
+    echo "📡 Node 2: http://localhost:8082"
+    echo "📡 Node 3: http://localhost:8083"
+    echo ""
+    docker compose up --build
+    ;;
+
+  build)
+    echo "🔨 Building Docker images..."
+    docker compose build
+    ;;
+
+  down|stop)
+    echo "🛑 Stopping Goud Chain network..."
+    docker compose down
+    ;;
+
+  clean)
+    echo "🧹 Cleaning up containers, images, and volumes..."
+    docker compose down --rmi all --volumes --remove-orphans
+    ;;
+
+  logs)
+    NODE=${1:-}
+    if [ -z "$NODE" ]; then
+      echo "📋 Showing logs from all nodes..."
+      docker compose logs -f
+    else
+      echo "📋 Showing logs from $NODE..."
+      docker compose logs -f "$NODE"
+    fi
+    ;;
+
+  status)
+    echo "📊 Network Status"
+    echo "================="
+    echo ""
+
+    for node in node1 node2 node3; do
+      port=$((8080 + ${node:4}))
+      echo "🔗 $node (http://localhost:$port)"
+
+      if curl -s "http://localhost:$port/chain" > /dev/null 2>&1; then
+        CHAIN_LENGTH=$(curl -s "http://localhost:$port/chain" | grep -o '"index"' | wc -l | xargs)
+        PEERS=$(curl -s "http://localhost:$port/peers" | grep -o '"count":[0-9]*' | grep -o '[0-9]*')
+        echo "   ✅ Online | Chain Length: $CHAIN_LENGTH | Peers: $PEERS"
+      else
+        echo "   ❌ Offline"
+      fi
+      echo ""
+    done
+    ;;
+
+  mine)
+    NODE=${1:-node1}
+    DATA=${2:-"Transaction data"}
+
+    PORT=8081
+    case "$NODE" in
+      node1) PORT=8081 ;;
+      node2) PORT=8082 ;;
+      node3) PORT=8083 ;;
+      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+    esac
+
+    echo "⛏️  Mining block on $NODE with data: \"$DATA\""
+    curl -X POST "http://localhost:$PORT/mine" \
+      -H "Content-Type: application/json" \
+      -d "{\"data\": \"$DATA\"}" | jq .
+    ;;
+
+  chain)
+    NODE=${1:-node1}
+
+    PORT=8081
+    case "$NODE" in
+      node1) PORT=8081 ;;
+      node2) PORT=8082 ;;
+      node3) PORT=8083 ;;
+      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+    esac
+
+    echo "📊 Blockchain from $NODE:"
+    curl -s "http://localhost:$PORT/chain" | jq .
+    ;;
+
+  sync)
+    NODE=${1:-node1}
+
+    PORT=8081
+    case "$NODE" in
+      node1) PORT=8081 ;;
+      node2) PORT=8082 ;;
+      node3) PORT=8083 ;;
+      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+    esac
+
+    echo "🔄 Syncing $NODE with peers..."
+    curl -s "http://localhost:$PORT/sync" | jq .
+    ;;
+
+  peers)
+    NODE=${1:-node1}
+
+    PORT=8081
+    case "$NODE" in
+      node1) PORT=8081 ;;
+      node2) PORT=8082 ;;
+      node3) PORT=8083 ;;
+      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+    esac
+
+    echo "🌐 Peers of $NODE:"
+    curl -s "http://localhost:$PORT/peers" | jq .
+    ;;
+
+  test)
+    echo "🧪 Running tests..."
+    cargo test
+    ;;
+
+  run)
+    echo "▶️  Running single node locally (without Docker)..."
+    cargo run
+    ;;
+
+  check)
+    echo "✅ Checking code..."
+    cargo check
+    ;;
+
+  fmt)
+    echo "🎨 Formatting code..."
+    cargo fmt
+    ;;
+
+  demo)
+    echo "🎬 Running demo scenario..."
+    echo ""
+
+    echo "1️⃣  Mining block on node1..."
+    curl -X POST "http://localhost:8081/mine" \
+      -H "Content-Type: application/json" \
+      -d '{"data": "Alice sends 10 coins to Bob"}' 2>/dev/null | jq .
+
+    echo ""
+    echo "2️⃣  Waiting for propagation..."
+    sleep 2
+
+    echo ""
+    echo "3️⃣  Mining block on node2..."
+    curl -X POST "http://localhost:8082/mine" \
+      -H "Content-Type: application/json" \
+      -d '{"data": "Bob sends 5 coins to Charlie"}' 2>/dev/null | jq .
+
+    echo ""
+    echo "4️⃣  Checking all node chains..."
+    sleep 2
+
+    for node in node1 node2 node3; do
+      port=$((8080 + ${node:4}))
+      echo ""
+      echo "📊 $node chain length:"
+      curl -s "http://localhost:$port/chain" | jq '.chain | length'
+    done
+    ;;
+
+  help|--help|-h)
+    echo "Goud Chain - Distributed Blockchain Network"
+    echo ""
+    echo "Usage: ./dev [command] [args]"
+    echo ""
+    echo "Network Commands:"
+    echo "  (no args)           Start the 3-node network"
+    echo "  up, start           Start the network"
+    echo "  build               Build Docker images"
+    echo "  down, stop          Stop the network"
+    echo "  clean               Remove all containers, images, and volumes"
+    echo "  logs [node]         Show logs (optional: node1, node2, node3)"
+    echo "  status              Show status of all nodes"
+    echo ""
+    echo "Blockchain Commands:"
+    echo "  mine [node] [data]  Mine a block (default: node1)"
+    echo "  chain [node]        View blockchain (default: node1)"
+    echo "  sync [node]         Sync with peers (default: node1)"
+    echo "  peers [node]        View peers (default: node1)"
+    echo ""
+    echo "Development Commands:"
+    echo "  test                Run cargo tests"
+    echo "  run                 Run single node locally"
+    echo "  check               Check code with cargo"
+    echo "  fmt                 Format code"
+    echo ""
+    echo "Demo:"
+    echo "  demo                Run a demo scenario"
+    echo ""
+    echo "Examples:"
+    echo "  ./dev                              # Start network"
+    echo "  ./dev mine node1 \"Hello World\"     # Mine on node1"
+    echo "  ./dev chain node2                  # View node2's chain"
+    echo "  ./dev status                       # Check all nodes"
+    echo "  ./dev logs node1                   # View node1 logs"
+    ;;
+
+  *)
+    echo "❌ Unknown command: $COMMAND"
+    echo "Run './dev help' for available commands"
+    exit 1
+    ;;
+esac

@@ -1,0 +1,50 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.claude/
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-compose.override.yml
+
+# Node (for dashboard)
+dashboard/node_modules/
+dashboard/package-lock.json
+dashboard/dist/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Blockchain data
+blockchain_data/
+wallets/
+*.wallet
+
+# OS
+.DS_Store
+Thumbs.db
