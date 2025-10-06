@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Rust checks
+echo "Running Rust formatting..."
+cargo fmt
+
+# Re-add any formatted files that were staged
+git diff --name-only --cached | grep '\.rs$' | xargs -r git add
+
+echo "Running Clippy..."
+cargo clippy -- -D warnings || {
+    echo "Error: Clippy found issues."
+    exit 1
+}
+
+echo "Running Rust tests..."
+cargo test || {
+    echo "Error: Tests failed."
+    exit 1
+}
+
+echo "Building Rust project..."
+cargo build || {
+    echo "Error: Build failed."
+    exit 1
+}
+
+# Dashboard checks
+echo "Running dashboard tests..."
+./dashboard/test.sh || {
+    echo "Error: Dashboard tests failed."
+    exit 1
+}
+
+echo "All pre-commit checks passed!"

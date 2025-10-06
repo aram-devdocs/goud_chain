@@ -21,3 +21,6 @@ aes-gcm = "0.10"  # For PIN-based encryption
 # Pin to avoid edition2024 requirement
 [dependencies.base64ct]
 version = "=1.6.0"
+
+[dev-dependencies]
+cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
