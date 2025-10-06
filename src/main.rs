@@ -537,21 +537,6 @@ impl P2PNode {
         }
     }
 
-    fn broadcast_encrypted_data(&self, data: &EncryptedData) {
-        let message = P2PMessage::NewData(data.clone());
-        let peers = self.peers.lock().unwrap().clone();
-
-        for peer in peers {
-            let msg = message.clone();
-            thread::spawn(move || {
-                if let Ok(encoded) = bincode::serialize(&msg) {
-                    if let Ok(mut stream) = TcpStream::connect(&peer) {
-                        stream.write_all(&encoded).ok();
-                    }
-                }
-            });
-        }
-    }
 
     fn request_chain_from_peers(&self) {
         let peers = self.peers.lock().unwrap().clone();

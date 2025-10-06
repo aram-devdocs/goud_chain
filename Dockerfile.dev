@@ -1,0 +1,13 @@
+# Development Dockerfile with hot reload support
+FROM rust:1.83-slim
+
+WORKDIR /app
+
+# Install cargo-watch for hot reload
+RUN cargo install cargo-watch
+
+# Expose HTTP and P2P ports
+EXPOSE 8080 9000
+
+# Use cargo-watch to auto-recompile and restart on changes
+CMD ["cargo", "watch", "-x", "run"]

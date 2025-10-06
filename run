@@ -2,12 +2,12 @@
 
 set -e
 
-COMMAND=${1:-up}
+COMMAND=${1:-start}
 shift || true
 
 case "$COMMAND" in
-  up|start)
-    echo "🚀 Starting Goud Chain network with dashboard..."
+  start)
+    echo "🚀 Starting Goud Chain network (production mode)..."
     echo ""
     echo "🌐 Dashboard: http://localhost:8080"
     echo "📡 Node 1: http://localhost:8081"
@@ -15,6 +15,21 @@ case "$COMMAND" in
     echo "📡 Node 3: http://localhost:8083"
     echo ""
     docker compose up --build
+    ;;
+
+  dev)
+    echo "🔥 Starting Goud Chain network (development mode with hot reload)..."
+    echo ""
+    echo "🌐 Dashboard: http://localhost:8080"
+    echo "📡 Node 1: http://localhost:8081"
+    echo "📡 Node 2: http://localhost:8082"
+    echo "📡 Node 3: http://localhost:8083"
+    echo ""
+    echo "✨ Hot reload enabled:"
+    echo "   - Dashboard: Changes to dashboard/ will auto-reload"
+    echo "   - Nodes: Changes to src/ will auto-recompile and restart"
+    echo ""
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
     ;;
 
   build)
@@ -180,11 +195,12 @@ case "$COMMAND" in
   help|--help|-h)
     echo "Goud Chain - Distributed Blockchain Network"
     echo ""
-    echo "Usage: ./dev [command] [args]"
+    echo "Usage: ./run [command] [args]"
     echo ""
     echo "Network Commands:"
-    echo "  (no args)           Start the 3-node network"
-    echo "  up, start           Start the network"
+    echo "  (no args)           Start the 3-node network (production)"
+    echo "  start               Start the network (production mode)"
+    echo "  dev                 Start the network (development mode with hot reload)"
     echo "  build               Build Docker images"
     echo "  down, stop          Stop the network"
     echo "  clean               Remove all containers, images, and volumes"
@@ -207,16 +223,17 @@ case "$COMMAND" in
     echo "  demo                Run a demo scenario"
     echo ""
     echo "Examples:"
-    echo "  ./dev                              # Start network"
-    echo "  ./dev mine node1 \"Hello World\"     # Mine on node1"
-    echo "  ./dev chain node2                  # View node2's chain"
-    echo "  ./dev status                       # Check all nodes"
-    echo "  ./dev logs node1                   # View node1 logs"
+    echo "  ./run                              # Start network (production)"
+    echo "  ./run dev                          # Start with hot reload"
+    echo "  ./run mine node1 \"Hello World\"     # Mine on node1"
+    echo "  ./run chain node2                  # View node2's chain"
+    echo "  ./run status                       # Check all nodes"
+    echo "  ./run logs node1                   # View node1 logs"
     ;;
 
   *)
     echo "❌ Unknown command: $COMMAND"
-    echo "Run './dev help' for available commands"
+    echo "Run './run help' for available commands"
     exit 1
     ;;
 esac

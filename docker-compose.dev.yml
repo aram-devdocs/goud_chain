@@ -1,0 +1,51 @@
+# Development override for hot reload
+services:
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    command: npm run dev
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./src:/app/src
+      - ./Cargo.toml:/app/Cargo.toml
+      - ./Cargo.lock:/app/Cargo.lock
+      - node1_cargo_cache:/usr/local/cargo/registry
+      - node1_target_cache:/app/target
+
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./src:/app/src
+      - ./Cargo.toml:/app/Cargo.toml
+      - ./Cargo.lock:/app/Cargo.lock
+      - node2_cargo_cache:/usr/local/cargo/registry
+      - node2_target_cache:/app/target
+
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./src:/app/src
+      - ./Cargo.toml:/app/Cargo.toml
+      - ./Cargo.lock:/app/Cargo.lock
+      - node3_cargo_cache:/usr/local/cargo/registry
+      - node3_target_cache:/app/target
+
+volumes:
+  node1_cargo_cache:
+  node1_target_cache:
+  node2_cargo_cache:
+  node2_target_cache:
+  node3_cargo_cache:
+  node3_target_cache:

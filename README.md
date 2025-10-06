@@ -14,7 +14,8 @@ Encrypted blockchain with PIN-based access control. Store any JSON data on an im
 ## Quick Start
 
 ```bash
-./dev              # Start 3-node network
+./run              # Start 3-node network (production)
+./run dev          # Start with hot reload (development)
 ```
 
 Open [http://localhost:8080](http://localhost:8080)
@@ -182,13 +183,20 @@ cargo clippy
 cargo run
 ```
 
-**Docker:**
+**Docker Commands:**
 ```bash
-./dev              # Start network
-./dev logs node1   # View logs
-./dev stop         # Stop network
-./dev clean        # Remove data
+./run start        # Production mode
+./run dev          # Development mode with hot reload
+./run logs node1   # View logs
+./run stop         # Stop network
+./run clean        # Remove data
+./run help         # Show all commands
 ```
+
+**Hot Reload (Dev Mode):**
+- Dashboard: Changes to `dashboard/index.html` auto-reload
+- Blockchain: Changes to `src/` auto-recompile and restart
+- Uses `nodemon` for dashboard, `cargo-watch` for Rust code
 
 ## Project Structure
 
@@ -197,10 +205,15 @@ goud_chain/
 ├── src/
 │   └── main.rs              # Blockchain core (~850 lines)
 ├── dashboard/
-│   └── index.html           # Web UI (~520 lines)
-├── docker-compose.yml       # 3-node network
-├── Dockerfile               # Rust build
-├── dev                      # Dev script
+│   ├── index.html           # Web UI (~520 lines)
+│   ├── server.js            # Dashboard server
+│   ├── package.json         # Node dependencies
+│   └── Dockerfile           # Dashboard image
+├── docker-compose.yml       # 3-node network (production)
+├── docker-compose.dev.yml   # Hot reload overrides (development)
+├── Dockerfile               # Rust build (production)
+├── Dockerfile.dev           # Rust build with cargo-watch (development)
+├── run                      # CLI script
 └── README.md                # This file
 ```
 
