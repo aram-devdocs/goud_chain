@@ -66,6 +66,22 @@ resource "oci_core_security_list" "blockchain" {
     }
   }
 
+  # HTTP (port 80) - for Cloudflare origin requests
+  dynamic "ingress_security_rules" {
+    for_each = var.allowed_http_cidrs
+    content {
+      protocol    = "6" # TCP
+      source      = ingress_security_rules.value
+      stateless   = false
+      description = "Allow HTTP from ${ingress_security_rules.value}"
+
+      tcp_options {
+        min = 80
+        max = 80
+      }
+    }
+  }
+
   # HTTP API - Load Balancer (port 8080)
   dynamic "ingress_security_rules" {
     for_each = var.allowed_http_cidrs
