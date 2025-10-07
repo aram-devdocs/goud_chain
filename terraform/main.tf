@@ -28,6 +28,10 @@ provider "oci" {
   region           = var.region
 }
 
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
 # Use compartment OCID if provided, otherwise use tenancy root
 locals {
   compartment_id = var.compartment_ocid != "" ? var.compartment_ocid : var.tenancy_ocid
@@ -86,6 +90,26 @@ module "storage" {
   instance_ids          = module.compute.instance_ids
   backup_retention_days = var.backup_retention_days
   tags                  = local.common_tags
+
+  depends_on = [module.compute]
+}
+
+# DNS management via Cloudflare
+module "dns" {
+  source = "./modules/dns"
+
+  cloudflare_zone_id      = var.cloudflare_zone_id
+  domain_name             = var.domain_name
+  environment             = var.environment
+  enable_dns              = var.enable_dns
+  enable_cloudflare_proxy = var.enable_cloudflare_proxy
+  enable_node_dns         = var.enable_node_dns
+  load_balancer_ip        = length(module.compute.public_ips) > 0 ? module.compute.public_ips[0] : ""
+  node_public_ips         = module.compute.public_ips
+  node_count              = var.blockchain_node_count
+  dashboard_subdomain     = var.dashboard_subdomain
+  api_subdomain           = var.api_subdomain
+  tags                    = local.common_tags
 
   depends_on = [module.compute]
 }

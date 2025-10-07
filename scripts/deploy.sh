@@ -32,7 +32,10 @@ terraform apply -parallelism=1 tfplan
 
 # Get outputs
 LOAD_BALANCER_IP=$(terraform output -raw load_balancer_public_ip 2>/dev/null || echo "")
+LOAD_BALANCER_URL=$(terraform output -raw load_balancer_url 2>/dev/null || echo "")
+DASHBOARD_URL=$(terraform output -raw dashboard_url 2>/dev/null || echo "")
 NODE_IPS=$(terraform output -json node_public_ips 2>/dev/null | jq -r '.[]' || echo "")
+DNS_ENABLED=$(terraform output -json dns_configuration 2>/dev/null | jq -r '.enabled' || echo "false")
 
 if [ -z "$LOAD_BALANCER_IP" ]; then
     echo -e "${RED}Error: Could not get load balancer IP${NC}"
@@ -41,6 +44,12 @@ fi
 
 echo -e "${GREEN}✅ Infrastructure deployed${NC}"
 echo "Load Balancer IP: $LOAD_BALANCER_IP"
+
+if [ "$DNS_ENABLED" == "true" ]; then
+    API_FQDN=$(terraform output -json dns_configuration 2>/dev/null | jq -r '.api_fqdn' || echo "")
+    DASHBOARD_FQDN=$(terraform output -json dns_configuration 2>/dev/null | jq -r '.dashboard_fqdn' || echo "")
+    echo "DNS Enabled: API at $API_FQDN, Dashboard at $DASHBOARD_FQDN"
+fi
 echo ""
 
 cd ../../..
@@ -210,9 +219,30 @@ echo ""
 echo -e "${GREEN}=== Deployment Complete ===${NC}"
 echo ""
 echo "📊 Access your blockchain:"
-echo "  Load Balancer: http://$LOAD_BALANCER_IP:8080"
-echo "  Dashboard:     http://$LOAD_BALANCER_IP:3000"
+
+if [ "$DNS_ENABLED" == "true" ] && [ -n "$LOAD_BALANCER_URL" ] && [ -n "$DASHBOARD_URL" ]; then
+    echo "  API Endpoint:  $LOAD_BALANCER_URL"
+    echo "  Dashboard:     $DASHBOARD_URL"
+    echo ""
+    echo "  (Direct IP):   http://$LOAD_BALANCER_IP:8080 (API)"
+    echo "  (Direct IP):   http://$LOAD_BALANCER_IP:3000 (Dashboard)"
+    echo ""
+    echo "⚠️  DNS Configuration Required:"
+    echo "  1. Go to Cloudflare Dashboard → goudchain.com → SSL/TLS → Overview"
+    echo "  2. Set SSL/TLS encryption mode to 'Flexible'"
+    echo "  3. (Optional) Enable 'Always Use HTTPS' under SSL/TLS → Edge Certificates"
+    echo "  4. Wait 2-5 minutes for DNS propagation and SSL certificate issuance"
+else
+    echo "  Load Balancer: http://$LOAD_BALANCER_IP:8080"
+    echo "  Dashboard:     http://$LOAD_BALANCER_IP:3000"
+fi
+
 echo ""
 echo "🔍 Health checks:"
-echo "  curl http://$LOAD_BALANCER_IP:8080/health"
-echo "  curl http://$LOAD_BALANCER_IP:8080/chain"
+if [ "$DNS_ENABLED" == "true" ] && [ -n "$LOAD_BALANCER_URL" ]; then
+    echo "  curl $LOAD_BALANCER_URL/health"
+    echo "  curl $LOAD_BALANCER_URL/chain"
+else
+    echo "  curl http://$LOAD_BALANCER_IP:8080/health"
+    echo "  curl http://$LOAD_BALANCER_IP:8080/chain"
+fi

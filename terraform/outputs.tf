@@ -8,12 +8,12 @@ output "load_balancer_public_ip" {
 
 output "load_balancer_url" {
   description = "Load balancer API URL"
-  value       = length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:8080" : null
+  value       = var.enable_dns && module.dns.api_url != null ? module.dns.api_url : (length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:8080" : null)
 }
 
 output "dashboard_url" {
   description = "Dashboard URL"
-  value       = length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:3000" : null
+  value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : (length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:3000" : null)
 }
 
 output "node_public_ips" {
@@ -66,9 +66,30 @@ output "deployment_summary" {
 
 output "health_check_commands" {
   description = "Commands to check health of deployed services"
-  value = length(module.compute.public_ips) > 0 ? {
+  value = length(module.compute.public_ips) > 0 ? (var.enable_dns && module.dns.api_url != null ? {
+    load_balancer = "curl ${module.dns.api_url}/lb/health"
+    node_health   = "curl ${module.dns.api_url}/health"
+    blockchain    = "curl ${module.dns.api_url}/chain"
+  } : {
     load_balancer = "curl http://${module.compute.public_ips[0]}:8080/lb/health"
     node_health   = "curl http://${module.compute.public_ips[0]}:8080/health"
     blockchain    = "curl http://${module.compute.public_ips[0]}:8080/chain"
-  } : null
+  }) : null
+}
+
+output "dns_configuration" {
+  description = "DNS configuration details"
+  value = var.enable_dns ? {
+    enabled           = true
+    domain_name       = var.domain_name
+    dashboard_fqdn    = module.dns.dashboard_fqdn
+    api_fqdn          = module.dns.api_fqdn
+    cloudflare_proxy  = var.enable_cloudflare_proxy
+    dns_records       = module.dns.dns_records_created
+    https_enabled     = var.enable_cloudflare_proxy
+    manual_steps_required = var.enable_cloudflare_proxy ? "Configure Cloudflare SSL/TLS mode to 'Flexible' in dashboard" : "N/A"
+  } : {
+    enabled = false
+    message = "DNS management is disabled. Set enable_dns = true to enable."
+  }
 }

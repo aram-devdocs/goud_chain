@@ -81,3 +81,37 @@ variable "backup_retention_days" {
 variable "tags" {
   type = map(string)
 }
+
+# DNS and domain configuration
+variable "enable_dns" {
+  type = bool
+}
+
+variable "domain_name" {
+  type = string
+}
+
+variable "cloudflare_api_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "cloudflare_zone_id" {
+  type = string
+}
+
+variable "enable_cloudflare_proxy" {
+  type = bool
+}
+
+variable "enable_node_dns" {
+  type = bool
+}
+
+variable "dashboard_subdomain" {
+  type = string
+}
+
+variable "api_subdomain" {
+  type = string
+}

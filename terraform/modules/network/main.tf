@@ -98,6 +98,22 @@ resource "oci_core_security_list" "blockchain" {
     }
   }
 
+  # HTTPS (port 443) - for Cloudflare or direct HTTPS access
+  dynamic "ingress_security_rules" {
+    for_each = var.allowed_http_cidrs
+    content {
+      protocol    = "6" # TCP
+      source      = ingress_security_rules.value
+      stateless   = false
+      description = "Allow HTTPS from ${ingress_security_rules.value}"
+
+      tcp_options {
+        min = 443
+        max = 443
+      }
+    }
+  }
+
   # Individual node debugging ports (8081-8083) - optional
   ingress_security_rules {
     protocol    = "6" # TCP

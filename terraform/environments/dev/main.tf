@@ -29,6 +29,16 @@ module "goud_chain" {
   enable_redis          = var.enable_redis
   backup_retention_days = var.backup_retention_days
   tags                  = var.tags
+
+  # DNS configuration
+  enable_dns              = var.enable_dns
+  domain_name             = var.domain_name
+  cloudflare_api_token    = var.cloudflare_api_token
+  cloudflare_zone_id      = var.cloudflare_zone_id
+  enable_cloudflare_proxy = var.enable_cloudflare_proxy
+  enable_node_dns         = var.enable_node_dns
+  dashboard_subdomain     = var.dashboard_subdomain
+  api_subdomain           = var.api_subdomain
 }
 
 # Re-export all outputs

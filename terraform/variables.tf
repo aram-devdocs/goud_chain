@@ -143,3 +143,53 @@ variable "tags" {
     Repository = "https://github.com/your-repo/goud_chain"
   }
 }
+
+# DNS and domain configuration
+variable "enable_dns" {
+  description = "Enable DNS management via Cloudflare"
+  type        = bool
+  default     = false
+}
+
+variable "domain_name" {
+  description = "Base domain name (e.g., goudchain.com)"
+  type        = string
+  default     = "goudchain.com"
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token with DNS edit permissions"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "cloudflare_zone_id" {
+  description = "Cloudflare Zone ID for the domain"
+  type        = string
+  default     = ""
+}
+
+variable "enable_cloudflare_proxy" {
+  description = "Enable Cloudflare proxy for CDN and HTTPS"
+  type        = bool
+  default     = true
+}
+
+variable "enable_node_dns" {
+  description = "Create DNS records for individual nodes (for debugging)"
+  type        = bool
+  default     = false
+}
+
+variable "dashboard_subdomain" {
+  description = "Subdomain for dashboard (will be prefixed with environment for non-prod)"
+  type        = string
+  default     = "dashboard"
+}
+
+variable "api_subdomain" {
+  description = "Subdomain for API (will be prefixed with environment for non-prod)"
+  type        = string
+  default     = "api"
+}
