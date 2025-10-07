@@ -80,16 +80,24 @@ output "health_check_commands" {
 output "dns_configuration" {
   description = "DNS configuration details"
   value = var.enable_dns ? {
-    enabled           = true
-    domain_name       = var.domain_name
-    dashboard_fqdn    = module.dns.dashboard_fqdn
-    api_fqdn          = module.dns.api_fqdn
-    cloudflare_proxy  = var.enable_cloudflare_proxy
-    dns_records       = module.dns.dns_records_created
-    https_enabled     = var.enable_cloudflare_proxy
+    enabled               = true
+    domain_name           = var.domain_name
+    dashboard_fqdn        = module.dns.dashboard_fqdn
+    api_fqdn              = module.dns.api_fqdn
+    cloudflare_proxy      = var.enable_cloudflare_proxy
+    dns_records           = module.dns.dns_records_created
+    https_enabled         = var.enable_cloudflare_proxy
     manual_steps_required = var.enable_cloudflare_proxy ? "Configure Cloudflare SSL/TLS mode to 'Flexible' in dashboard" : "N/A"
+    message               = "DNS is enabled and configured"
   } : {
-    enabled = false
-    message = "DNS management is disabled. Set enable_dns = true to enable."
+    enabled               = false
+    domain_name           = null
+    dashboard_fqdn        = null
+    api_fqdn              = null
+    cloudflare_proxy      = false
+    dns_records           = null
+    https_enabled         = false
+    manual_steps_required = null
+    message               = "DNS management is disabled. Set enable_dns = true to enable."
   }
 }

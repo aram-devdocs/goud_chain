@@ -16,6 +16,14 @@ resource "oci_core_volume" "blockchain_data" {
       Purpose    = "blockchain-data"
     }
   )
+
+  lifecycle {
+    prevent_destroy = true # Prevent accidental deletion of blockchain data
+    ignore_changes = [
+      availability_domain, # Ignore AZ recalculation (prevents volume replacement)
+      defined_tags,        # Ignore Oracle-managed tags
+    ]
+  }
 }
 
 # Attach block volumes to instances

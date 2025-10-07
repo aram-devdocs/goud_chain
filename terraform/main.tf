@@ -9,6 +9,10 @@ terraform {
       source  = "oracle/oci"
       version = "~> 5.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
   }
 
   # Optional: Configure remote backend for state management

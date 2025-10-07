@@ -9,7 +9,9 @@ services:
     image: nginx:alpine
     container_name: goud_nginx_lb
     ports:
-      - "8080:8080"
+      - "80:80"      # For Cloudflare HTTPS proxy
+      - "8080:8080"  # For direct IP access
+      - "3000:3000"  # For dashboard direct access
     volumes:
       - ./nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -42,12 +44,8 @@ services:
   dashboard:
     build: ./dashboard
     container_name: goud_dashboard
-    ports:
-      - "3000:8080"
     networks:
       - goud_network
-    depends_on:
-      - nginx
     restart: unless-stopped
     deploy:
       resources:

@@ -25,7 +25,18 @@ if [ ! -f "terraform.tfvars" ]; then
 fi
 
 terraform init
+
+# Validate configuration before planning
+echo "Validating Terraform configuration..."
+if ! terraform validate; then
+    echo -e "${RED}Error: Terraform validation failed${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Terraform configuration is valid${NC}"
+echo ""
+
 terraform plan -out=tfplan
+
 # Use -parallelism=1 to avoid OCI volume attachment race conditions
 # See: https://github.com/oracle/terraform-provider-oci/issues/73
 terraform apply -parallelism=1 tfplan

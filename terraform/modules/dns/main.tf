@@ -15,7 +15,7 @@ resource "cloudflare_record" "dashboard" {
 
   zone_id = var.cloudflare_zone_id
   name    = var.environment == "production" ? var.dashboard_subdomain : "${var.environment}-${var.dashboard_subdomain}"
-  value   = var.load_balancer_ip
+  content = var.load_balancer_ip
   type    = "A"
   ttl     = 1 # Auto TTL when proxied
   proxied = var.enable_cloudflare_proxy
@@ -29,7 +29,7 @@ resource "cloudflare_record" "api" {
 
   zone_id = var.cloudflare_zone_id
   name    = var.environment == "production" ? var.api_subdomain : "${var.environment}-${var.api_subdomain}"
-  value   = var.load_balancer_ip
+  content = var.load_balancer_ip
   type    = "A"
   ttl     = 1 # Auto TTL when proxied
   proxied = var.enable_cloudflare_proxy
@@ -43,7 +43,7 @@ resource "cloudflare_record" "nodes" {
 
   zone_id = var.cloudflare_zone_id
   name    = var.environment == "production" ? "node${count.index + 1}" : "${var.environment}-node${count.index + 1}"
-  value   = var.node_public_ips[count.index]
+  content = var.node_public_ips[count.index]
   type    = "A"
   ttl     = 300 # 5 minutes
   proxied = false # Don't proxy node debugging endpoints
