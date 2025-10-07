@@ -256,3 +256,134 @@ This is a proof-of-concept, so prioritize:
 - **Flexibility over optimization** - premature optimization adds rigidity
 
 Expect significant refactoring as the project evolves. Keep code modular and well-tested to enable rapid iteration.
+
+## DevOps & Infrastructure
+
+### Load Balancer Architecture
+
+The system uses a **reverse proxy load balancer** as the single entry point for all API requests. This provides:
+
+**High Availability:**
+- Automatic failover when nodes become unhealthy
+- Health checks monitor node responsiveness
+- No single point of failure (nodes operate independently)
+
+**Performance Optimization:**
+- **Read operations** use round-robin distribution to balance load evenly
+- **Write operations** use least-connections routing to avoid overwhelming nodes
+- Connection pooling reduces TCP handshake overhead
+- Appropriate cache headers for blockchain data (short TTL due to eventual consistency)
+
+**Operational Benefits:**
+- Single endpoint simplifies client configuration
+- Transparent node maintenance (take nodes offline without API downtime)
+- Centralized logging and metrics
+- Easy to add/remove nodes without client changes
+
+### Deployment Strategy
+
+**Container Orchestration:**
+- All services run in isolated containers
+- Internal network for inter-node P2P communication
+- Only load balancer and dashboard exposed externally
+- Persistent volumes for blockchain data
+
+**Scaling Approach:**
+- **Horizontal scaling** - Add blockchain nodes to the upstream pool
+- **Vertical scaling** - Increase container resources (CPU/memory)
+- P2P peer discovery uses environment variables (configurable at runtime)
+
+**Production Hardening:**
+- Remove direct node access (only load balancer should be public)
+- Enable TLS/HTTPS at load balancer termination
+- Implement rate limiting to prevent abuse
+- Add authentication layer for write operations
+- Use secrets management for cryptographic keys
+- Configure resource limits and health check intervals
+
+### Infrastructure as Code
+
+The system is designed to be **cloud-native** and **Terraform-ready**:
+
+**AWS Deployment Pattern:**
+- Application Load Balancer (ALB) or Network Load Balancer (NLB)
+- ECS Fargate tasks for blockchain nodes (stateless, scalable)
+- Elastic File System (EFS) for persistent blockchain storage
+- CloudWatch for logs and metrics
+- Secrets Manager for cryptographic material
+
+**Key Design Decisions:**
+- **Stateless nodes** - Blockchain state persists to shared storage
+- **Service discovery** - Load balancer handles routing, not service mesh
+- **Health checks** - Both load balancer and application-level health endpoints
+- **Observability** - Structured logging, metrics export, distributed tracing ready
+
+### Monitoring & Observability
+
+**Health Check Strategy:**
+- **Load balancer health**: Checks if reverse proxy is responsive
+- **Node health**: Checks blockchain state (chain length, peer count, node ID)
+- **Passive health checks**: Mark nodes unhealthy after failed requests
+- **Active health checks**: Periodic probes to health endpoint
+
+**Metrics to Monitor:**
+- Load balancer: Request rate, error rate, connection count, upstream latency
+- Blockchain nodes: Chain length, block creation time, peer count, pending transactions
+- System: CPU, memory, disk I/O, network throughput
+
+**Operational Commands:**
+- Check overall system status (load balancer + all nodes)
+- Get detailed load balancer statistics
+- View logs from specific services
+- Gracefully stop/start individual nodes
+
+### Blockchain-Specific DevOps Considerations
+
+**State Management:**
+- Blockchain data is **append-only** and **immutable**
+- Nodes synchronize via P2P gossip protocol
+- Longest valid chain wins (eventual consistency)
+- Checkpoints prevent deep chain reorganizations
+
+**Consensus Coordination:**
+- Proof of Authority uses deterministic validator rotation
+- Load balancer routing doesn't interfere with consensus
+- Write operations can go to any node (PoA validator creates block)
+- P2P network handles block propagation independently
+
+**Backup & Recovery:**
+- Blockchain state stored in structured files (simple backup)
+- Nodes can resync from peers if data is lost
+- Genesis block is deterministic (always reconstructable)
+- Consider periodic snapshots for faster recovery
+
+**Network Partitions:**
+- Nodes continue operating independently during partitions
+- Chain sync occurs when partition heals
+- Checkpoints provide safety against long-range attacks
+- Monitor peer count to detect isolation
+
+### Security Architecture
+
+**Network Segmentation:**
+- Public-facing: Load balancer, Dashboard
+- Internal-only: P2P communication between nodes
+- Debug endpoints: Individual node APIs (can be disabled in production)
+
+**Attack Surface Reduction:**
+- Load balancer performs input validation and rate limiting
+- CORS headers restrict browser-based access if needed
+- Individual nodes not directly accessible in production
+- P2P messages validated before processing
+
+**Cryptographic Operations:**
+- PIN-based encryption uses secure key derivation
+- Digital signatures prevent data tampering
+- Cryptographic hashing for integrity checks
+- All crypto uses audited libraries, no custom primitives
+
+**Future Enhancements:**
+- OAuth2/JWT for API authentication
+- TLS mutual authentication for P2P connections
+- Hardware security modules (HSM) for key storage
+- Audit logging for compliance requirements

@@ -9,10 +9,15 @@ case "$COMMAND" in
   start)
     echo "🚀 Starting Goud Chain network (production mode)..."
     echo ""
-    echo "🌐 Dashboard: http://localhost:8080"
-    echo "📡 Node 1: http://localhost:8081"
-    echo "📡 Node 2: http://localhost:8082"
-    echo "📡 Node 3: http://localhost:8083"
+    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "   └─ Use this endpoint for all blockchain operations"
+    echo ""
+    echo "🌐 Dashboard: http://localhost:3000"
+    echo ""
+    echo "📡 Individual Nodes (for debugging):"
+    echo "   Node 1: http://localhost:8081"
+    echo "   Node 2: http://localhost:8082"
+    echo "   Node 3: http://localhost:8083"
     echo ""
     docker compose up --build
     ;;
@@ -20,10 +25,15 @@ case "$COMMAND" in
   dev)
     echo "🔥 Starting Goud Chain network (development mode with hot reload)..."
     echo ""
-    echo "🌐 Dashboard: http://localhost:8080"
-    echo "📡 Node 1: http://localhost:8081"
-    echo "📡 Node 2: http://localhost:8082"
-    echo "📡 Node 3: http://localhost:8083"
+    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "   └─ Use this endpoint for all blockchain operations"
+    echo ""
+    echo "🌐 Dashboard: http://localhost:3000"
+    echo ""
+    echo "📡 Individual Nodes (for debugging):"
+    echo "   Node 1: http://localhost:8081"
+    echo "   Node 2: http://localhost:8082"
+    echo "   Node 3: http://localhost:8083"
     echo ""
     echo "✨ Hot reload enabled:"
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
@@ -63,19 +73,50 @@ case "$COMMAND" in
     echo "================="
     echo ""
 
+    # Check load balancer
+    echo "⚡ Load Balancer (http://localhost:8080)"
+    if curl -s "http://localhost:8080/lb/health" > /dev/null 2>&1; then
+      LB_INFO=$(curl -s "http://localhost:8080/lb/health")
+      echo "   ✅ Online"
+      echo "   $(echo $LB_INFO | jq -r '.service')"
+    else
+      echo "   ❌ Offline"
+    fi
+    echo ""
+
+    # Check individual nodes
     for node in node1 node2 node3; do
       port=$((8080 + ${node:4}))
       echo "🔗 $node (http://localhost:$port)"
 
-      if curl -s "http://localhost:$port/chain" > /dev/null 2>&1; then
-        CHAIN_LENGTH=$(curl -s "http://localhost:$port/chain" | grep -o '"index"' | wc -l | xargs)
-        PEERS=$(curl -s "http://localhost:$port/peers" | grep -o '"count":[0-9]*' | grep -o '[0-9]*')
-        echo "   ✅ Online | Chain Length: $CHAIN_LENGTH | Peers: $PEERS"
+      if curl -s "http://localhost:$port/health" > /dev/null 2>&1; then
+        HEALTH=$(curl -s "http://localhost:$port/health")
+        CHAIN_LENGTH=$(echo $HEALTH | jq -r '.chain_length')
+        PEERS=$(echo $HEALTH | jq -r '.peer_count')
+        NODE_ID=$(echo $HEALTH | jq -r '.node_id')
+        echo "   ✅ Online | Chain Length: $CHAIN_LENGTH | Peers: $PEERS | ID: $NODE_ID"
       else
         echo "   ❌ Offline"
       fi
       echo ""
     done
+    ;;
+
+  lb-status)
+    echo "⚡ Load Balancer Status"
+    echo "======================"
+    echo ""
+
+    if curl -s "http://localhost:8080/lb/health" > /dev/null 2>&1; then
+      echo "Health:"
+      curl -s "http://localhost:8080/lb/health" | jq .
+      echo ""
+      echo "NGINX Stats:"
+      curl -s "http://localhost:8080/lb/status"
+    else
+      echo "❌ Load balancer is offline"
+      exit 1
+    fi
     ;;
 
   mine)
@@ -193,9 +234,11 @@ case "$COMMAND" in
     ;;
 
   help|--help|-h)
-    echo "Goud Chain - Distributed Blockchain Network"
+    echo "Goud Chain - Distributed Blockchain Network with Load Balancer"
     echo ""
     echo "Usage: ./run [command] [args]"
+    echo ""
+    echo "🚀 PRIMARY API ENDPOINT: http://localhost:8080 (NGINX Load Balancer)"
     echo ""
     echo "Network Commands:"
     echo "  (no args)           Start the 3-node network (production)"
@@ -204,8 +247,9 @@ case "$COMMAND" in
     echo "  build               Build Docker images"
     echo "  down, stop          Stop the network"
     echo "  clean               Remove all containers, images, and volumes"
-    echo "  logs [node]         Show logs (optional: node1, node2, node3)"
-    echo "  status              Show status of all nodes"
+    echo "  logs [node]         Show logs (optional: node1, node2, node3, nginx)"
+    echo "  status              Show status of load balancer and all nodes"
+    echo "  lb-status           Show detailed load balancer status and metrics"
     echo ""
     echo "Blockchain Commands:"
     echo "  mine [node] [data]  Mine a block (default: node1)"
@@ -225,10 +269,14 @@ case "$COMMAND" in
     echo "Examples:"
     echo "  ./run                              # Start network (production)"
     echo "  ./run dev                          # Start with hot reload"
+    echo "  ./run status                       # Check load balancer + all nodes"
+    echo "  ./run lb-status                    # Detailed load balancer stats"
+    echo "  ./run logs nginx                   # View load balancer logs"
     echo "  ./run mine node1 \"Hello World\"     # Mine on node1"
     echo "  ./run chain node2                  # View node2's chain"
-    echo "  ./run status                       # Check all nodes"
-    echo "  ./run logs node1                   # View node1 logs"
+    echo ""
+    echo "📖 For developers: Use http://localhost:8080 for all API calls"
+    echo "   The load balancer automatically routes requests to healthy nodes"
     ;;
 
   *)

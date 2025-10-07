@@ -205,6 +205,25 @@ pub fn handle_sync(p2p: Arc<P2PNode>) -> Response<std::io::Cursor<Vec<u8>>> {
     json_response(serde_json::to_string(&response).unwrap())
 }
 
+/// Handle GET /health - Health check endpoint for load balancer
+pub fn handle_health(
+    blockchain: Arc<Mutex<Blockchain>>,
+    p2p: Arc<P2PNode>,
+) -> Response<std::io::Cursor<Vec<u8>>> {
+    let blockchain = blockchain.lock().unwrap();
+    let peers = p2p.peers.lock().unwrap();
+
+    let health_info = serde_json::json!({
+        "status": "healthy",
+        "node_id": blockchain.node_id,
+        "chain_length": blockchain.chain.len(),
+        "peer_count": peers.len(),
+        "latest_block": blockchain.chain.last().map(|b| b.index).unwrap_or(0),
+    });
+
+    json_response(serde_json::to_string(&health_info).unwrap())
+}
+
 /// Route and handle HTTP requests
 pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: Arc<P2PNode>) {
     let method = request.method().clone();
@@ -228,6 +247,9 @@ pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: 
         }
         (Method::Get, "/sync") => {
             let _ = request.respond(handle_sync(p2p));
+        }
+        (Method::Get, "/health") => {
+            let _ = request.respond(handle_health(blockchain, p2p));
         }
         _ => {
             let _ = request.respond(error_response(
