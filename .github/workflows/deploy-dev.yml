@@ -186,8 +186,15 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
+          # Write SSH private key (secret already contains newlines from gh secret set)
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/goud_chain_rsa
           chmod 600 ~/.ssh/goud_chain_rsa
+          # Verify key format
+          echo "Private key format check:"
+          head -1 ~/.ssh/goud_chain_rsa
+          tail -1 ~/.ssh/goud_chain_rsa
+          echo "Key file has $(wc -l < ~/.ssh/goud_chain_rsa) lines"
+          # Add host to known_hosts
           ssh-keyscan -H ${{ needs.terraform-deploy.outputs.load_balancer_ip }} >> ~/.ssh/known_hosts
 
       - name: Deploy to VM1 (nginx + node1 + dashboard)
