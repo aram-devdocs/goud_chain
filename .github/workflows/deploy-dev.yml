@@ -91,20 +91,31 @@ jobs:
           # Get absolute path to working directory
           WORKSPACE=$(pwd)
 
-          # Create OCI config file (matches local ~/.oci/config)
-          cat > ~/.oci/config <<EOF
-          [DEFAULT]
-          user=${{ secrets.OCI_USER_OCID }}
-          fingerprint=${{ secrets.OCI_FINGERPRINT }}
-          tenancy=${{ secrets.OCI_TENANCY_OCID }}
-          region=${{ secrets.OCI_REGION }}
-          key_file=${WORKSPACE}/oci_api_key.pem
-          EOF
+          # Create OCI config file (no leading spaces)
+          echo "[DEFAULT]" > ~/.oci/config
+          echo "user=${{ secrets.OCI_USER_OCID }}" >> ~/.oci/config
+          echo "fingerprint=${{ secrets.OCI_FINGERPRINT }}" >> ~/.oci/config
+          echo "tenancy=${{ secrets.OCI_TENANCY_OCID }}" >> ~/.oci/config
+          echo "region=${{ secrets.OCI_REGION }}" >> ~/.oci/config
+          echo "key_file=${WORKSPACE}/oci_api_key.pem" >> ~/.oci/config
           chmod 600 ~/.oci/config
 
           # Create OCI private key file
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > oci_api_key.pem
           chmod 600 oci_api_key.pem
+
+          # Debug: Show config file (with secrets masked)
+          echo "=== OCI Config File Debug ==="
+          echo "Working directory: $(pwd)"
+          echo "Config file location: ~/.oci/config"
+          echo "Config file contents (secrets will be masked by GitHub):"
+          cat ~/.oci/config
+          echo ""
+          echo "Key file location: ${WORKSPACE}/oci_api_key.pem"
+          echo "Key file exists: $(test -f oci_api_key.pem && echo 'YES' || echo 'NO')"
+          echo "Key file permissions: $(ls -la oci_api_key.pem 2>/dev/null || echo 'N/A')"
+          echo "Key file first line: $(head -n 1 oci_api_key.pem)"
+          echo "=== End Debug ==="
 
       - name: Terraform Init
         run: terraform init
@@ -119,7 +130,13 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -var-file=terraform.tfvars.local -out=tfplan
+        run: |
+          echo "=== Terraform Plan Debug ==="
+          echo "Current directory: $(pwd)"
+          echo "OCI config exists: $(test -f ~/.oci/config && echo 'YES' || echo 'NO')"
+          echo "OCI key exists: $(test -f oci_api_key.pem && echo 'YES' || echo 'NO')"
+          echo "=== End Debug ==="
+          terraform plan -var-file=terraform.tfvars.local -out=tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
