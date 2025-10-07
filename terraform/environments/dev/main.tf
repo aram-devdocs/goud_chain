@@ -16,10 +16,19 @@ terraform {
 }
 
 # Configure OCI provider
-# Note: Provider configuration cannot use variables from tfvars files
-# Use environment variables: OCI_TENANCY, OCI_USER_OCID, OCI_FINGERPRINT, OCI_KEY_FILE, OCI_REGION
-# Or configure via ~/.oci/config file
-provider "oci" {}
+# Authentication methods (in priority order):
+# 1. Explicit variables (used when TF_VAR_* env vars are set in GitHub Actions)
+# 2. Falls back to ~/.oci/config if variables are empty/invalid (local dev fallback)
+#
+# IMPORTANT: If using terraform.tfvars locally, private_key_path must be absolute path
+# (Terraform doesn't expand ~ in variable values - use full path like /Users/yourname/.oci/key.pem)
+provider "oci" {
+  tenancy_ocid     = var.tenancy_ocid
+  user_ocid        = var.user_ocid
+  fingerprint      = var.fingerprint
+  private_key_path = var.private_key_path
+  region           = var.region
+}
 
 # Configure Cloudflare provider
 provider "cloudflare" {
