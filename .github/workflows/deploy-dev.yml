@@ -83,28 +83,28 @@ jobs:
           }
           EOF
 
-      - name: Setup OCI Authentication
+      - name: Setup OCI Configuration
         run: |
+          # Create OCI config directory
+          mkdir -p ~/.oci
+
+          # Create OCI config file (matches local ~/.oci/config)
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          region=${{ secrets.OCI_REGION }}
+          key_file=$PWD/oci_api_key.pem
+          EOF
+          chmod 600 ~/.oci/config
+
           # Create OCI private key file
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > oci_api_key.pem
           chmod 600 oci_api_key.pem
-        env:
-          # Set OCI provider environment variables
-          OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
-          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_CLI_KEY_FILE: ./oci_api_key.pem
-          OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Terraform Init
         run: terraform init
-        env:
-          # OCI provider environment variables
-          OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
-          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_CLI_KEY_FILE: ./oci_api_key.pem
-          OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Migrate Provider (if needed)
         continue-on-error: true
@@ -117,24 +117,10 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -var-file=terraform.tfvars.local -out=tfplan
-        env:
-          # OCI provider environment variables
-          OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
-          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_CLI_KEY_FILE: ./oci_api_key.pem
-          OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve tfplan
-        env:
-          # OCI provider environment variables
-          OCI_CLI_TENANCY: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_CLI_USER: ${{ secrets.OCI_USER_OCID }}
-          OCI_CLI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
-          OCI_CLI_KEY_FILE: ./oci_api_key.pem
-          OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
 
       - name: Get Terraform Outputs
         id: outputs
