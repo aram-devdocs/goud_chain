@@ -1,5 +1,18 @@
 # Compute module - Oracle Cloud instances for Goud Chain blockchain nodes
 
+terraform {
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "~> 5.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
+  }
+}
+
 # Get the latest Ubuntu 22.04 image (ARM or x86 depending on shape)
 data "oci_core_images" "ubuntu" {
   compartment_id           = var.compartment_id

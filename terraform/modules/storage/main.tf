@@ -1,5 +1,14 @@
 # Storage module - Block volumes for blockchain data persistence
 
+terraform {
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "~> 5.0"
+    }
+  }
+}
+
 # Block volumes for blockchain data
 resource "oci_core_volume" "blockchain_data" {
   count = var.node_count

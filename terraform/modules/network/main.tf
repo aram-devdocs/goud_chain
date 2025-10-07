@@ -1,5 +1,14 @@
 # Network module - VCN, subnets, security, routing for Goud Chain
 
+terraform {
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "~> 5.0"
+    }
+  }
+}
+
 # Virtual Cloud Network (VCN)
 resource "oci_core_vcn" "main" {
   compartment_id = var.compartment_id

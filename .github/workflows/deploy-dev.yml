@@ -91,6 +91,14 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      - name: Migrate Provider (if needed)
+        continue-on-error: true
+        run: |
+          # Migrate from deprecated hashicorp/oci to oracle/oci if state exists
+          if [ -f terraform.tfstate ]; then
+            terraform state replace-provider -auto-approve hashicorp/oci oracle/oci || true
+          fi
+
       - name: Terraform Validate
         run: terraform validate
 
