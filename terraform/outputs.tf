@@ -70,7 +70,7 @@ output "health_check_commands" {
     load_balancer = "curl ${module.dns.api_url}/lb/health"
     node_health   = "curl ${module.dns.api_url}/health"
     blockchain    = "curl ${module.dns.api_url}/chain"
-  } : {
+    } : {
     load_balancer = "curl http://${module.compute.public_ips[0]}:8080/lb/health"
     node_health   = "curl http://${module.compute.public_ips[0]}:8080/health"
     blockchain    = "curl http://${module.compute.public_ips[0]}:8080/chain"
@@ -89,7 +89,7 @@ output "dns_configuration" {
     https_enabled         = var.enable_cloudflare_proxy
     manual_steps_required = var.enable_cloudflare_proxy ? "Configure Cloudflare SSL/TLS mode to 'Flexible' in dashboard" : "N/A"
     message               = "DNS is enabled and configured"
-  } : {
+    } : {
     enabled               = false
     domain_name           = null
     dashboard_fqdn        = null

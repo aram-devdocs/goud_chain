@@ -45,7 +45,7 @@ resource "cloudflare_record" "nodes" {
   name    = var.environment == "production" ? "node${count.index + 1}" : "${var.environment}-node${count.index + 1}"
   content = var.node_public_ips[count.index]
   type    = "A"
-  ttl     = 300 # 5 minutes
+  ttl     = 300   # 5 minutes
   proxied = false # Don't proxy node debugging endpoints
 
   comment = "Goud Chain ${var.environment} Node ${count.index + 1} - managed by Terraform"

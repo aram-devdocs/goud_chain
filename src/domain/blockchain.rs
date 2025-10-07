@@ -96,6 +96,8 @@ impl Blockchain {
         self.pending_data.clear();
 
         // Create checkpoint
+        #[allow(unknown_lints)]
+        #[allow(clippy::manual_is_multiple_of)]
         if new_block.index % CHECKPOINT_INTERVAL == 0 {
             self.checkpoints.push(new_block.hash.clone());
             info!(block_number = new_block.index, "Checkpoint created");

@@ -1,14 +1,11 @@
 #!/bin/sh
 
 # Rust checks
-echo "Running Rust formatting..."
-cargo fmt
-
-# Re-add any formatted files that were staged
-STAGED_RS_FILES=$(git diff --name-only --cached | grep '\.rs$' || true)
-if [ -n "$STAGED_RS_FILES" ]; then
-    echo "$STAGED_RS_FILES" | xargs git add
-fi
+echo "Running Rust formatting check..."
+cargo fmt -- --check || {
+    echo "Error: Code is not formatted. Run 'cargo fmt' to fix."
+    exit 1
+}
 
 echo "Running Clippy..."
 cargo clippy -- -D warnings || {
@@ -49,20 +46,15 @@ echo "Running dashboard tests..."
 if [ -d "terraform" ]; then
     echo "Running Terraform format check..."
     terraform -chdir=terraform fmt -check -recursive || {
-        echo "Formatting Terraform files..."
-        terraform -chdir=terraform fmt -recursive
-        # Re-add formatted terraform files
-        STAGED_TF_FILES=$(git diff --name-only --cached | grep '\.tf$' || true)
-        if [ -n "$STAGED_TF_FILES" ]; then
-            echo "$STAGED_TF_FILES" | xargs git add
-        fi
+        echo "Error: Terraform files are not formatted. Run 'terraform fmt -recursive' in terraform/ to fix."
+        exit 1
     }
 
     echo "Running Terraform validation..."
     if [ -d "terraform/environments/free-tier" ]; then
         terraform -chdir=terraform/environments/free-tier init -backend=false -upgrade=false > /dev/null 2>&1 || true
         terraform -chdir=terraform/environments/free-tier validate || {
-            echo "Error: Terraform validation failed."
+            echo "Error: Terraform validation failed for free-tier environment."
             exit 1
         }
     fi

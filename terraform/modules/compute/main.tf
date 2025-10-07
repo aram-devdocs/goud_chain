@@ -70,10 +70,10 @@ resource "oci_core_instance" "blockchain_node" {
   lifecycle {
     ignore_changes = [
       source_details[0].source_id, # Ignore image updates
-      metadata,                     # Ignore cloud-init script changes (prevents instance replacement)
-      availability_domain,          # Ignore AZ recalculation (prevents instance replacement)
-      freeform_tags,                # Ignore tag changes
-      defined_tags,                 # Ignore Oracle-managed tags
+      metadata,                    # Ignore cloud-init script changes (prevents instance replacement)
+      availability_domain,         # Ignore AZ recalculation (prevents instance replacement)
+      freeform_tags,               # Ignore tag changes
+      defined_tags,                # Ignore Oracle-managed tags
     ]
   }
 }

@@ -62,6 +62,16 @@ jobs:
           enable_redis          = true
           backup_retention_days = 7
 
+          # DNS Configuration (Cloudflare)
+          enable_dns              = false
+          domain_name             = "goudchain.com"
+          cloudflare_api_token    = ""
+          cloudflare_zone_id      = ""
+          enable_cloudflare_proxy = false
+          enable_node_dns         = false
+          dashboard_subdomain     = "dashboard"
+          api_subdomain           = "api"
+
           tags = {
             Project     = "goud-chain"
             Environment = "dev"
