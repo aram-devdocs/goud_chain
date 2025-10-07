@@ -224,7 +224,12 @@ jobs:
       - name: Deploy to VM1 (nginx + node1 + dashboard)
         run: |
           ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
-            cd /opt/goud_chain || (sudo mkdir -p /opt/goud_chain && sudo chown ubuntu:ubuntu /opt/goud_chain && cd /opt/goud_chain)
+            # Create app directory if it doesn't exist
+            if [ ! -d /opt/goud_chain ]; then
+              sudo mkdir -p /opt/goud_chain
+              sudo chown ubuntu:ubuntu /opt/goud_chain
+            fi
+            cd /opt/goud_chain
 
             # Pull latest code
             if [ -d .git ]; then
