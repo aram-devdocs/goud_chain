@@ -24,17 +24,8 @@ terraform {
   # }
 }
 
-provider "oci" {
-  tenancy_ocid     = var.tenancy_ocid
-  user_ocid        = var.user_ocid
-  fingerprint      = var.fingerprint
-  private_key_path = var.private_key_path
-  region           = var.region
-}
-
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
-}
+# Provider configuration is handled by the calling environment module
+# (e.g., environments/dev/main.tf) to allow for environment-specific credentials
 
 # Use compartment OCID if provided, otherwise use tenancy root
 locals {
