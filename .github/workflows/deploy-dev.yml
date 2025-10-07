@@ -88,6 +88,9 @@ jobs:
           # Create OCI config directory
           mkdir -p ~/.oci
 
+          # Get absolute path to working directory
+          WORKSPACE=$(pwd)
+
           # Create OCI config file (matches local ~/.oci/config)
           cat > ~/.oci/config <<EOF
           [DEFAULT]
@@ -95,7 +98,7 @@ jobs:
           fingerprint=${{ secrets.OCI_FINGERPRINT }}
           tenancy=${{ secrets.OCI_TENANCY_OCID }}
           region=${{ secrets.OCI_REGION }}
-          key_file=$PWD/oci_api_key.pem
+          key_file=${WORKSPACE}/oci_api_key.pem
           EOF
           chmod 600 ~/.oci/config
 
