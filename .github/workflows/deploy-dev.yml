@@ -197,6 +197,30 @@ jobs:
           # Add host to known_hosts
           ssh-keyscan -H ${{ needs.terraform-deploy.outputs.load_balancer_ip }} >> ~/.ssh/known_hosts
 
+      - name: Wait for Docker installation (if needed)
+        run: |
+          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
+            # Check if Docker is already installed
+            if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
+              echo "Docker already installed, proceeding..."
+              docker --version
+              docker-compose --version
+            else
+              echo "Docker not found, waiting for cloud-init to complete..."
+              # Wait for cloud-init boot-finished marker (max 5 minutes)
+              timeout 300 bash -c 'until [ -f /var/lib/cloud/instance/boot-finished ]; do echo "Waiting..."; sleep 5; done' || echo "Timeout waiting for cloud-init"
+
+              # Verify Docker is now installed
+              if command -v docker &> /dev/null; then
+                docker --version
+                docker-compose --version
+              else
+                echo "ERROR: Docker still not installed after cloud-init"
+                exit 1
+              fi
+            fi
+          EOF
+
       - name: Deploy to VM1 (nginx + node1 + dashboard)
         run: |
           ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
