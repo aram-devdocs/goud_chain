@@ -19,7 +19,7 @@ case "$COMMAND" in
     echo "   Node 2: http://localhost:8082"
     echo "   Node 3: http://localhost:8083"
     echo ""
-    docker compose up --build
+    docker compose -f docker-compose.local.yml up --build
     ;;
 
   dev)
@@ -39,32 +39,32 @@ case "$COMMAND" in
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
     echo "   - Nodes: Changes to src/ will auto-recompile and restart"
     echo ""
-    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml up --build
     ;;
 
   build)
     echo "🔨 Building Docker images..."
-    docker compose build
+    docker compose -f docker-compose.local.yml build
     ;;
 
   down|stop)
     echo "🛑 Stopping Goud Chain network..."
-    docker compose down
+    docker compose -f docker-compose.local.yml down
     ;;
 
   clean)
     echo "🧹 Cleaning up containers, images, and volumes..."
-    docker compose down --rmi all --volumes --remove-orphans
+    docker compose -f docker-compose.local.yml down --rmi all --volumes --remove-orphans
     ;;
 
   logs)
     NODE=${1:-}
     if [ -z "$NODE" ]; then
       echo "📋 Showing logs from all nodes..."
-      docker compose logs -f
+      docker compose -f docker-compose.local.yml logs -f
     else
       echo "📋 Showing logs from $NODE..."
-      docker compose logs -f "$NODE"
+      docker compose -f docker-compose.local.yml logs -f "$NODE"
     fi
     ;;
 

@@ -16,8 +16,13 @@ output "private_ips" {
 }
 
 output "availability_domain" {
-  description = "Availability domain of the first instance"
+  description = "Availability domain of the first instance (deprecated - use availability_domains)"
   value       = oci_core_instance.blockchain_node[0].availability_domain
+}
+
+output "availability_domains" {
+  description = "Availability domains for all instances"
+  value       = oci_core_instance.blockchain_node[*].availability_domain
 }
 
 output "instance_details" {

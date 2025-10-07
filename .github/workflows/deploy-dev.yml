@@ -1,7 +1,7 @@
-# Deploy to Oracle Cloud Free Tier
+# Deploy to Oracle Cloud Development Environment
 # Triggered manually or on merge to main branch
 
-name: Deploy Free Tier
+name: Deploy Dev
 
 on:
   workflow_dispatch:  # Manual trigger
@@ -13,7 +13,7 @@ on:
       - '.gitignore'
 
 env:
-  ENVIRONMENT: free-tier
+  ENVIRONMENT: dev
   OCI_CLI_VERSION: 3.37.0
   TERRAFORM_VERSION: 1.6.6
 
@@ -66,11 +66,11 @@ jobs:
     name: Terraform Deploy
     runs-on: ubuntu-latest
     needs: build-and-push
-    environment: free-tier
+    environment: dev
 
     defaults:
       run:
-        working-directory: ./terraform/environments/free-tier
+        working-directory: ./terraform/environments/dev
 
     steps:
       - name: Checkout code
@@ -90,11 +90,12 @@ jobs:
           private_key_path = "./oci_api_key.pem"
           region           = "${{ secrets.OCI_REGION }}"
 
-          environment           = "free-tier"
-          blockchain_node_count = 4
-          instance_shape        = "VM.Standard.A1.Flex"
+          environment           = "dev"
+          blockchain_node_count = 2
+          instance_shape        = "VM.Standard.E2.1"
           instance_ocpus        = 1
-          instance_memory_gb    = 6
+          instance_memory_gb    = 8
+          boot_volume_size_gb   = 50
           block_volume_size_gb  = 50
 
           ssh_public_key    = "${{ secrets.SSH_PUBLIC_KEY }}"
@@ -107,7 +108,7 @@ jobs:
 
           tags = {
             Project     = "goud-chain"
-            Environment = "free-tier"
+            Environment = "dev"
             ManagedBy   = "github-actions"
             Repository  = "${{ github.repository }}"
             DeployedBy  = "${{ github.actor }}"
@@ -145,8 +146,8 @@ jobs:
         with:
           name: terraform-outputs
           path: |
-            terraform/environments/free-tier/terraform.tfstate
-            terraform/environments/free-tier/tfplan
+            terraform/environments/dev/terraform.tfstate
+            terraform/environments/dev/tfplan
 
     outputs:
       load_balancer_ip: ${{ steps.outputs.outputs.load_balancer_ip }}
@@ -157,7 +158,7 @@ jobs:
     name: Deploy Containers
     runs-on: ubuntu-latest
     needs: terraform-deploy
-    environment: free-tier
+    environment: dev
 
     steps:
       - name: Checkout code

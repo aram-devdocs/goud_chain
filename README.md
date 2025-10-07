@@ -476,6 +476,96 @@ node1:
     - PEERS=node2:9000,node3:9000
 ```
 
+## Cloud Deployment (Oracle Cloud)
+
+### Prerequisites
+
+1. Oracle Cloud account with $300 trial credits or always-free tier
+2. OCI CLI configured with API keys
+3. SSH key pair for VM access
+4. GitHub repository secrets configured (for CI/CD)
+
+### Manual Deployment
+
+**1. Configure Terraform variables:**
+```bash
+# Create terraform/environments/dev/terraform.tfvars
+tenancy_ocid     = "ocid1.tenancy.oc1..."
+user_ocid        = "ocid1.user.oc1..."
+fingerprint      = "ab:cd:ef:..."
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "us-ashburn-1"
+ssh_public_key   = "ssh-rsa AAAAB3..."
+
+environment            = "dev"
+blockchain_node_count  = 2
+instance_shape         = "VM.Standard.E2.1"  # x86 instances
+instance_ocpus         = 1
+instance_memory_gb     = 8
+boot_volume_size_gb    = 50
+block_volume_size_gb   = 50
+
+allowed_ssh_cidrs      = ["0.0.0.0/0"]
+allowed_http_cidrs     = ["0.0.0.0/0"]
+enable_monitoring      = false
+enable_redis           = true
+backup_retention_days  = 7
+
+tags = {
+  Project     = "goud-chain"
+  Environment = "dev"
+  ManagedBy   = "terraform"
+}
+```
+
+**2. Deploy infrastructure and application:**
+```bash
+./scripts/deploy.sh
+```
+
+**3. Destroy all resources:**
+```bash
+./scripts/destroy.sh
+```
+
+### Automated Deployment (GitHub Actions)
+
+**Setup GitHub Secrets:**
+```
+OCI_TENANCY_OCID
+OCI_USER_OCID
+OCI_FINGERPRINT
+OCI_PRIVATE_KEY
+OCI_REGION
+SSH_PUBLIC_KEY
+SSH_PRIVATE_KEY
+```
+
+**Automatic deployment triggers:**
+- Push to `main` branch → Full deploy
+- Manual trigger → Via GitHub Actions UI
+
+**Deployment workflow:**
+1. Build multi-arch Docker images → Push to Oracle Container Registry
+2. Terraform plan & apply → Provision infrastructure
+3. Deploy containers → SSH to VMs and start services
+4. Health checks → Verify deployment success
+
+### Infrastructure
+
+**Cost:** ~$15/month (covered by $300 trial credits for ~20 months)
+
+**Resources:**
+- 2× VM.Standard.E2.1 (x86, 1 vCPU, 8GB RAM each)
+- 2× 50GB boot volumes
+- 2× 50GB block volumes (blockchain data)
+- 1× VCN with public subnet
+- Load balancer (nginx on VM1)
+
+**Public Access:**
+- Load Balancer API: `http://<VM1_IP>:8080`
+- Dashboard: `http://<VM1_IP>:3000`
+
 ## License
 
 MIT

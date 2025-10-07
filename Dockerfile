@@ -17,6 +17,12 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
+# Install runtime dependencies (curl for health checks)
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the binary from builder
 COPY --from=builder /app/target/release/goud_chain .
 

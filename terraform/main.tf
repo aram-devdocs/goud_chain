@@ -36,7 +36,6 @@ locals {
     var.tags,
     {
       Environment = var.environment
-      DeployedAt  = timestamp()
     }
   )
 }
@@ -83,7 +82,7 @@ module "storage" {
   environment           = var.environment
   node_count            = var.blockchain_node_count
   block_volume_size_gb  = var.block_volume_size_gb
-  availability_domain   = module.compute.availability_domain
+  availability_domains  = module.compute.availability_domains
   instance_ids          = module.compute.instance_ids
   backup_retention_days = var.backup_retention_days
   tags                  = local.common_tags

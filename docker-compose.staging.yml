@@ -1,20 +1,21 @@
-# Development environment - Oracle Cloud (2 nodes + nginx + dashboard)
-# Deployed via scripts/deploy.sh
+# Staging environment - Oracle Cloud (3 nodes + nginx + dashboard)
+# For pre-production testing
 
 version: '3.8'
 
 services:
-  # NGINX Load Balancer - Single API endpoint
+  # NGINX Load Balancer
   nginx:
     image: nginx:alpine
     container_name: goud_nginx_lb
     ports:
       - "8080:8080"
     volumes:
-      - ./nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx-staging.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - node1
       - node2
+      - node3
     networks:
       - goud_network
     restart: unless-stopped
@@ -38,7 +39,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Dashboard - Web UI
+  # Dashboard
   dashboard:
     build: ./dashboard
     container_name: goud_dashboard
@@ -80,9 +81,9 @@ services:
       - NODE_ID=node1
       - HTTP_PORT=8080
       - P2P_PORT=9000
-      - PEERS=node2:9000
+      - PEERS=node2:9000,node3:9000
     ports:
-      - "8081:8080"  # Debug access
+      - "8081:8080"
       - "9001:9000"
     volumes:
       - /data/node1:/data
@@ -92,11 +93,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.8'
-          memory: 2G
+          cpus: '0.7'
+          memory: 1.5G
         reservations:
           cpus: '0.5'
-          memory: 1.5G
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -120,9 +121,9 @@ services:
       - NODE_ID=node2
       - HTTP_PORT=8080
       - P2P_PORT=9000
-      - PEERS=node1:9000
+      - PEERS=node1:9000,node3:9000
     ports:
-      - "8082:8080"  # Debug access
+      - "8082:8080"
       - "9002:9000"
     volumes:
       - /data/node2:/data
@@ -132,11 +133,51 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.8'
-          memory: 2G
+          cpus: '0.7'
+          memory: 1.5G
         reservations:
           cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blockchain Node 3
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node3
+    environment:
+      - NODE_ID=node3
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node1:9000,node2:9000
+    ports:
+      - "8083:8080"
+      - "9003:9000"
+    volumes:
+      - /data/node3:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
           memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s

@@ -5,7 +5,7 @@ resource "oci_core_volume" "blockchain_data" {
   count = var.node_count
 
   compartment_id      = var.compartment_id
-  availability_domain = var.availability_domain
+  availability_domain = var.availability_domains[count.index]
   display_name        = "${var.project_name}-${var.environment}-node${count.index + 1}-data"
   size_in_gbs         = var.block_volume_size_gb
 
@@ -19,19 +19,16 @@ resource "oci_core_volume" "blockchain_data" {
 }
 
 # Attach block volumes to instances
+# Note: To prevent 409 Conflict errors from parallel attachments, consider using
+# `-parallelism=1` with terraform apply
+# See: https://github.com/oracle/terraform-provider-oci/issues/73
 resource "oci_core_volume_attachment" "blockchain_data" {
   count = var.node_count
 
   attachment_type = "paravirtualized"
   instance_id     = var.instance_ids[count.index]
   volume_id       = oci_core_volume.blockchain_data[count.index].id
-  display_name    = "${var.project_name}-${var.environment}-node${count.index + 1}-attachment"
-
-  # Make sure the instance is running before attaching
-  device = "/dev/oracleoci/oraclevdb"
-
-  # Wait for attachment to be active
-  is_read_only = false
+  display_name    = "${var.project_name}-${var.environment}-node${count.index + 1}-data-attachment"
 }
 
 # Backup policy for blockchain data volumes

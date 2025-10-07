@@ -25,9 +25,9 @@ variable "block_volume_size_gb" {
   type        = number
 }
 
-variable "availability_domain" {
-  description = "Availability domain for block volumes"
-  type        = string
+variable "availability_domains" {
+  description = "Availability domains for block volumes (one per node)"
+  type        = list(string)
 }
 
 variable "instance_ids" {
