@@ -1,0 +1,229 @@
+# Deploy to Oracle Cloud Free Tier
+# Triggered manually or on merge to main branch
+
+name: Deploy Free Tier
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+env:
+  ENVIRONMENT: free-tier
+  OCI_CLI_VERSION: 3.37.0
+  TERRAFORM_VERSION: 1.6.6
+
+jobs:
+  # Build and push Docker images to OCIR
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Oracle Container Registry (OCIR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.OCI_REGION }}.ocir.io
+          username: ${{ secrets.OCI_TENANCY_NAMESPACE }}/${{ secrets.OCI_USERNAME }}
+          password: ${{ secrets.OCI_AUTH_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.OCI_REGION }}.ocir.io/${{ secrets.OCI_TENANCY_NAMESPACE }}/goud-chain
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Terraform plan and apply
+  terraform-deploy:
+    name: Terraform Deploy
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: free-tier
+
+    defaults:
+      run:
+        working-directory: ./terraform/environments/free-tier
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Create Terraform variables file
+        run: |
+          cat > terraform.tfvars.local <<EOF
+          tenancy_ocid     = "${{ secrets.OCI_TENANCY_OCID }}"
+          user_ocid        = "${{ secrets.OCI_USER_OCID }}"
+          fingerprint      = "${{ secrets.OCI_FINGERPRINT }}"
+          private_key_path = "./oci_api_key.pem"
+          region           = "${{ secrets.OCI_REGION }}"
+
+          environment           = "free-tier"
+          blockchain_node_count = 4
+          instance_shape        = "VM.Standard.A1.Flex"
+          instance_ocpus        = 1
+          instance_memory_gb    = 6
+          block_volume_size_gb  = 50
+
+          ssh_public_key    = "${{ secrets.SSH_PUBLIC_KEY }}"
+          allowed_ssh_cidrs = ["0.0.0.0/0"]
+          allowed_http_cidrs = ["0.0.0.0/0"]
+
+          enable_monitoring     = false
+          enable_redis          = true
+          backup_retention_days = 7
+
+          tags = {
+            Project     = "goud-chain"
+            Environment = "free-tier"
+            ManagedBy   = "github-actions"
+            Repository  = "${{ github.repository }}"
+            DeployedBy  = "${{ github.actor }}"
+            CommitSHA   = "${{ github.sha }}"
+          }
+          EOF
+
+      - name: Create OCI private key file
+        run: |
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > oci_api_key.pem
+          chmod 600 oci_api_key.pem
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file=terraform.tfvars.local -out=tfplan
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Terraform Outputs
+        id: outputs
+        run: |
+          echo "load_balancer_ip=$(terraform output -raw load_balancer_public_ip)" >> $GITHUB_OUTPUT
+          echo "node_ips=$(terraform output -json node_public_ips)" >> $GITHUB_OUTPUT
+
+      - name: Save outputs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs
+          path: |
+            terraform/environments/free-tier/terraform.tfstate
+            terraform/environments/free-tier/tfplan
+
+    outputs:
+      load_balancer_ip: ${{ steps.outputs.outputs.load_balancer_ip }}
+      node_ips: ${{ steps.outputs.outputs.node_ips }}
+
+  # Deploy Docker containers to VMs
+  deploy-containers:
+    name: Deploy Containers
+    runs-on: ubuntu-latest
+    needs: terraform-deploy
+    environment: free-tier
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/goud_chain_rsa
+          chmod 600 ~/.ssh/goud_chain_rsa
+          ssh-keyscan -H ${{ needs.terraform-deploy.outputs.load_balancer_ip }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VM1 (nginx + node1 + dashboard)
+        run: |
+          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
+            cd /opt/goud_chain || (sudo mkdir -p /opt/goud_chain && sudo chown ubuntu:ubuntu /opt/goud_chain && cd /opt/goud_chain)
+
+            # Pull latest code
+            if [ -d .git ]; then
+              git pull origin main
+            else
+              git clone ${{ github.server_url }}/${{ github.repository }} .
+            fi
+
+            # Pull Docker images
+            docker-compose -f docker-compose.prod.yml pull nginx node1 dashboard
+
+            # Restart containers
+            docker-compose -f docker-compose.prod.yml up -d nginx node1 dashboard
+
+            # Wait for health checks
+            sleep 30
+            docker ps
+          EOF
+
+      - name: Verify deployment
+        run: |
+          # Wait for services to be ready
+          sleep 30
+
+          # Check load balancer health
+          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080/lb/health || exit 1
+
+          # Check blockchain API
+          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080/health || exit 1
+
+          # Check dashboard
+          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:3000 || exit 1
+
+  # Post-deployment notifications
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [build-and-push, terraform-deploy, deploy-containers]
+    if: always()
+
+    steps:
+      - name: Deployment Success
+        if: ${{ needs.deploy-containers.result == 'success' }}
+        run: |
+          echo "✅ Deployment successful!"
+          echo "🚀 Load Balancer: http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080"
+          echo "🌐 Dashboard: http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:3000"
+
+      - name: Deployment Failed
+        if: ${{ needs.deploy-containers.result == 'failure' }}
+        run: |
+          echo "❌ Deployment failed!"
+          exit 1

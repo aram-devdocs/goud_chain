@@ -1,0 +1,87 @@
+#cloud-config
+# Cloud-init script to set up Goud Chain blockchain node
+# Installs Docker, Docker Compose, and configures the system
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - git
+  - jq
+  - htop
+  - vim
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+write_files:
+  - path: /etc/sysctl.d/99-goud-chain.conf
+    content: |
+      # Network optimizations for blockchain P2P
+      net.core.somaxconn = 4096
+      net.ipv4.tcp_max_syn_backlog = 4096
+      net.ipv4.ip_local_port_range = 10000 65535
+      net.ipv4.tcp_fin_timeout = 30
+      net.ipv4.tcp_keepalive_time = 600
+      net.ipv4.tcp_keepalive_intvl = 60
+      net.ipv4.tcp_keepalive_probes = 3
+
+      # File descriptor limits
+      fs.file-max = 2097152
+      fs.inotify.max_user_watches = 524288
+
+  - path: /etc/security/limits.d/99-goud-chain.conf
+    content: |
+      # File descriptor limits for Docker containers
+      *  soft  nofile  65536
+      *  hard  nofile  65536
+      root  soft  nofile  65536
+      root  hard  nofile  65536
+
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2",
+        "live-restore": true
+      }
+
+runcmd:
+  # Apply sysctl settings
+  - sysctl -p /etc/sysctl.d/99-goud-chain.conf
+
+  # Install Docker
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Install Docker Compose
+  - curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  - chmod +x /usr/local/bin/docker-compose
+
+  # Add ubuntu user to docker group
+  - usermod -aG docker ubuntu
+
+  # Create directory for blockchain data
+  - mkdir -p /data
+  - chown ubuntu:ubuntu /data
+
+  # Create directory for Goud Chain application
+  - mkdir -p /opt/goud-chain
+  - chown ubuntu:ubuntu /opt/goud-chain
+
+  # Set timezone to UTC
+  - timedatectl set-timezone UTC
+
+  # Enable automatic security updates
+  - echo 'Unattended-Upgrade::Allowed-Origins {"${distro_id}:${distro_codename}-security";};' > /etc/apt/apt.conf.d/50unattended-upgrades
+  - systemctl enable unattended-upgrades
+  - systemctl start unattended-upgrades
+
+final_message: "Goud Chain node setup complete after $UPTIME seconds"

@@ -45,4 +45,27 @@ echo "Running dashboard tests..."
     exit 1
 }
 
+# Terraform checks
+if [ -d "terraform" ]; then
+    echo "Running Terraform format check..."
+    terraform -chdir=terraform fmt -check -recursive || {
+        echo "Formatting Terraform files..."
+        terraform -chdir=terraform fmt -recursive
+        # Re-add formatted terraform files
+        STAGED_TF_FILES=$(git diff --name-only --cached | grep '\.tf$' || true)
+        if [ -n "$STAGED_TF_FILES" ]; then
+            echo "$STAGED_TF_FILES" | xargs git add
+        fi
+    }
+
+    echo "Running Terraform validation..."
+    if [ -d "terraform/environments/free-tier" ]; then
+        terraform -chdir=terraform/environments/free-tier init -backend=false -upgrade=false > /dev/null 2>&1 || true
+        terraform -chdir=terraform/environments/free-tier validate || {
+            echo "Error: Terraform validation failed."
+            exit 1
+        }
+    fi
+fi
+
 echo "All pre-commit checks passed!"

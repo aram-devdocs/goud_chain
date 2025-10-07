@@ -1,0 +1,259 @@
+# Production Docker Compose for Goud Chain
+# Optimized for Oracle Cloud Free Tier (4 VMs, 1 OCPU + 6GB RAM each)
+#
+# VM1: nginx + node1 + dashboard
+# VM2: node2 + redis
+# VM3: node3
+# VM4: node4
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # NGINX Load Balancer - Primary API endpoint
+  nginx:
+    image: nginx:alpine
+    container_name: goud_nginx_lb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 200M
+        reservations:
+          cpus: '0.05'
+          memory: 100M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/lb/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Dashboard - Web UI
+  dashboard:
+    build: ./dashboard
+    container_name: goud_dashboard
+    ports:
+      - "3000:8080"
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 200M
+        reservations:
+          cpus: '0.05'
+          memory: 150M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis - Caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: goud_redis
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 150M
+        reservations:
+          cpus: '0.05'
+          memory: 100M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blockchain Node 1 (on VM1 with nginx + dashboard)
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node1
+    environment:
+      - NODE_ID=node1
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=${NODE2_IP}:9000,${NODE3_IP}:9000,${NODE4_IP}:9000
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - /data/node1:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.4'
+          memory: 800M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blockchain Node 2 (on VM2 with redis)
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node2
+    environment:
+      - NODE_ID=node2
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=${NODE1_IP}:9000,${NODE3_IP}:9000,${NODE4_IP}:9000
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - /data/node2:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.4'
+          memory: 800M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blockchain Node 3 (on VM3)
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node3
+    environment:
+      - NODE_ID=node3
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=${NODE1_IP}:9000,${NODE2_IP}:9000,${NODE4_IP}:9000
+      - REDIS_URL=redis://${NODE2_IP}:6379
+    volumes:
+      - /data/node3:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1.5G
+        reservations:
+          cpus: '0.6'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Blockchain Node 4 (on VM4)
+  node4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node4
+    environment:
+      - NODE_ID=node4
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=${NODE1_IP}:9000,${NODE2_IP}:9000,${NODE3_IP}:9000
+      - REDIS_URL=redis://${NODE2_IP}:6379
+    volumes:
+      - /data/node4:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1.5G
+        reservations:
+          cpus: '0.6'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  goud_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
