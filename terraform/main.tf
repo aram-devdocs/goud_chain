@@ -1,9 +1,11 @@
 # Main Terraform configuration for Goud Chain
 # This orchestrates all modules to build the complete infrastructure
 
-# Root module - orchestrates all infrastructure components
-# When used as a module (called from environments/*/main.tf), this inherits
-# provider configuration from the calling module
+# Main Terraform configuration for Goud Chain
+# This module orchestrates all infrastructure components
+#
+# NOTE: This is used as a child module, called from environments/*/main.tf
+# Provider configuration is handled by the calling environment module
 
 # Use compartment OCID if provided, otherwise use tenancy root
 locals {

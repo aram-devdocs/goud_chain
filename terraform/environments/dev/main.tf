@@ -6,7 +6,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
@@ -16,13 +16,10 @@ terraform {
 }
 
 # Configure OCI provider
-provider "oci" {
-  tenancy_ocid     = var.tenancy_ocid
-  user_ocid        = var.user_ocid
-  fingerprint      = var.fingerprint
-  private_key_path = var.private_key_path
-  region           = var.region
-}
+# Note: Provider configuration cannot use variables from tfvars files
+# Use environment variables: OCI_TENANCY, OCI_USER_OCID, OCI_FINGERPRINT, OCI_KEY_FILE, OCI_REGION
+# Or configure via ~/.oci/config file
+provider "oci" {}
 
 # Configure Cloudflare provider
 provider "cloudflare" {
