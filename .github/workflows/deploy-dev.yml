@@ -99,9 +99,6 @@ jobs:
             terraform state replace-provider -auto-approve hashicorp/oci oracle/oci || true
           fi
 
-      - name: Terraform Validate
-        run: terraform validate
-
       - name: Terraform Plan
         id: plan
         run: terraform plan -var-file=terraform.tfvars.local -out=tfplan

@@ -1,31 +1,9 @@
 # Main Terraform configuration for Goud Chain
 # This orchestrates all modules to build the complete infrastructure
 
-terraform {
-  required_version = ">= 1.6.0"
-
-  required_providers {
-    oci = {
-      source  = "oracle/oci"
-      version = "~> 5.0"
-    }
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
-    }
-  }
-
-  # Optional: Configure remote backend for state management
-  # Uncomment and configure for production use
-  # backend "s3" {
-  #   bucket = "goud-chain-terraform-state"
-  #   key    = "infrastructure/terraform.tfstate"
-  #   region = "us-ashburn-1"
-  # }
-}
-
-# Provider configuration is handled by the calling environment module
-# (e.g., environments/dev/main.tf) to allow for environment-specific credentials
+# Root module - orchestrates all infrastructure components
+# When used as a module (called from environments/*/main.tf), this inherits
+# provider configuration from the calling module
 
 # Use compartment OCID if provided, otherwise use tenancy root
 locals {
