@@ -63,11 +63,11 @@ jobs:
           backup_retention_days = 7
 
           # DNS Configuration (Cloudflare)
-          enable_dns              = false
+          enable_dns              = true
           domain_name             = "goudchain.com"
-          cloudflare_api_token    = ""
-          cloudflare_zone_id      = ""
-          enable_cloudflare_proxy = false
+          cloudflare_api_token    = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          cloudflare_zone_id      = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
+          enable_cloudflare_proxy = true
           enable_node_dns         = false
           dashboard_subdomain     = "dashboard"
           api_subdomain           = "api"
