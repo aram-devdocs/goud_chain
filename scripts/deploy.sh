@@ -406,6 +406,8 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
                 -e HTTP_PORT=8080 \
                 -e P2P_PORT=9000 \
                 -e PEERS=${peers} \
+                -e NODE1_ADDR=goud_node1:8080 \
+                -e NODE2_ADDR=goud_node2:8080 \
                 --health-cmd='curl -f http://localhost:8080/health || exit 1' \
                 --health-interval=30s \
                 --health-timeout=10s \

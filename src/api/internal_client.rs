@@ -108,12 +108,10 @@ fn parse_http_response(response: &str) -> Result<(u16, String)> {
 
 /// Get the HTTP address for a validator node
 /// Maps validator names (Validator_1, Validator_2) to node addresses
+/// Tries environment variable first, then defaults to local service name
 pub fn get_validator_node_address(validator_name: &str) -> Result<String> {
     let node_addr = match validator_name {
-        "Validator_1" => {
-            // Try environment variable first, fall back to default
-            std::env::var("NODE1_ADDR").unwrap_or_else(|_| "node1:8080".to_string())
-        }
+        "Validator_1" => std::env::var("NODE1_ADDR").unwrap_or_else(|_| "node1:8080".to_string()),
         "Validator_2" => std::env::var("NODE2_ADDR").unwrap_or_else(|_| "node2:8080".to_string()),
         "Validator_3" => std::env::var("NODE3_ADDR").unwrap_or_else(|_| "node3:8080".to_string()),
         _ => {
