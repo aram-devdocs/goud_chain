@@ -191,6 +191,8 @@ impl P2PNode {
         reputation: Arc<Mutex<HashMap<String, i32>>>,
         peer_addr: &str,
     ) -> Result<()> {
+        // Note: We can't trigger sync from here as this is a static method
+        // Chain divergence will be caught by periodic sync task
         let mut buffer = Vec::new();
         stream
             .read_to_end(&mut buffer)
@@ -204,21 +206,88 @@ impl P2PNode {
                 let mut blockchain = blockchain.lock().unwrap();
                 let latest = blockchain.get_latest_block()?;
 
-                if block.index == latest.index + 1 && block.hash == block.calculate_hash() {
-                    blockchain.chain.push(block);
-                    storage::save_blockchain(&blockchain)?;
-                    info!("Received and added valid block from network");
+                // Check if block already exists (idempotency)
+                if blockchain.chain.iter().any(|b| b.hash == block.hash) {
+                    info!(
+                        block_index = block.index,
+                        block_hash = %block.hash,
+                        "Block already exists, skipping"
+                    );
+                    return Ok(());
+                }
 
-                    // Good peer
-                    let mut r = reputation.lock().unwrap();
-                    *r.entry(peer_addr.to_string()).or_insert(0) += REPUTATION_REWARD_VALID_BLOCK;
-                } else {
-                    warn!(peer = %peer_addr, "Rejected invalid block");
+                // Validate block index is sequential
+                if block.index != latest.index + 1 {
+                    warn!(
+                        peer = %peer_addr,
+                        block_index = block.index,
+                        expected_index = latest.index + 1,
+                        "Rejected block: non-sequential index"
+                    );
+                    return Ok(()); // Don't penalize - might be a timing issue
+                }
+
+                // Validate previous_hash links to our latest block
+                if block.previous_hash != latest.hash {
+                    warn!(
+                        peer = %peer_addr,
+                        block_index = block.index,
+                        block_previous_hash = %block.previous_hash,
+                        our_latest_hash = %latest.hash,
+                        "Rejected block: previous_hash mismatch - chain has diverged"
+                    );
+                    // Chain has diverged - periodic sync will resolve this
+                    return Ok(());
+                }
+
+                // Validate block hash is correct
+                let calculated_hash = block.calculate_hash();
+                if block.hash != calculated_hash {
+                    warn!(
+                        peer = %peer_addr,
+                        block_index = block.index,
+                        claimed_hash = %block.hash,
+                        calculated_hash = %calculated_hash,
+                        "Rejected block: invalid hash"
+                    );
                     // Bad peer - decrease reputation
                     let mut r = reputation.lock().unwrap();
                     *r.entry(peer_addr.to_string()).or_insert(0) +=
                         REPUTATION_PENALTY_INVALID_BLOCK;
+                    return Ok(());
                 }
+
+                // Validate merkle root
+                let calculated_merkle =
+                    Block::calculate_merkle_root(&block.encrypted_block_data, &block.blind_indexes);
+                if block.merkle_root != calculated_merkle {
+                    warn!(
+                        peer = %peer_addr,
+                        block_index = block.index,
+                        claimed_merkle = %block.merkle_root,
+                        calculated_merkle = %calculated_merkle,
+                        "Rejected block: invalid merkle root"
+                    );
+                    // Bad peer - decrease reputation
+                    let mut r = reputation.lock().unwrap();
+                    *r.entry(peer_addr.to_string()).or_insert(0) +=
+                        REPUTATION_PENALTY_INVALID_BLOCK;
+                    return Ok(());
+                }
+
+                // All validations passed - add block
+                blockchain.chain.push(block.clone());
+                storage::save_blockchain(&blockchain)?;
+                info!(
+                    block_index = block.index,
+                    block_hash = %block.hash,
+                    peer = %peer_addr,
+                    "Received and added valid block from network"
+                );
+
+                // Good peer
+                let mut r = reputation.lock().unwrap();
+                *r.entry(peer_addr.to_string()).or_insert(0) += REPUTATION_REWARD_VALID_BLOCK;
             }
             P2PMessage::NewAccount(account) => {
                 let mut blockchain = blockchain.lock().unwrap();

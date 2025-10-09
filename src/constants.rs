@@ -2,7 +2,7 @@
 //! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
-pub const SCHEMA_VERSION: &str = "v4_deterministic_genesis";
+pub const SCHEMA_VERSION: &str = "v5_deterministic_genesis";
 
 // Storage paths
 pub const BLOCKCHAIN_FILE_PATH: &str = "/data/blockchain.json";
