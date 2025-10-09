@@ -1,6 +1,5 @@
 /// System-wide constants for the Goud Chain blockchain
 /// This module contains all magic numbers and strings used throughout the application
-
 // Storage paths
 pub const BLOCKCHAIN_FILE_PATH: &str = "/data/blockchain.json";
 pub const DATA_DIRECTORY: &str = "/data";

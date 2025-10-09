@@ -40,10 +40,10 @@ resource "google_compute_instance" "blockchain_node" {
   }
 
   metadata = {
-    ssh-keys           = "${var.ssh_username}:${var.ssh_public_key}"
-    enable-oslogin     = "FALSE"
-    startup-script     = file("${path.module}/startup.sh")
-    user-data          = <<-EOT
+    ssh-keys       = "${var.ssh_username}:${var.ssh_public_key}"
+    enable-oslogin = "FALSE"
+    startup-script = file("${path.module}/startup.sh")
+    user-data      = <<-EOT
       #cloud-config
       packages:
         - docker.io

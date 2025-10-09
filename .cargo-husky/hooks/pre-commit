@@ -51,10 +51,10 @@ if [ -d "terraform" ]; then
     }
 
     echo "Running Terraform validation..."
-    if [ -d "terraform/environments/free-tier" ]; then
-        terraform -chdir=terraform/environments/free-tier init -backend=false -upgrade=false > /dev/null 2>&1 || true
-        terraform -chdir=terraform/environments/free-tier validate || {
-            echo "Error: Terraform validation failed for free-tier environment."
+    if [ -d "terraform/environments/dev" ]; then
+        terraform -chdir=terraform/environments/dev init -backend=false -upgrade=false > /dev/null 2>&1 || true
+        terraform -chdir=terraform/environments/dev validate || {
+            echo "Error: Terraform validation failed for dev environment."
             exit 1
         }
     fi

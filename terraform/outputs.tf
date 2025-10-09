@@ -29,14 +29,14 @@ output "ssh_command" {
 output "deployment_summary" {
   description = "Summary of deployed resources"
   value = {
-    environment     = var.environment
-    region          = var.region
-    zone            = var.zone
-    machine_type    = var.machine_type
-    disk_size_gb    = var.boot_disk_size_gb
-    architecture    = "single-vm-multi-container"
-    node_count      = 2 # 2 blockchain nodes in Docker containers
-    validators      = 2 # PoA validators
+    environment  = var.environment
+    region       = var.region
+    zone         = var.zone
+    machine_type = var.machine_type
+    disk_size_gb = var.boot_disk_size_gb
+    architecture = "single-vm-multi-container"
+    node_count   = 2 # 2 blockchain nodes in Docker containers
+    validators   = 2 # PoA validators
   }
 }
 
