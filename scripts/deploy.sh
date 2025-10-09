@@ -134,10 +134,18 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
     sudo mkdir -p /data
     sudo chown -R ubuntu:ubuntu /data
 
+    # Stop and remove old containers to avoid ContainerConfig errors
+    echo "Cleaning up old containers and images..."
+    sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
+
+    # Remove dangling images that may have corrupted metadata
+    sudo docker image prune -f
+
     # Build and start services using GCP-optimized compose file
     # Use sudo for docker commands to avoid group permission issues
-    sudo docker-compose -f docker-compose.gcp.yml build
-    sudo docker-compose -f docker-compose.gcp.yml up -d
+    # --force-recreate ensures containers are rebuilt from scratch
+    sudo docker-compose -f docker-compose.gcp.yml build --no-cache
+    sudo docker-compose -f docker-compose.gcp.yml up -d --force-recreate --remove-orphans
 
     echo "✅ Application deployed"
     sudo docker-compose -f docker-compose.gcp.yml ps
