@@ -243,19 +243,47 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
     # Smart deployment with zero-downtime rolling updates
     echo "Starting zero-downtime deployment..."
 
+    # Clean up dangling images to avoid ContainerConfig errors
+    echo "Cleaning up dangling images..."
+    sudo docker image prune -f 2>/dev/null || true
+
     # Ensure network exists
     sudo docker network create goud_network 2>/dev/null || true
 
-    # Check if this is initial deployment
-    if ! sudo docker ps -a | grep -q goud_node1; then
-        echo "Initial deployment detected, starting all services..."
+    # Check if we have a running deployment (all core containers exist)
+    NGINX_EXISTS=$(sudo docker ps -a --filter "name=^goud_nginx_lb$" --format "{{.Names}}" 2>/dev/null)
+    NODE1_EXISTS=$(sudo docker ps -a --filter "name=^goud_node1$" --format "{{.Names}}" 2>/dev/null)
+    NODE2_EXISTS=$(sudo docker ps -a --filter "name=^goud_node2$" --format "{{.Names}}" 2>/dev/null)
+
+    echo "Container status: NGINX=${NGINX_EXISTS:-missing}, Node1=${NODE1_EXISTS:-missing}, Node2=${NODE2_EXISTS:-missing}"
+
+    if [ -z "$NGINX_EXISTS" ] || [ -z "$NODE1_EXISTS" ] || [ -z "$NODE2_EXISTS" ]; then
+        echo "Initial deployment or missing containers detected, starting all services..."
+
+        # Clean start - remove any corrupted metadata
+        sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
+        sudo docker system prune -f 2>/dev/null || true
+
+        # Build images
+        sudo docker-compose -f docker-compose.gcp.yml build
+
+        # Start all services
         sudo docker-compose -f docker-compose.gcp.yml up -d
         echo "✅ Initial deployment complete"
     else
         echo "Existing deployment detected, performing rolling update..."
 
-        # Update NGINX config if changed (quick, no downtime)
-        sudo docker-compose -f docker-compose.gcp.yml up -d --no-deps nginx
+        # Update NGINX config manually to avoid docker-compose ContainerConfig bug
+        echo "Checking NGINX configuration..."
+        if sudo docker exec goud_nginx_lb nginx -t 2>/dev/null; then
+            echo "✅ NGINX config is valid"
+        else
+            echo "⚠️  NGINX config needs update, reloading..."
+            sudo docker exec goud_nginx_lb nginx -s reload 2>/dev/null || {
+                echo "NGINX reload failed, restarting container..."
+                sudo docker restart goud_nginx_lb
+            }
+        fi
 
         # Rolling update: node2 first (node1 continues serving traffic)
         rolling_update_node "node2" "8082" "9002" "node1:9000"
@@ -266,11 +294,34 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
         # Update dashboard (can have brief downtime, non-critical)
         echo "Updating dashboard..."
         if sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest 2>/dev/null; then
+            echo "✅ Pulled pre-built dashboard image"
             sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
+
+            # Graceful dashboard update
+            sudo docker stop goud_dashboard 2>/dev/null || true
+            sudo docker rm goud_dashboard 2>/dev/null || true
+            sudo docker run -d \
+                --name goud_dashboard \
+                --network goud_network \
+                -p 3000:8080 \
+                --restart unless-stopped \
+                goud-chain-dashboard:latest
         else
-            sudo docker-compose -f docker-compose.gcp.yml build dashboard
+            echo "Building dashboard locally..."
+            cd dashboard
+            sudo docker build -t goud-chain-dashboard:latest .
+            cd ..
+
+            # Graceful dashboard update
+            sudo docker stop goud_dashboard 2>/dev/null || true
+            sudo docker rm goud_dashboard 2>/dev/null || true
+            sudo docker run -d \
+                --name goud_dashboard \
+                --network goud_network \
+                -p 3000:8080 \
+                --restart unless-stopped \
+                goud-chain-dashboard:latest
         fi
-        sudo docker-compose -f docker-compose.gcp.yml up -d --no-deps dashboard
 
         echo "✅ Rolling deployment complete"
     fi
