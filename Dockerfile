@@ -3,13 +3,25 @@ FROM rust:1.83-slim as builder
 
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml ./
+# Install cargo-chef for dependency caching
+RUN cargo install cargo-chef
 
-# Copy source code
+# Copy manifests first to cache dependency compilation
+COPY Cargo.toml Cargo.lock* ./
+
+# Create a dummy src/main.rs to build dependencies only
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn dummy() {}" > src/lib.rs
+
+# Build dependencies (this layer is cached unless Cargo.toml changes)
+RUN cargo build --release && \
+    rm -rf src
+
+# Now copy the real source code
 COPY src ./src
 
-# Build for release
+# Build the actual application (only this rebuilds when code changes)
 RUN cargo build --release
 
 # Runtime stage

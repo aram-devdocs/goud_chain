@@ -134,21 +134,150 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
     sudo mkdir -p /data
     sudo chown -R ubuntu:ubuntu /data
 
-    # Stop and remove old containers to avoid ContainerConfig errors
-    echo "Cleaning up old containers and images..."
-    sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
+    # Rolling deployment functions
+    wait_for_health() {
+        local container=$1
+        local max_wait=60
+        local elapsed=0
 
-    # Remove dangling images that may have corrupted metadata
-    sudo docker image prune -f
+        echo "Waiting for $container to become healthy..."
+        while [ $elapsed -lt $max_wait ]; do
+            HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' $container 2>/dev/null || echo "none")
+            if [ "$HEALTH" = "healthy" ]; then
+                echo "✅ $container is healthy"
+                return 0
+            fi
 
-    # Build and start services using GCP-optimized compose file
-    # Use sudo for docker commands to avoid group permission issues
-    # --force-recreate ensures containers are rebuilt from scratch
-    sudo docker-compose -f docker-compose.gcp.yml build --no-cache
-    sudo docker-compose -f docker-compose.gcp.yml up -d --force-recreate --remove-orphans
+            # If no health check, verify container is running
+            if [ "$HEALTH" = "none" ]; then
+                if sudo docker inspect --format='{{.State.Running}}' $container 2>/dev/null | grep -q "true"; then
+                    echo "✅ $container is running (no health check configured)"
+                    return 0
+                fi
+            fi
 
+            sleep 2
+            elapsed=$((elapsed + 2))
+            echo -n "."
+        done
+
+        echo ""
+        echo "❌ $container failed to become healthy after ${max_wait}s"
+        return 1
+    }
+
+    rolling_update_node() {
+        local node_name=$1
+        local node_port=$2
+        local p2p_port=$3
+        local peers=$4
+
+        echo "===  Rolling update: $node_name ==="
+
+        # Build or pull new image
+        if sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest 2>/dev/null; then
+            echo "✅ Pulled pre-built image"
+            sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
+        else
+            echo "Building image locally..."
+            sudo docker-compose -f docker-compose.gcp.yml build ${node_name}
+        fi
+
+        # Start new container alongside old one (temporary port)
+        echo "Starting new ${node_name} container..."
+        sudo docker run -d \
+            --name ${node_name}_new \
+            --network goud_network \
+            -v ${node_name}_data:/data \
+            -e NODE_ID=${node_name} \
+            -e HTTP_PORT=8080 \
+            -e P2P_PORT=9000 \
+            -e PEERS=${peers} \
+            goud-chain:latest
+
+        # Wait for new container to be healthy
+        if wait_for_health ${node_name}_new; then
+            echo "New container healthy, switching over..."
+
+            # Stop old container
+            sudo docker stop goud_${node_name} 2>/dev/null || true
+            sudo docker rm goud_${node_name} 2>/dev/null || true
+
+            # Rename new container to production name
+            sudo docker rename ${node_name}_new goud_${node_name}
+
+            # Update port mappings (requires container restart)
+            sudo docker stop goud_${node_name}
+            sudo docker rm goud_${node_name}
+
+            # Start with correct ports
+            sudo docker run -d \
+                --name goud_${node_name} \
+                --network goud_network \
+                -p ${node_port}:8080 \
+                -p ${p2p_port}:9000 \
+                -v ${node_name}_data:/data \
+                -e NODE_ID=${node_name} \
+                -e HTTP_PORT=8080 \
+                -e P2P_PORT=9000 \
+                -e PEERS=${peers} \
+                --restart unless-stopped \
+                goud-chain:latest
+
+            # Final health check
+            if wait_for_health goud_${node_name}; then
+                echo "✅ ${node_name} updated successfully"
+                return 0
+            else
+                echo "❌ ${node_name} failed final health check"
+                return 1
+            fi
+        else
+            echo "❌ New container failed health check, keeping old container"
+            sudo docker stop ${node_name}_new 2>/dev/null || true
+            sudo docker rm ${node_name}_new 2>/dev/null || true
+            return 1
+        fi
+    }
+
+    # Smart deployment with zero-downtime rolling updates
+    echo "Starting zero-downtime deployment..."
+
+    # Ensure network exists
+    sudo docker network create goud_network 2>/dev/null || true
+
+    # Check if this is initial deployment
+    if ! sudo docker ps -a | grep -q goud_node1; then
+        echo "Initial deployment detected, starting all services..."
+        sudo docker-compose -f docker-compose.gcp.yml up -d
+        echo "✅ Initial deployment complete"
+    else
+        echo "Existing deployment detected, performing rolling update..."
+
+        # Update NGINX config if changed (quick, no downtime)
+        sudo docker-compose -f docker-compose.gcp.yml up -d --no-deps nginx
+
+        # Rolling update: node2 first (node1 continues serving traffic)
+        rolling_update_node "node2" "8082" "9002" "node1:9000"
+
+        # Rolling update: node1 second (node2 now serves traffic)
+        rolling_update_node "node1" "8081" "9001" "node2:9000"
+
+        # Update dashboard (can have brief downtime, non-critical)
+        echo "Updating dashboard..."
+        if sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest 2>/dev/null; then
+            sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
+        else
+            sudo docker-compose -f docker-compose.gcp.yml build dashboard
+        fi
+        sudo docker-compose -f docker-compose.gcp.yml up -d --no-deps dashboard
+
+        echo "✅ Rolling deployment complete"
+    fi
+
+    echo ""
     echo "✅ Application deployed"
-    sudo docker-compose -f docker-compose.gcp.yml ps
+    sudo docker ps --filter "name=goud_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ENDSSH
 
 echo ""

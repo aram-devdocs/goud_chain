@@ -16,6 +16,7 @@ services:
       - "8080:8080"   # For direct IP access
     volumes:
       - ./nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/cors.conf:/etc/nginx/cors.conf:ro
     networks:
       - goud_network
     restart: unless-stopped
@@ -41,6 +42,7 @@ services:
 
   # Dashboard - Web UI
   dashboard:
+    image: goud-chain-dashboard:latest
     build: ./dashboard
     container_name: goud_dashboard
     ports:
@@ -70,10 +72,10 @@ services:
 
   # Blockchain Node 1
   node1:
+    image: goud-chain:latest
     build:
       context: .
       dockerfile: Dockerfile
-    image: goud-chain:latest
     container_name: goud_node1
     environment:
       - NODE_ID=node1
@@ -110,10 +112,10 @@ services:
 
   # Blockchain Node 2
   node2:
+    image: goud-chain:latest
     build:
       context: .
       dockerfile: Dockerfile
-    image: goud-chain:latest
     container_name: goud_node2
     environment:
       - NODE_ID=node2
