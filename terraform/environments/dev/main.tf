@@ -3,6 +3,14 @@
 terraform {
   required_version = ">= 1.6.0"
 
+  # Remote state backend in Google Cloud Storage
+  # This allows local and GitHub Actions to share the same state
+  # Run scripts/setup-terraform-backend.sh to create the bucket
+  backend "gcs" {
+    bucket = "goudchain-terraform-state"
+    prefix = "dev/terraform.tfstate"
+  }
+
   required_providers {
     google = {
       source  = "hashicorp/google"

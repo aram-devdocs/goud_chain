@@ -81,14 +81,14 @@ jobs:
           dashboard_subdomain     = "dashboard"
           api_subdomain           = "api"
 
-          # Tags
+          # Tags (GCP labels: lowercase, numbers, underscores, dashes only)
           tags = {
             project     = "goud-chain"
             environment = "dev"
             managed_by  = "github-actions"
-            repository  = "${{ github.repository }}"
+            repository  = replace("${{ github.repository }}", "/", "_")
             deployed_by = "${{ github.actor }}"
-            commit_sha  = "${{ github.sha }}"
+            commit_sha  = substr("${{ github.sha }}", 0, 8)
           }
           EOF
 

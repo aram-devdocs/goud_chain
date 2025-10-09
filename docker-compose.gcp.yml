@@ -12,7 +12,8 @@ services:
     image: nginx:alpine
     container_name: goud_nginx_lb
     ports:
-      - "8080:8080"
+      - "80:80"       # For Cloudflare proxy
+      - "8080:8080"   # For direct IP access
     volumes:
       - ./nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro
     networks:
