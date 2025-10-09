@@ -2,6 +2,31 @@
 
 Encrypted blockchain with PIN-based access control. Store any JSON data on an immutable, distributed ledger using Proof of Authority consensus.
 
+[![API Status](https://img.shields.io/badge/API-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-api.goudchain.com/)
+[![Dashboard Status](https://img.shields.io/badge/Dashboard-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-dashboard.goudchain.com/)
+
+## 🚀 Try the Live Demo
+
+**Test the blockchain in action** - No installation required!
+
+- **📡 API Endpoint:** [https://dev-api.goudchain.com](https://dev-api.goudchain.com)
+- **🌐 Dashboard:** [https://dev-dashboard.goudchain.com](https://dev-dashboard.goudchain.com)
+
+**Quick Test:**
+```bash
+# Submit encrypted data
+curl -X POST https://dev-api.goudchain.com/data/submit \
+  -H "Content-Type: application/json" \
+  -d '{"label": "test", "pin": "1234", "data": {"message": "Hello Blockchain!"}}'
+
+# View the blockchain
+curl https://dev-api.goudchain.com/chain
+```
+
+Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with the blockchain visually.
+
+> **Note:** This is a proof-of-concept deployment running on GCP's free tier. Hosted on a 2-node network with load balancing.
+
 ## Features
 
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
