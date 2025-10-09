@@ -7,9 +7,9 @@ cargo fmt -- --check || {
     exit 1
 }
 
-echo "Running Clippy..."
-cargo clippy -- -D warnings || {
-    echo "Error: Clippy found issues."
+echo "Running Clippy (warnings as errors)..."
+cargo clippy --all-targets -- -D warnings || {
+    echo "Error: Clippy found issues. Run 'cargo clippy --all-targets -- -D warnings' to see them."
     exit 1
 }
 

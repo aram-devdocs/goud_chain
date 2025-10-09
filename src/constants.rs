@@ -1,5 +1,5 @@
-/// System-wide constants for the Goud Chain blockchain
-/// This module contains all magic numbers and strings used throughout the application
+//! System-wide constants for the Goud Chain blockchain.
+//! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
 pub const SCHEMA_VERSION: &str = "v2_api_key";
