@@ -39,7 +39,7 @@ pub const EMPTY_MERKLE_ROOT: &str = "0";
 // Default network configuration
 pub const DEFAULT_HTTP_PORT: &str = "8080";
 pub const DEFAULT_P2P_PORT: &str = "9000";
-pub const PEER_SYNC_DELAY_SECONDS: u64 = 2;
+pub const PEER_SYNC_DELAY_SECONDS: u64 = 10; // Sync every 10 seconds to avoid thrashing
 
 // Peer reputation
 pub const REPUTATION_REWARD_VALID_BLOCK: i32 = 1;

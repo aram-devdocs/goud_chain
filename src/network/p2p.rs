@@ -51,7 +51,7 @@ impl P2PNode {
         }
     }
 
-    /// Request the blockchain from all peers
+    /// Request the blockchain from all peers (async, spawns threads)
     pub fn request_chain_from_peers(&self) {
         let peers = self.peers.lock().unwrap().clone();
         let blockchain = Arc::clone(&self.blockchain);
@@ -68,6 +68,7 @@ impl P2PNode {
                             let mut bc = bc.lock().unwrap();
                             match bc.replace_chain(chain) {
                                 Ok(true) => {
+                                    info!(peer = %peer, "Successfully synced chain from peer");
                                     if let Err(e) = storage::save_blockchain(&bc) {
                                         error!(error = %e, "Failed to save blockchain");
                                     }
@@ -89,6 +90,56 @@ impl P2PNode {
                 }
             });
         }
+    }
+
+    /// Request the blockchain from all peers synchronously (blocks until complete or timeout)
+    /// Returns true if any peer successfully updated the chain
+    pub fn sync_chain_blocking(&self) -> bool {
+        let peers = self.peers.lock().unwrap().clone();
+
+        if peers.is_empty() {
+            info!("No peers configured, skipping initial sync");
+            return false;
+        }
+
+        info!(peers = ?peers, "Starting blocking sync with peers");
+        let mut synced = false;
+
+        for peer in peers {
+            let message = P2PMessage::RequestChain;
+            match Self::send_and_receive(&peer, &message) {
+                Ok(response) => {
+                    if let P2PMessage::ResponseChain(chain) = response {
+                        let mut bc = self.blockchain.lock().unwrap();
+                        match bc.replace_chain(chain) {
+                            Ok(true) => {
+                                info!(peer = %peer, "Successfully synced chain from peer during startup");
+                                if let Err(e) = storage::save_blockchain(&bc) {
+                                    error!(error = %e, "Failed to save blockchain");
+                                }
+                                synced = true;
+                                // Don't break - try all peers to get longest chain
+                            }
+                            Err(e) => {
+                                warn!(peer = %peer, error = %e, "Failed to replace chain during startup sync");
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(peer = %peer, error = %e, "Failed to sync from peer during startup");
+                }
+            }
+        }
+
+        if synced {
+            info!("Initial chain sync completed successfully");
+        } else {
+            info!("Initial chain sync completed with no updates");
+        }
+
+        synced
     }
 
     /// Start the P2P server to listen for incoming connections
@@ -124,10 +175,11 @@ impl P2PNode {
         );
     }
 
-    /// Start a background sync task
+    /// Start a background sync task that runs continuously
     pub fn start_sync_task(self: Arc<Self>) {
-        thread::spawn(move || {
+        thread::spawn(move || loop {
             thread::sleep(Duration::from_secs(PEER_SYNC_DELAY_SECONDS));
+            info!("Running periodic chain sync with peers");
             self.request_chain_from_peers();
         });
     }

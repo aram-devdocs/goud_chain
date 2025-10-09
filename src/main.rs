@@ -49,7 +49,11 @@ fn main() {
     let p2p_node = P2PNode::new(Arc::clone(&blockchain), config.peers.clone());
     p2p_node.start_p2p_server(config.p2p_port);
 
-    // Start sync task
+    // Perform initial blocking sync before serving requests
+    info!("Performing initial blockchain sync...");
+    p2p_node.sync_chain_blocking();
+
+    // Start continuous sync task
     let p2p_clone = Arc::new(p2p_node);
     Arc::clone(&p2p_clone).start_sync_task();
 
