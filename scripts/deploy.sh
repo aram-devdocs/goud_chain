@@ -204,31 +204,36 @@ fi
 if [ "$IS_LOCAL" = true ]; then
     echo -e "${YELLOW}Step 3.5: Transferring images to VM...${NC}"
 
-    # SCP options for reliable transfer
-    SCP_OPTS="-i ~/.ssh/goud_chain_rsa \
+    # SSH options for rsync
+    SSH_OPTS="-i ~/.ssh/goud_chain_rsa \
               -o StrictHostKeyChecking=no \
-              -o ServerAliveInterval=30 \
-              -o ServerAliveCountMax=3 \
+              -o ServerAliveInterval=15 \
+              -o ServerAliveCountMax=5 \
               -o TCPKeepAlive=yes \
-              -o Compression=yes"
+              -o Compression=no"
 
-    # Function to transfer with retry
+    # Function to transfer with retry using rsync (supports resume)
     transfer_with_retry() {
         local file=$1
         local name=$2
-        local max_retries=3
+        local max_retries=5
         local retry=0
 
         while [ $retry -lt $max_retries ]; do
             echo "Uploading $name (attempt $((retry + 1))/$max_retries)..."
-            if scp $SCP_OPTS "$file" ubuntu@$INSTANCE_IP:/tmp/; then
+
+            # rsync: partial transfers, resume support, bandwidth limit for e2-micro
+            if rsync -avz --partial --progress --timeout=300 \
+                     --bwlimit=2048 \
+                     -e "ssh $SSH_OPTS" \
+                     "$file" ubuntu@$INSTANCE_IP:/tmp/; then
                 echo -e "${GREEN}✅ $name transferred${NC}"
                 return 0
             else
                 retry=$((retry + 1))
                 if [ $retry -lt $max_retries ]; then
-                    echo -e "${YELLOW}⚠️  Transfer failed, retrying in 5 seconds...${NC}"
-                    sleep 5
+                    echo -e "${YELLOW}⚠️  Transfer failed, retrying in 10 seconds...${NC}"
+                    sleep 10
                 fi
             fi
         done
@@ -238,7 +243,28 @@ if [ "$IS_LOCAL" = true ]; then
     }
 
     # Transfer images with retry logic
+    # Transfer node image first
     transfer_with_retry "/tmp/goud-chain-deploy/node.tar.gz" "node image" || exit 1
+
+    # Free up VM memory before second transfer (e2-micro has only 1GB RAM)
+    echo "Freeing VM memory between transfers..."
+    ssh -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no ubuntu@$INSTANCE_IP << 'ENDSSH'
+        # Stop running containers to free memory
+        echo "Stopping containers temporarily..."
+        sudo docker ps -q | xargs -r sudo docker stop 2>/dev/null || true
+
+        # Drop caches to free memory
+        sudo sync
+        echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
+
+        # Show available memory
+        echo "Available memory: $(free -h | awk '/^Mem:/ {print $7}')"
+ENDSSH
+
+    # Small delay to let VM stabilize
+    sleep 5
+
+    # Transfer dashboard image
     transfer_with_retry "/tmp/goud-chain-deploy/dashboard.tar.gz" "dashboard image" || exit 1
 
     echo -e "${GREEN}✅ All images transferred${NC}"
