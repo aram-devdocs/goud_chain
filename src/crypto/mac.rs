@@ -101,7 +101,10 @@ mod tests {
         let mac1 = compute_mac(key, message1);
         let mac2 = compute_mac(key, message2);
 
-        assert_ne!(mac1, mac2, "Different messages should produce different MACs");
+        assert_ne!(
+            mac1, mac2,
+            "Different messages should produce different MACs"
+        );
     }
 
     #[test]
@@ -129,7 +132,8 @@ mod tests {
     #[test]
     fn test_hmac_long_key() {
         // Test with key longer than block size (64 bytes)
-        let long_key = b"this_is_a_very_long_key_that_exceeds_the_sha256_block_size_of_64_bytes_for_testing";
+        let long_key =
+            b"this_is_a_very_long_key_that_exceeds_the_sha256_block_size_of_64_bytes_for_testing";
         let message = b"Test message";
 
         let mac = compute_mac(long_key, message);

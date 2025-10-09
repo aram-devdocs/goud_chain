@@ -5,9 +5,7 @@ use tracing::{error, info};
 use super::auth::{generate_session_token, verify_api_key_hash};
 use super::middleware::{error_response, json_response};
 use crate::constants::SESSION_EXPIRY_SECONDS;
-use crate::crypto::{
-    encode_api_key, generate_api_key, generate_signing_key, hash_api_key,
-};
+use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key};
 use crate::domain::{Blockchain, UserAccount};
 use crate::network::P2PNode;
 use crate::storage;
@@ -67,10 +65,8 @@ pub fn handle_create_account(
                                 }
                                 Err(e) => {
                                     error!(error = %e, "Failed to create block");
-                                    let _ = request.respond(error_response(
-                                        e.to_json(),
-                                        e.status_code(),
-                                    ));
+                                    let _ = request
+                                        .respond(error_response(e.to_json(), e.status_code()));
                                 }
                             }
                         }

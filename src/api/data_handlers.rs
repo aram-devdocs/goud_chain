@@ -220,7 +220,9 @@ pub fn handle_list_data(
         }
     }
 
-    let response = CollectionListResponse { collections: result };
+    let response = CollectionListResponse {
+        collections: result,
+    };
     json_response(serde_json::to_string(&response).unwrap())
 }
 
@@ -240,10 +242,8 @@ pub fn handle_decrypt_data(
         AuthMethod::ApiKey(key) => key,
         AuthMethod::SessionToken(_) => {
             return error_response(
-                GoudChainError::Unauthorized(
-                    "Direct API key required for decryption".to_string(),
-                )
-                .to_json(),
+                GoudChainError::Unauthorized("Direct API key required for decryption".to_string())
+                    .to_json(),
                 403,
             );
         }
@@ -272,10 +272,7 @@ pub fn handle_decrypt_data(
                 (Ok(metadata), Ok(data)) => {
                     let response = DecryptCollectionResponse {
                         collection_id: collection.collection_id,
-                        label: metadata["label"]
-                            .as_str()
-                            .unwrap_or("unknown")
-                            .to_string(),
+                        label: metadata["label"].as_str().unwrap_or("unknown").to_string(),
                         data,
                         created_at: metadata["created_at"].as_i64().unwrap_or(0),
                     };

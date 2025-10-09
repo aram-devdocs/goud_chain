@@ -58,10 +58,7 @@ impl Block {
 
         // Hash all accounts
         for account in accounts {
-            let account_hash = format!(
-                "{}{}",
-                account.account_id, account.api_key_hash
-            );
+            let account_hash = format!("{}{}", account.account_id, account.api_key_hash);
             let mut hasher = Sha256::new();
             hasher.update(account_hash.as_bytes());
             hashes.push(format!("{:x}", hasher.finalize()));

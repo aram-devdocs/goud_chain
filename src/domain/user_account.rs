@@ -3,10 +3,11 @@ use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::crypto::{
-    encrypt_data_with_key, get_public_key_hex, hash_api_key, sign_message, verify_signature, derive_encryption_key,
-};
 use crate::constants::ENCRYPTION_SALT;
+use crate::crypto::{
+    derive_encryption_key, encrypt_data_with_key, get_public_key_hex, hash_api_key, sign_message,
+    verify_signature,
+};
 use crate::types::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,11 +22,7 @@ pub struct UserAccount {
 
 impl UserAccount {
     /// Create a new user account with an API key
-    pub fn new(
-        api_key: &[u8],
-        signing_key: &SigningKey,
-        metadata: Option<String>,
-    ) -> Result<Self> {
+    pub fn new(api_key: &[u8], signing_key: &SigningKey, metadata: Option<String>) -> Result<Self> {
         let account_id = Uuid::new_v4().to_string();
         let api_key_hash = hash_api_key(api_key);
         let public_key = get_public_key_hex(signing_key);

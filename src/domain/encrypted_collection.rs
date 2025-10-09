@@ -48,7 +48,8 @@ impl EncryptedCollection {
             .map_err(|e| crate::types::GoudChainError::Internal(e.to_string()))?;
 
         // Encrypt metadata and payload
-        let (encrypted_metadata, _meta_nonce) = encrypt_data_with_key(&metadata_str, &encryption_key)?;
+        let (encrypted_metadata, _meta_nonce) =
+            encrypt_data_with_key(&metadata_str, &encryption_key)?;
         let (encrypted_payload, nonce) = encrypt_data_with_key(&data, &encryption_key)?;
 
         // Compute MAC over collection_id + encrypted data for integrity

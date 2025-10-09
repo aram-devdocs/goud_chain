@@ -5,8 +5,7 @@ use tracing::{info, warn};
 
 use super::{block::Block, encrypted_collection::EncryptedCollection, user_account::UserAccount};
 use crate::constants::{
-    CHECKPOINT_INTERVAL, GENESIS_PREVIOUS_HASH,
-    SCHEMA_VERSION, TIMESTAMP_TOLERANCE_SECONDS,
+    CHECKPOINT_INTERVAL, GENESIS_PREVIOUS_HASH, SCHEMA_VERSION, TIMESTAMP_TOLERANCE_SECONDS,
 };
 use crate::crypto::generate_signing_key;
 use crate::types::{GoudChainError, Result};
@@ -143,7 +142,12 @@ impl Blockchain {
             }
 
             // Validate merkle root
-            if current.merkle_root != Block::calculate_merkle_root(&current.user_accounts, &current.encrypted_collections) {
+            if current.merkle_root
+                != Block::calculate_merkle_root(
+                    &current.user_accounts,
+                    &current.encrypted_collections,
+                )
+            {
                 return Err(GoudChainError::InvalidMerkleRoot(i as u64));
             }
 
@@ -225,7 +229,6 @@ impl Blockchain {
         }
         None
     }
-
 }
 
 #[cfg(test)]

@@ -20,10 +20,7 @@ impl DependencyGraph {
     }
 
     fn add_dependency(&mut self, from: String, to: String) {
-        self.edges
-            .entry(from)
-            .or_default()
-            .insert(to);
+        self.edges.entry(from).or_default().insert(to);
     }
 
     /// Detect circular dependencies using DFS
@@ -226,12 +223,14 @@ fn test_layered_architecture() {
     let graph = build_dependency_graph();
 
     // Define layers (lower layers cannot depend on higher layers)
-    let layers = [vec!["constants", "types"], // Layer 0: Foundation
+    let layers = [
+        vec!["constants", "types"], // Layer 0: Foundation
         vec!["crypto", "config"],   // Layer 1: Utilities
         vec!["domain"],             // Layer 2: Business Logic
         vec!["storage"],            // Layer 3: Persistence
         vec!["network"],            // Layer 4: Network/P2P
-        vec!["api"]];
+        vec!["api"],
+    ];
 
     for (layer_idx, layer) in layers.iter().enumerate() {
         for module in layer {

@@ -63,20 +63,22 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
     use std::collections::HashMap;
 
     let chain = blockchain.lock().unwrap();
-    
+
     // Calculate statistics
     let total_blocks = chain.chain.len() as u64;
-    
+
     let mut total_collections = 0u64;
     let mut total_accounts = 0u64;
     let mut validator_distribution: HashMap<String, u64> = HashMap::new();
-    
+
     for block in &chain.chain {
         total_collections += block.encrypted_collections.len() as u64;
         total_accounts += block.user_accounts.len() as u64;
-        *validator_distribution.entry(block.validator.clone()).or_insert(0) += 1;
+        *validator_distribution
+            .entry(block.validator.clone())
+            .or_insert(0) += 1;
     }
-    
+
     // Calculate average block time
     let avg_block_time = if chain.chain.len() > 1 {
         let mut total_time = 0.0;
@@ -87,7 +89,7 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
     } else {
         0.0
     };
-    
+
     let stats = ChainStatsResponse {
         total_blocks,
         total_collections,
@@ -95,7 +97,7 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
         avg_block_time_seconds: avg_block_time,
         validator_distribution,
     };
-    
+
     json_response(serde_json::to_string(&stats).unwrap())
 }
 
@@ -108,9 +110,9 @@ pub fn handle_get_metrics(
 
     let chain = blockchain.lock().unwrap();
     let peers = p2p.peers.lock().unwrap();
-    
+
     let latest_block = chain.chain.last();
-    
+
     let metrics = NodeMetricsResponse {
         node_id: chain.node_id.clone(),
         chain_length: chain.chain.len() as u64,
@@ -119,7 +121,7 @@ pub fn handle_get_metrics(
         latest_block_timestamp: latest_block.map(|b| b.timestamp).unwrap_or(0),
         status: "healthy".to_string(),
     };
-    
+
     json_response(serde_json::to_string(&metrics).unwrap())
 }
 

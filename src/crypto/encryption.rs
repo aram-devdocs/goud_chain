@@ -9,7 +9,10 @@ use crate::constants::{AES_KEY_SIZE_BYTES, NONCE_SIZE_BYTES};
 use crate::types::{GoudChainError, Result};
 
 /// Encrypt data using AES-256-GCM with a derived key from API key
-pub fn encrypt_data_with_key(data: &str, encryption_key: &[u8; AES_KEY_SIZE_BYTES]) -> Result<(String, String)> {
+pub fn encrypt_data_with_key(
+    data: &str,
+    encryption_key: &[u8; AES_KEY_SIZE_BYTES],
+) -> Result<(String, String)> {
     let key = GenericArray::from_slice(encryption_key);
     let cipher = Aes256Gcm::new(key);
 
@@ -33,7 +36,10 @@ pub fn encrypt_data_with_key(data: &str, encryption_key: &[u8; AES_KEY_SIZE_BYTE
 }
 
 /// Decrypt data using AES-256-GCM with a derived key from API key
-pub fn decrypt_data_with_key(encrypted_payload: &str, encryption_key: &[u8; AES_KEY_SIZE_BYTES]) -> Result<String> {
+pub fn decrypt_data_with_key(
+    encrypted_payload: &str,
+    encryption_key: &[u8; AES_KEY_SIZE_BYTES],
+) -> Result<String> {
     let key = GenericArray::from_slice(encryption_key);
     let cipher = Aes256Gcm::new(key);
 

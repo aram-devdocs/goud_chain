@@ -47,19 +47,15 @@ pub fn verify_session_token(token: &str) -> Result<Claims> {
     let validation = Validation::default();
     let jwt_secret = get_jwt_secret();
 
-    decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(&jwt_secret),
-        &validation,
-    )
-    .map(|data| data.claims)
-    .map_err(|e| GoudChainError::Unauthorized(format!("Invalid token: {}", e)))
+    decode::<Claims>(token, &DecodingKey::from_secret(&jwt_secret), &validation)
+        .map(|data| data.claims)
+        .map_err(|e| GoudChainError::Unauthorized(format!("Invalid token: {}", e)))
 }
 
 /// Extract API key or session token from Authorization header
 pub enum AuthMethod {
-    ApiKey(Vec<u8>),       // Raw API key bytes
-    SessionToken(Claims),  // Decoded JWT claims
+    ApiKey(Vec<u8>),      // Raw API key bytes
+    SessionToken(Claims), // Decoded JWT claims
 }
 
 /// Extract authentication from HTTP request
@@ -68,7 +64,12 @@ pub fn extract_auth(request: &Request) -> Result<AuthMethod> {
     let auth_header = request
         .headers()
         .iter()
-        .find(|h| h.field.as_str().as_str().eq_ignore_ascii_case("authorization"))
+        .find(|h| {
+            h.field
+                .as_str()
+                .as_str()
+                .eq_ignore_ascii_case("authorization")
+        })
         .ok_or_else(|| GoudChainError::Unauthorized("Missing Authorization header".to_string()))?;
 
     let auth_value = auth_header.value.as_str();

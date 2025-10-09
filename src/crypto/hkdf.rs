@@ -1,8 +1,7 @@
 use sha2::{Digest, Sha256};
 
 use crate::constants::{
-    AES_KEY_SIZE_BYTES, HKDF_CONTEXT_ENCRYPTION, HKDF_CONTEXT_MAC,
-    HKDF_ITERATIONS,
+    AES_KEY_SIZE_BYTES, HKDF_CONTEXT_ENCRYPTION, HKDF_CONTEXT_MAC, HKDF_ITERATIONS,
 };
 
 /// HKDF-Extract: Extract a pseudorandom key from input keying material
@@ -134,7 +133,10 @@ mod tests {
         let d = "abc12";
 
         assert!(constant_time_compare(a, b), "Equal strings should match");
-        assert!(!constant_time_compare(a, c), "Different strings should not match");
+        assert!(
+            !constant_time_compare(a, c),
+            "Different strings should not match"
+        );
         assert!(
             !constant_time_compare(a, d),
             "Different length strings should not match"

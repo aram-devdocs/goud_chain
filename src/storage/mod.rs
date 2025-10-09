@@ -28,7 +28,8 @@ pub fn load_blockchain(node_id: String) -> Result<Blockchain> {
     match fs::read_to_string(BLOCKCHAIN_FILE_PATH) {
         Ok(content) => {
             // Try to extract just the schema_version field to check compatibility
-            let schema_check: serde_json::Result<serde_json::Value> = serde_json::from_str(&content);
+            let schema_check: serde_json::Result<serde_json::Value> =
+                serde_json::from_str(&content);
 
             match schema_check {
                 Ok(value) => {
