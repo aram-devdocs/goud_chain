@@ -1,92 +1,138 @@
-# Compute module - Oracle Cloud instances for Goud Chain blockchain nodes
+# Compute module - Google Cloud Compute Engine instance for Goud Chain
 
 terraform {
   required_providers {
-    oci = {
-      source  = "oracle/oci"
+    google = {
+      source  = "hashicorp/google"
       version = "~> 6.0"
     }
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.0"
+  }
+}
+
+# Get the latest Ubuntu 22.04 LTS image
+data "google_compute_image" "ubuntu" {
+  family  = "ubuntu-2204-lts"
+  project = "ubuntu-os-cloud"
+}
+
+# Single e2-micro instance (FREE tier)
+resource "google_compute_instance" "blockchain_node" {
+  name         = "${var.project_name}-${var.environment}-vm"
+  machine_type = var.machine_type
+  zone         = var.zone
+
+  tags = ["blockchain-node", "http-server", "https-server"]
+
+  boot_disk {
+    initialize_params {
+      image = data.google_compute_image.ubuntu.self_link
+      size  = var.boot_disk_size_gb
+      type  = "pd-standard" # Standard persistent disk (free tier eligible)
     }
   }
-}
 
-# Get the latest Ubuntu 22.04 image (ARM or x86 depending on shape)
-data "oci_core_images" "ubuntu" {
-  compartment_id           = var.compartment_id
-  operating_system         = "Canonical Ubuntu"
-  operating_system_version = "22.04"
-  shape                    = var.instance_shape
+  network_interface {
+    network = "default" # Use default VPC (free tier)
 
-  filter {
-    name   = "display_name"
-    values = ["^Canonical-Ubuntu-22.04-.*"]
-    regex  = true
-  }
-}
-
-# Get availability domains
-data "oci_identity_availability_domains" "ads" {
-  compartment_id = var.compartment_id
-}
-
-# Load cloud-init script
-data "local_file" "cloud_init" {
-  filename = "${path.module}/cloud-init.yaml"
-}
-
-# Blockchain node instances
-resource "oci_core_instance" "blockchain_node" {
-  count = var.node_count
-
-  compartment_id      = var.compartment_id
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[count.index % length(data.oci_identity_availability_domains.ads.availability_domains)].name
-  display_name        = "${var.project_name}-${var.environment}-node${count.index + 1}"
-  shape               = var.instance_shape
-
-  # Don't specify fault_domain - let Oracle auto-assign for better capacity availability
-  # Per: https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/troubleshooting-out-of-host-capacity.htm
-
-  shape_config {
-    ocpus         = var.instance_ocpus
-    memory_in_gbs = var.instance_memory_gb
-  }
-
-  create_vnic_details {
-    subnet_id        = var.subnet_id
-    display_name     = "${var.project_name}-${var.environment}-node${count.index + 1}-vnic"
-    assign_public_ip = true
-    hostname_label   = "node${count.index + 1}"
-  }
-
-  source_details {
-    source_type             = "image"
-    source_id               = data.oci_core_images.ubuntu.images[0].id
-    boot_volume_size_in_gbs = var.boot_volume_size_gb
+    access_config {
+      # Ephemeral public IP
+    }
   }
 
   metadata = {
-    ssh_authorized_keys = var.ssh_public_key
-    user_data           = base64encode(data.local_file.cloud_init.content)
+    ssh-keys           = "${var.ssh_username}:${var.ssh_public_key}"
+    enable-oslogin     = "FALSE"
+    startup-script     = file("${path.module}/startup.sh")
+    user-data          = <<-EOT
+      #cloud-config
+      packages:
+        - docker.io
+        - docker-compose
+        - git
+        - curl
+      runcmd:
+        - systemctl enable docker
+        - systemctl start docker
+        - usermod -aG docker ${var.ssh_username}
+        - mkdir -p /data
+        - chmod 755 /data
+        - chown ${var.ssh_username}:${var.ssh_username} /data
+    EOT
   }
 
-  freeform_tags = merge(
+  service_account {
+    scopes = ["cloud-platform"]
+  }
+
+  allow_stopping_for_update = true
+
+  labels = merge(
     var.tags,
     {
-      NodeNumber = count.index + 1
-      Role       = count.index == 0 ? "load-balancer" : "blockchain-node"
+      environment = var.environment
+      role        = "blockchain-node"
     }
   )
 
   lifecycle {
     ignore_changes = [
-      source_details[0].source_id, # Ignore image updates
-      metadata,                    # Ignore cloud-init script changes (prevents instance replacement)
-      availability_domain,         # Ignore AZ recalculation (prevents instance replacement)
-      freeform_tags,               # Ignore tag changes
-      defined_tags,                # Ignore Oracle-managed tags
+      metadata["ssh-keys"], # Prevent replacement on key changes
     ]
   }
+}
+
+# Firewall rule for SSH (port 22)
+resource "google_compute_firewall" "ssh" {
+  name    = "${var.project_name}-${var.environment}-allow-ssh"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = var.allowed_ssh_cidrs
+  target_tags   = ["blockchain-node"]
+}
+
+# Firewall rule for HTTP API (port 8080)
+resource "google_compute_firewall" "http_api" {
+  name    = "${var.project_name}-${var.environment}-allow-http-api"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["8080"]
+  }
+
+  source_ranges = var.allowed_http_cidrs
+  target_tags   = ["blockchain-node"]
+}
+
+# Firewall rule for Dashboard (port 3000)
+resource "google_compute_firewall" "dashboard" {
+  name    = "${var.project_name}-${var.environment}-allow-dashboard"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["3000"]
+  }
+
+  source_ranges = var.allowed_http_cidrs
+  target_tags   = ["blockchain-node"]
+}
+
+# Firewall rule for HTTP/HTTPS (for Cloudflare origin requests)
+resource "google_compute_firewall" "http_https" {
+  name    = "${var.project_name}-${var.environment}-allow-http-https"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+
+  source_ranges = var.allowed_http_cidrs
+  target_tags   = ["http-server", "https-server"]
 }

@@ -1,80 +1,56 @@
-# Terraform outputs for Goud Chain infrastructure
+# Terraform outputs for Goud Chain infrastructure on Google Cloud Platform
 # These values are used by CI/CD and for manual operations
 
-output "load_balancer_public_ip" {
-  description = "Public IP of the load balancer (primary API endpoint)"
-  value       = length(module.compute.public_ips) > 0 ? module.compute.public_ips[0] : null
+output "instance_public_ip" {
+  description = "Public IP of the GCP compute instance"
+  value       = module.compute.public_ip
+}
+
+output "instance_name" {
+  description = "Name of the GCP compute instance"
+  value       = module.compute.instance_name
 }
 
 output "load_balancer_url" {
   description = "Load balancer API URL"
-  value       = var.enable_dns && module.dns.api_url != null ? module.dns.api_url : (length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:8080" : null)
+  value       = var.enable_dns && module.dns.api_url != null ? module.dns.api_url : "http://${module.compute.public_ip}:8080"
 }
 
 output "dashboard_url" {
   description = "Dashboard URL"
-  value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : (length(module.compute.public_ips) > 0 ? "http://${module.compute.public_ips[0]}:3000" : null)
-}
-
-output "node_public_ips" {
-  description = "Public IP addresses of all blockchain nodes"
-  value       = module.compute.public_ips
-}
-
-output "node_private_ips" {
-  description = "Private IP addresses of all blockchain nodes for P2P communication"
-  value       = module.compute.private_ips
-}
-
-output "instance_ids" {
-  description = "OCIDs of all compute instances"
-  value       = module.compute.instance_ids
-}
-
-output "block_volume_ids" {
-  description = "OCIDs of all block volumes for blockchain data"
-  value       = module.storage.block_volume_ids
-}
-
-output "vcn_id" {
-  description = "OCID of the Virtual Cloud Network"
-  value       = module.network.vcn_id
-}
-
-output "subnet_id" {
-  description = "OCID of the public subnet"
-  value       = module.network.public_subnet_id
+  value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : "http://${module.compute.public_ip}:3000"
 }
 
 output "ssh_command" {
-  description = "SSH command to connect to the first node (load balancer)"
-  value       = length(module.compute.public_ips) > 0 ? "ssh ubuntu@${module.compute.public_ips[0]}" : null
+  description = "SSH command to connect to the instance"
+  value       = "ssh ${var.ssh_username}@${module.compute.public_ip}"
 }
 
 output "deployment_summary" {
   description = "Summary of deployed resources"
   value = {
-    environment      = var.environment
-    region           = var.region
-    node_count       = var.blockchain_node_count
-    instance_shape   = var.instance_shape
-    total_ocpus      = var.blockchain_node_count * var.instance_ocpus
-    total_memory_gb  = var.blockchain_node_count * var.instance_memory_gb
-    total_storage_gb = var.blockchain_node_count * var.block_volume_size_gb
+    environment     = var.environment
+    region          = var.region
+    zone            = var.zone
+    machine_type    = var.machine_type
+    disk_size_gb    = var.boot_disk_size_gb
+    architecture    = "single-vm-multi-container"
+    node_count      = 2 # 2 blockchain nodes in Docker containers
+    validators      = 2 # PoA validators
   }
 }
 
 output "health_check_commands" {
   description = "Commands to check health of deployed services"
-  value = length(module.compute.public_ips) > 0 ? (var.enable_dns && module.dns.api_url != null ? {
+  value = var.enable_dns && module.dns.api_url != null ? {
     load_balancer = "curl ${module.dns.api_url}/lb/health"
     node_health   = "curl ${module.dns.api_url}/health"
     blockchain    = "curl ${module.dns.api_url}/chain"
     } : {
-    load_balancer = "curl http://${module.compute.public_ips[0]}:8080/lb/health"
-    node_health   = "curl http://${module.compute.public_ips[0]}:8080/health"
-    blockchain    = "curl http://${module.compute.public_ips[0]}:8080/chain"
-  }) : null
+    load_balancer = "curl http://${module.compute.public_ip}:8080/lb/health"
+    node_health   = "curl http://${module.compute.public_ip}:8080/health"
+    blockchain    = "curl http://${module.compute.public_ip}:8080/chain"
+  }
 }
 
 output "dns_configuration" {

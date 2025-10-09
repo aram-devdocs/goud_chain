@@ -1,39 +1,31 @@
-# Compute module outputs
+# Outputs for GCP Compute module
 
-output "instance_ids" {
-  description = "OCIDs of all compute instances"
-  value       = oci_core_instance.blockchain_node[*].id
+output "instance_id" {
+  description = "GCP compute instance ID"
+  value       = google_compute_instance.blockchain_node.instance_id
 }
 
-output "public_ips" {
-  description = "Public IP addresses of all instances"
-  value       = oci_core_instance.blockchain_node[*].public_ip
+output "instance_name" {
+  description = "GCP compute instance name"
+  value       = google_compute_instance.blockchain_node.name
 }
 
-output "private_ips" {
-  description = "Private IP addresses of all instances"
-  value       = oci_core_instance.blockchain_node[*].private_ip
+output "public_ip" {
+  description = "Public IP address of the instance"
+  value       = google_compute_instance.blockchain_node.network_interface[0].access_config[0].nat_ip
 }
 
-output "availability_domain" {
-  description = "Availability domain of the first instance (deprecated - use availability_domains)"
-  value       = oci_core_instance.blockchain_node[0].availability_domain
+output "private_ip" {
+  description = "Private IP address of the instance"
+  value       = google_compute_instance.blockchain_node.network_interface[0].network_ip
 }
 
-output "availability_domains" {
-  description = "Availability domains for all instances"
-  value       = oci_core_instance.blockchain_node[*].availability_domain
+output "zone" {
+  description = "GCP zone where instance is running"
+  value       = google_compute_instance.blockchain_node.zone
 }
 
-output "instance_details" {
-  description = "Detailed information about all instances"
-  value = [
-    for i, instance in oci_core_instance.blockchain_node : {
-      name       = instance.display_name
-      public_ip  = instance.public_ip
-      private_ip = instance.private_ip
-      ad         = instance.availability_domain
-      state      = instance.state
-    }
-  ]
+output "machine_type" {
+  description = "Machine type of the instance"
+  value       = google_compute_instance.blockchain_node.machine_type
 }

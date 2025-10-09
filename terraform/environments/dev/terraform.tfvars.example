@@ -1,0 +1,24 @@
+# Goud Chain Terraform Configuration Example
+# Copy this to terraform.tfvars and fill in your values
+
+project_id         = "your-gcp-project-id"
+region             = "us-central1"
+zone               = "us-central1-a"
+environment        = "dev"
+project_name       = "goud-chain"
+machine_type       = "e2-micro"
+boot_disk_size_gb  = 30
+ssh_username       = "ubuntu"
+ssh_public_key     = "ssh-rsa AAAAB3NzaC1yc2E..."
+allowed_ssh_cidrs  = ["0.0.0.0/0"]
+allowed_http_cidrs = ["0.0.0.0/0"]
+enable_dns              = false
+domain_name             = "goudchain.com"
+cloudflare_api_token    = ""
+cloudflare_zone_id      = ""
+enable_cloudflare_proxy = false
+tags = {
+  project     = "goud-chain"
+  environment = "dev"
+  managed_by  = "terraform"
+}

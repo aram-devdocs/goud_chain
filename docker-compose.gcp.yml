@@ -1,0 +1,156 @@
+# Docker Compose for Goud Chain on Google Cloud Platform e2-micro (1GB RAM)
+# Optimized for single-VM deployment with 2 blockchain nodes
+#
+# Usage:
+#   docker-compose -f docker-compose.gcp.yml up -d
+
+version: '3.8'
+
+services:
+  # NGINX Load Balancer - Primary API endpoint
+  nginx:
+    image: nginx:alpine
+    container_name: goud_nginx_lb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/lb/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Dashboard - Web UI
+  dashboard:
+    build: ./dashboard
+    container_name: goud_dashboard
+    ports:
+      - "3000:8080"
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Blockchain Node 1
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node1
+    environment:
+      - NODE_ID=node1
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node2:9000
+    ports:
+      - "8081:8080"
+      - "9001:9000"
+    volumes:
+      - node1_data:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 384M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Blockchain Node 2
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: goud-chain:latest
+    container_name: goud_node2
+    environment:
+      - NODE_ID=node2
+      - HTTP_PORT=8080
+      - P2P_PORT=9000
+      - PEERS=node1:9000
+    ports:
+      - "8082:8080"
+      - "9002:9000"
+    volumes:
+      - node2_data:/data
+    networks:
+      - goud_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 384M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+networks:
+  goud_network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:

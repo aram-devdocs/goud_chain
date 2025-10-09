@@ -1,117 +1,119 @@
-# Free tier environment variables
-# These mirror the root module variables
+# Variables for dev environment
+# Mirror of root variables for pass-through
 
-variable "tenancy_ocid" {
-  type = string
-}
-
-variable "user_ocid" {
-  type = string
-}
-
-variable "fingerprint" {
-  type = string
-}
-
-variable "private_key_path" {
-  type = string
+variable "project_id" {
+  description = "Google Cloud project ID"
+  type        = string
 }
 
 variable "region" {
-  type = string
+  description = "GCP region"
+  type        = string
+  default     = "us-central1"
 }
 
-variable "compartment_ocid" {
-  type    = string
-  default = ""
+variable "zone" {
+  description = "GCP zone"
+  type        = string
+  default     = "us-central1-a"
+}
+
+variable "project_name" {
+  description = "Project name"
+  type        = string
+  default     = "goud-chain"
 }
 
 variable "environment" {
-  type = string
+  description = "Environment name"
+  type        = string
+  default     = "dev"
 }
 
-variable "blockchain_node_count" {
-  type = number
+variable "machine_type" {
+  description = "GCP machine type"
+  type        = string
+  default     = "e2-micro"
 }
 
-variable "instance_shape" {
-  type = string
+variable "boot_disk_size_gb" {
+  description = "Boot disk size in GB"
+  type        = number
+  default     = 30
 }
 
-variable "instance_ocpus" {
-  type = number
-}
-
-variable "instance_memory_gb" {
-  type = number
-}
-
-variable "boot_volume_size_gb" {
-  type = number
-}
-
-variable "block_volume_size_gb" {
-  type = number
+variable "ssh_username" {
+  description = "SSH username"
+  type        = string
+  default     = "ubuntu"
 }
 
 variable "ssh_public_key" {
-  type = string
+  description = "SSH public key"
+  type        = string
 }
 
 variable "allowed_ssh_cidrs" {
-  type = list(string)
+  description = "Allowed SSH CIDRs"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
 }
 
 variable "allowed_http_cidrs" {
-  type = list(string)
-}
-
-variable "enable_monitoring" {
-  type = bool
-}
-
-variable "enable_redis" {
-  type = bool
-}
-
-variable "backup_retention_days" {
-  type = number
+  description = "Allowed HTTP CIDRs"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
 }
 
 variable "tags" {
-  type = map(string)
+  description = "Resource labels"
+  type        = map(string)
+  default = {
+    project     = "goud-chain"
+    environment = "dev"
+    managed_by  = "terraform"
+  }
 }
 
-# DNS and domain configuration
 variable "enable_dns" {
-  type = bool
+  description = "Enable Cloudflare DNS"
+  type        = bool
+  default     = true
 }
 
 variable "domain_name" {
-  type = string
+  description = "Domain name"
+  type        = string
+  default     = "goudchain.com"
 }
 
 variable "cloudflare_api_token" {
-  type      = string
-  sensitive = true
+  description = "Cloudflare API token"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "cloudflare_zone_id" {
-  type = string
+  description = "Cloudflare zone ID"
+  type        = string
+  default     = ""
 }
 
 variable "enable_cloudflare_proxy" {
-  type = bool
-}
-
-variable "enable_node_dns" {
-  type = bool
+  description = "Enable Cloudflare proxy"
+  type        = bool
+  default     = true
 }
 
 variable "dashboard_subdomain" {
-  type = string
+  description = "Dashboard subdomain"
+  type        = string
+  default     = "dashboard"
 }
 
 variable "api_subdomain" {
-  type = string
+  description = "API subdomain"
+  type        = string
+  default     = "api"
 }

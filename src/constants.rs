@@ -45,4 +45,5 @@ pub const HEADER_VALUE_HEADERS: &[u8] = b"Content-Type";
 pub const HEADER_VALUE_JSON: &[u8] = b"application/json";
 
 // Proof of Authority validators
-pub const VALIDATORS: [&str; 3] = ["Validator_1", "Validator_2", "Validator_3"];
+// Reduced to 2 validators for single-VM GCP deployment (optimized for e2-micro 1GB RAM)
+pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];

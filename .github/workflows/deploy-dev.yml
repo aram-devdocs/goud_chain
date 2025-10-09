@@ -1,5 +1,5 @@
-# Deploy to Oracle Cloud Development Environment
-# Triggered manually or on merge to main branch
+# Deploy to Google Cloud Platform Development Environment
+# Triggered manually or on push to main branch
 
 name: Deploy Dev
 
@@ -14,8 +14,9 @@ on:
 
 env:
   ENVIRONMENT: dev
-  OCI_CLI_VERSION: 3.37.0
   TERRAFORM_VERSION: 1.6.6
+  GCP_REGION: us-central1
+  GCP_ZONE: us-central1-a
 
 jobs:
   # Terraform plan and apply
@@ -37,31 +38,39 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
       - name: Create Terraform variables file
         run: |
-          cat > terraform.tfvars.local <<EOF
-          tenancy_ocid     = "${{ secrets.OCI_TENANCY_OCID }}"
-          user_ocid        = "${{ secrets.OCI_USER_OCID }}"
-          fingerprint      = "${{ secrets.OCI_FINGERPRINT }}"
-          private_key_path = "./oci_api_key.pem"
-          region           = "${{ secrets.OCI_REGION }}"
-          compartment_ocid = "${{ secrets.OCI_TENANCY_OCID }}"
+          cat > terraform.tfvars <<EOF
+          # GCP Configuration
+          project_id    = "${{ secrets.GCP_PROJECT_ID }}"
+          region        = "${{ env.GCP_REGION }}"
+          zone          = "${{ env.GCP_ZONE }}"
 
-          environment           = "dev"
-          blockchain_node_count = 2
-          instance_shape        = "VM.Standard.E2.1"
-          instance_ocpus        = 1
-          instance_memory_gb    = 8
-          boot_volume_size_gb   = 50
-          block_volume_size_gb  = 50
+          # Environment
+          environment   = "dev"
+          project_name  = "goud-chain"
 
-          ssh_public_key    = "${{ secrets.SSH_PUBLIC_KEY }}"
-          allowed_ssh_cidrs = ["0.0.0.0/0"]
+          # Compute
+          machine_type      = "e2-micro"
+          boot_disk_size_gb = 30
+
+          # SSH Access
+          ssh_username   = "ubuntu"
+          ssh_public_key = "${{ secrets.SSH_PUBLIC_KEY }}"
+
+          # Network Security
+          allowed_ssh_cidrs  = ["0.0.0.0/0"]
           allowed_http_cidrs = ["0.0.0.0/0"]
-
-          enable_monitoring     = false
-          enable_redis          = true
-          backup_retention_days = 7
 
           # DNS Configuration (Cloudflare)
           enable_dns              = true
@@ -69,96 +78,40 @@ jobs:
           cloudflare_api_token    = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
           cloudflare_zone_id      = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
           enable_cloudflare_proxy = true
-          enable_node_dns         = false
           dashboard_subdomain     = "dashboard"
           api_subdomain           = "api"
 
+          # Tags
           tags = {
-            Project     = "goud-chain"
-            Environment = "dev"
-            ManagedBy   = "github-actions"
-            Repository  = "${{ github.repository }}"
-            DeployedBy  = "${{ github.actor }}"
-            CommitSHA   = "${{ github.sha }}"
+            project     = "goud-chain"
+            environment = "dev"
+            managed_by  = "github-actions"
+            repository  = "${{ github.repository }}"
+            deployed_by = "${{ github.actor }}"
+            commit_sha  = "${{ github.sha }}"
           }
           EOF
-
-      - name: Setup OCI Configuration
-        run: |
-          # Create OCI config directory
-          mkdir -p ~/.oci
-
-          # Get absolute path to working directory
-          WORKSPACE=$(pwd)
-
-          # Create OCI config file (no leading spaces)
-          echo "[DEFAULT]" > ~/.oci/config
-          echo "user=${{ secrets.OCI_USER_OCID }}" >> ~/.oci/config
-          echo "fingerprint=${{ secrets.OCI_FINGERPRINT }}" >> ~/.oci/config
-          echo "tenancy=${{ secrets.OCI_TENANCY_OCID }}" >> ~/.oci/config
-          echo "region=${{ secrets.OCI_REGION }}" >> ~/.oci/config
-          echo "key_file=${WORKSPACE}/oci_api_key.pem" >> ~/.oci/config
-          chmod 600 ~/.oci/config
-
-          # Create OCI private key file
-          echo "${{ secrets.OCI_PRIVATE_KEY }}" > oci_api_key.pem
-          chmod 600 oci_api_key.pem
-
-          # Debug: Show config file (with secrets masked)
-          echo "=== OCI Config File Debug ==="
-          echo "Working directory: $(pwd)"
-          echo "Config file location: ~/.oci/config"
-          echo "Config file contents (secrets will be masked by GitHub):"
-          cat ~/.oci/config
-          echo ""
-          echo "Key file location: ${WORKSPACE}/oci_api_key.pem"
-          echo "Key file exists: $(test -f oci_api_key.pem && echo 'YES' || echo 'NO')"
-          echo "Key file permissions: $(ls -la oci_api_key.pem 2>/dev/null || echo 'N/A')"
-          echo "Key file first line: $(head -n 1 oci_api_key.pem)"
-          echo "=== End Debug ==="
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Migrate Provider (if needed)
-        continue-on-error: true
-        run: |
-          # Migrate from deprecated hashicorp/oci to oracle/oci if state exists
-          if [ -f terraform.tfstate ]; then
-            terraform state replace-provider -auto-approve hashicorp/oci oracle/oci || true
-          fi
+      - name: Terraform Validate
+        run: terraform validate
 
       - name: Terraform Plan
         id: plan
-        env:
-          TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
-          TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
-          TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
-          TF_VAR_region: ${{ secrets.OCI_REGION }}
-          TF_VAR_private_key_path: ./oci_api_key.pem
-        run: |
-          echo "=== Terraform Plan Debug ==="
-          echo "Current directory: $(pwd)"
-          echo "OCI config exists: $(test -f ~/.oci/config && echo 'YES' || echo 'NO')"
-          echo "OCI key exists: $(test -f oci_api_key.pem && echo 'YES' || echo 'NO')"
-          echo "=== End Debug ==="
-          terraform plan -var-file=terraform.tfvars.local -out=tfplan
+        run: terraform plan -out=tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
-          TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
-          TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
-          TF_VAR_region: ${{ secrets.OCI_REGION }}
-          TF_VAR_private_key_path: ./oci_api_key.pem
         run: terraform apply -auto-approve tfplan
 
       - name: Get Terraform Outputs
         id: outputs
         run: |
-          echo "load_balancer_ip=$(terraform output -raw load_balancer_public_ip)" >> $GITHUB_OUTPUT
-          echo "node_ips=$(terraform output -json node_public_ips)" >> $GITHUB_OUTPUT
+          echo "instance_ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
+          echo "load_balancer_url=$(terraform output -raw load_balancer_url)" >> $GITHUB_OUTPUT
+          echo "dashboard_url=$(terraform output -raw dashboard_url)" >> $GITHUB_OUTPUT
 
       - name: Save outputs as artifact
         uses: actions/upload-artifact@v4
@@ -169,10 +122,11 @@ jobs:
             terraform/environments/dev/tfplan
 
     outputs:
-      load_balancer_ip: ${{ steps.outputs.outputs.load_balancer_ip }}
-      node_ips: ${{ steps.outputs.outputs.node_ips }}
+      instance_ip: ${{ steps.outputs.outputs.instance_ip }}
+      load_balancer_url: ${{ steps.outputs.outputs.load_balancer_url }}
+      dashboard_url: ${{ steps.outputs.outputs.dashboard_url }}
 
-  # Deploy Docker containers to VMs
+  # Deploy Docker containers to GCP VM
   deploy-containers:
     name: Deploy Containers
     runs-on: ubuntu-latest
@@ -186,82 +140,104 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          # Write SSH private key (secret already contains newlines from gh secret set)
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/goud_chain_rsa
           chmod 600 ~/.ssh/goud_chain_rsa
+
           # Verify key format
-          echo "Private key format check:"
+          echo "SSH key validation:"
           head -1 ~/.ssh/goud_chain_rsa
           tail -1 ~/.ssh/goud_chain_rsa
-          echo "Key file has $(wc -l < ~/.ssh/goud_chain_rsa) lines"
+
           # Add host to known_hosts
-          ssh-keyscan -H ${{ needs.terraform-deploy.outputs.load_balancer_ip }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ needs.terraform-deploy.outputs.instance_ip }} >> ~/.ssh/known_hosts
 
-      - name: Wait for Docker installation (if needed)
+      - name: Wait for VM startup (Docker installation)
         run: |
-          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
-            # Check if Docker is already installed
-            if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
-              echo "Docker already installed, proceeding..."
-              docker --version
-              docker-compose --version
-            else
-              echo "Docker not found, waiting for cloud-init to complete..."
-              # Wait for cloud-init boot-finished marker (max 5 minutes)
-              timeout 300 bash -c 'until [ -f /var/lib/cloud/instance/boot-finished ]; do echo "Waiting..."; sleep 5; done' || echo "Timeout waiting for cloud-init"
+          echo "Waiting for VM to complete startup script..."
+          sleep 120
 
-              # Verify Docker is now installed
-              if command -v docker &> /dev/null; then
-                docker --version
-                docker-compose --version
-              else
-                echo "ERROR: Docker still not installed after cloud-init"
-                exit 1
-              fi
-            fi
+          # Verify SSH connectivity
+          ssh -i ~/.ssh/goud_chain_rsa -o ConnectTimeout=10 ubuntu@${{ needs.terraform-deploy.outputs.instance_ip }} "echo 'SSH connection successful'"
+
+      - name: Wait for Docker to be ready
+        run: |
+          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.instance_ip }} << 'EOF'
+            echo "Checking Docker availability..."
+            timeout 180 bash -c 'until docker ps >/dev/null 2>&1; do echo "Waiting for Docker..."; sleep 5; done' || {
+              echo "Docker not ready, attempting to start..."
+              sudo systemctl start docker
+              sleep 10
+            }
+
+            docker --version
+            docker-compose --version
+            docker ps
           EOF
 
-      - name: Deploy to VM1 (nginx + node1 + dashboard)
+      - name: Deploy application to GCP VM
         run: |
-          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.load_balancer_ip }} << 'EOF'
-            # Create app directory if it doesn't exist
-            if [ ! -d /opt/goud_chain ]; then
-              sudo mkdir -p /opt/goud_chain
-              sudo chown ubuntu:ubuntu /opt/goud_chain
-            fi
-            cd /opt/goud_chain
+          ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.instance_ip }} << 'EOF'
+            set -e
 
-            # Pull latest code
+            # Create app directory
+            sudo mkdir -p /opt/goud-chain
+            sudo chown ubuntu:ubuntu /opt/goud-chain
+            cd /opt/goud-chain
+
+            # Clone or update repository
             if [ -d .git ]; then
+              echo "Updating existing repository..."
               git pull origin main
             else
+              echo "Cloning repository..."
               git clone ${{ github.server_url }}/${{ github.repository }} .
             fi
 
-            # Pull Docker images
-            docker-compose -f docker-compose.prod.yml pull nginx node1 dashboard
+            # Create data directory
+            sudo mkdir -p /data
+            sudo chown ubuntu:ubuntu /data
 
-            # Restart containers
-            docker-compose -f docker-compose.prod.yml up -d nginx node1 dashboard
+            # Build images
+            echo "Building Docker images..."
+            docker-compose -f docker-compose.gcp.yml build
 
-            # Wait for health checks
+            # Start services
+            echo "Starting services..."
+            docker-compose -f docker-compose.gcp.yml up -d
+
+            # Wait for services to start
             sleep 30
-            docker ps
+
+            # Show status
+            echo "=== Container Status ==="
+            docker-compose -f docker-compose.gcp.yml ps
+
+            echo "=== Recent Logs ==="
+            docker-compose -f docker-compose.gcp.yml logs --tail=20
           EOF
 
       - name: Verify deployment
         run: |
-          # Wait for services to be ready
+          echo "Verifying deployment health..."
           sleep 30
 
           # Check load balancer health
-          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080/lb/health || exit 1
+          echo "Testing load balancer..."
+          curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080/lb/health || exit 1
 
           # Check blockchain API
-          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080/health || exit 1
+          echo "Testing blockchain API..."
+          curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080/health || exit 1
+
+          # Check blockchain endpoint
+          echo "Testing blockchain endpoint..."
+          curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080/chain || exit 1
 
           # Check dashboard
-          curl -f http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:3000 || exit 1
+          echo "Testing dashboard..."
+          curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:3000 || exit 1
+
+          echo "✅ All health checks passed!"
 
   # Post-deployment notifications
   notify:
@@ -275,11 +251,13 @@ jobs:
         if: ${{ needs.deploy-containers.result == 'success' }}
         run: |
           echo "✅ Deployment successful!"
-          echo "🚀 Load Balancer: http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:8080"
-          echo "🌐 Dashboard: http://${{ needs.terraform-deploy.outputs.load_balancer_ip }}:3000"
+          echo "🚀 API Endpoint: ${{ needs.terraform-deploy.outputs.load_balancer_url }}"
+          echo "🌐 Dashboard: ${{ needs.terraform-deploy.outputs.dashboard_url }}"
+          echo "📡 Direct IP: http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080"
 
       - name: Deployment Failed
         if: ${{ needs.deploy-containers.result == 'failure' }}
         run: |
           echo "❌ Deployment failed!"
+          echo "Check the logs above for details"
           exit 1

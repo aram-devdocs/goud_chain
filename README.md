@@ -476,95 +476,328 @@ node1:
     - PEERS=node2:9000,node3:9000
 ```
 
-## Cloud Deployment (Oracle Cloud)
+## Cloud Deployment (Google Cloud Platform)
+
+**Cost: FREE** - Runs on GCP's Always Free tier (1x e2-micro instance)
 
 ### Prerequisites
 
-1. Oracle Cloud account with $300 trial credits or always-free tier
-2. OCI CLI configured with API keys
-3. SSH key pair for VM access
-4. GitHub repository secrets configured (for CI/CD)
+1. Google Cloud account (free tier available)
+2. `gcloud` CLI installed
+3. `terraform` CLI installed
+4. `gh` CLI (for GitHub secrets setup)
+5. Cloudflare account (optional, for custom domain)
 
-### Manual Deployment
+### Quick Start
 
-**1. Configure Terraform variables:**
+**Option A: Automated Setup Script**
+
 ```bash
-# Create terraform/environments/dev/terraform.tfvars
-tenancy_ocid     = "ocid1.tenancy.oc1..."
-user_ocid        = "ocid1.user.oc1..."
-fingerprint      = "ab:cd:ef:..."
-private_key_path = "~/.oci/oci_api_key.pem"
-region           = "us-ashburn-1"
-ssh_public_key   = "ssh-rsa AAAAB3..."
+# Run the guided setup script (creates GCP project, service account, generates configs)
+./scripts/setup-gcp.sh
 
-environment            = "dev"
-blockchain_node_count  = 2
-instance_shape         = "VM.Standard.E2.1"  # x86 instances
-instance_ocpus         = 1
-instance_memory_gb     = 8
-boot_volume_size_gb    = 50
-block_volume_size_gb   = 50
-
-allowed_ssh_cidrs      = ["0.0.0.0/0"]
-allowed_http_cidrs     = ["0.0.0.0/0"]
-enable_monitoring      = false
-enable_redis           = true
-backup_retention_days  = 7
-
-tags = {
-  Project     = "goud-chain"
-  Environment = "dev"
-  ManagedBy   = "terraform"
-}
-```
-
-**2. Deploy infrastructure and application:**
-```bash
+# Deploy infrastructure + application
 ./scripts/deploy.sh
 ```
 
-**3. Destroy all resources:**
+**Option B: Manual Setup**
+
+**1. Install Prerequisites:**
 ```bash
-./scripts/destroy.sh
+# Install gcloud CLI
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+
+# Install Terraform
+brew install terraform  # macOS
+# or download from https://www.terraform.io/downloads
+
+# Install GitHub CLI (for secrets management)
+brew install gh  # macOS
+gh auth login
+```
+
+**2. Setup GCP Project:**
+```bash
+# Authenticate with Google Cloud
+gcloud auth login
+gcloud auth application-default login
+
+# Create a new project (or use existing)
+gcloud projects create goud-chain-12345 --set-as-default
+PROJECT_ID=$(gcloud config get-value project)
+
+# Enable required APIs
+gcloud services enable compute.googleapis.com
+
+# Create service account for Terraform
+gcloud iam service-accounts create goud-chain-terraform \
+  --display-name="Goud Chain Terraform Service Account"
+
+# Grant necessary permissions
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:goud-chain-terraform@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/compute.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:goud-chain-terraform@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+
+# Generate service account key
+mkdir -p ~/.gcloud
+gcloud iam service-accounts keys create ~/.gcloud/goud-chain-terraform-key.json \
+  --iam-account="goud-chain-terraform@${PROJECT_ID}.iam.gserviceaccount.com"
+```
+
+**3. Generate SSH Keys:**
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/goud_chain_rsa -N "" -C "goud-chain-gcp"
+```
+
+**4. Create Terraform Configuration:**
+```bash
+cat > terraform/environments/dev/terraform.tfvars <<EOF
+# GCP Configuration
+project_id    = "your-gcp-project-id"
+region        = "us-central1"
+zone          = "us-central1-a"
+
+# Environment
+environment   = "dev"
+project_name  = "goud-chain"
+
+# Compute (FREE tier)
+machine_type      = "e2-micro"
+boot_disk_size_gb = 30
+
+# SSH Access
+ssh_username   = "ubuntu"
+ssh_public_key = "$(cat ~/.ssh/goud_chain_rsa.pub)"
+
+# Network Security
+allowed_ssh_cidrs  = ["0.0.0.0/0"]
+allowed_http_cidrs = ["0.0.0.0/0"]
+
+# DNS (optional - Cloudflare)
+enable_dns              = false  # Set to true if using custom domain
+domain_name             = "goudchain.com"
+cloudflare_api_token    = ""
+cloudflare_zone_id      = ""
+enable_cloudflare_proxy = false
+
+# Tags
+tags = {
+  project     = "goud-chain"
+  environment = "dev"
+  managed_by  = "terraform"
+}
+EOF
+```
+
+**5. Deploy:**
+```bash
+./scripts/deploy.sh
 ```
 
 ### Automated Deployment (GitHub Actions)
 
 **Setup GitHub Secrets:**
+```bash
+# Use the automated script
+./scripts/setup-secrets.sh
+
+# Or manually via gh CLI:
+gh secret set GCP_PROJECT_ID
+gh secret set GCP_SERVICE_ACCOUNT_KEY < ~/.gcloud/goud-chain-terraform-key.json
+gh secret set SSH_PUBLIC_KEY < ~/.ssh/goud_chain_rsa.pub
+gh secret set SSH_PRIVATE_KEY < ~/.ssh/goud_chain_rsa
+gh secret set CLOUDFLARE_API_TOKEN  # Optional
+gh secret set CLOUDFLARE_ZONE_ID    # Optional
 ```
-OCI_TENANCY_OCID
-OCI_USER_OCID
-OCI_FINGERPRINT
-OCI_PRIVATE_KEY
-OCI_REGION
-SSH_PUBLIC_KEY
-SSH_PRIVATE_KEY
-```
 
-**Automatic deployment triggers:**
-- Push to `main` branch → Full deploy
-- Manual trigger → Via GitHub Actions UI
+**Deployment Triggers:**
+- Push to `main` branch → Automatic deployment
+- Manual trigger → GitHub Actions UI → "Deploy Dev" workflow
 
-**Deployment workflow:**
-1. Build multi-arch Docker images → Push to Oracle Container Registry
-2. Terraform plan & apply → Provision infrastructure
-3. Deploy containers → SSH to VMs and start services
-4. Health checks → Verify deployment success
+**Workflow Steps:**
+1. Authenticate to GCP using service account key
+2. Terraform plan & apply → Provision e2-micro instance
+3. Wait for VM startup (Docker installation via cloud-init)
+4. Clone repository and deploy Docker containers
+5. Health checks → Verify all services are running
 
-### Infrastructure
+### Infrastructure Details
 
-**Cost:** ~$15/month (covered by $300 trial credits for ~20 months)
+**Cost: $0/month** (GCP Always Free tier)
 
 **Resources:**
-- 2× VM.Standard.E2.1 (x86, 1 vCPU, 8GB RAM each)
-- 2× 50GB boot volumes
-- 2× 50GB block volumes (blockchain data)
-- 1× VCN with public subnet
-- Load balancer (nginx on VM1)
+- 1× e2-micro instance (0.25-2 vCPU bursting, 1GB RAM)
+- 30GB standard persistent disk
+- Default VPC + firewall rules
+- Cloudflare DNS (optional, also free)
+
+**Architecture:**
+- **Single VM deployment** - All services run as Docker containers
+- 2 blockchain nodes (reduced for 1GB RAM constraint)
+- 1 nginx load balancer
+- 1 dashboard web UI
+- P2P networking between containers via Docker bridge network
+
+**What's Running:**
+```
+VM: e2-micro (1GB RAM)
+├── nginx:alpine (~64MB)
+├── dashboard (~128MB)
+├── node1 (goud-chain) (~384MB)
+└── node2 (goud-chain) (~384MB)
+```
 
 **Public Access:**
-- Load Balancer API: `http://<VM1_IP>:8080`
-- Dashboard: `http://<VM1_IP>:3000`
+- API Endpoint: `http://<INSTANCE_IP>:8080`
+- Dashboard: `http://<INSTANCE_IP>:3000`
+- Individual Nodes (debug): `http://<INSTANCE_IP>:8081`, `:8082`
+
+**With Cloudflare DNS:**
+- API: `https://dev-api.goudchain.com`
+- Dashboard: `https://dev-dashboard.goudchain.com`
+
+### Management Commands
+
+**Deploy:**
+```bash
+./scripts/deploy.sh
+```
+
+**Destroy:**
+```bash
+./scripts/destroy.sh
+```
+
+**SSH to instance:**
+```bash
+ssh ubuntu@<INSTANCE_IP>
+
+# View container logs
+cd /opt/goud-chain
+docker-compose -f docker-compose.gcp.yml logs -f
+
+# Restart services
+docker-compose -f docker-compose.gcp.yml restart
+
+# View container status
+docker-compose -f docker-compose.gcp.yml ps
+```
+
+**Health Checks:**
+```bash
+# Load balancer
+curl http://<INSTANCE_IP>:8080/lb/health
+
+# Blockchain API
+curl http://<INSTANCE_IP>:8080/health
+
+# View chain
+curl http://<INSTANCE_IP>:8080/chain
+```
+
+### GCP Free Tier Limits
+
+**Always Free (no expiration):**
+- 1× e2-micro instance per month (us-west1, us-central1, or us-east1)
+- 30 GB standard persistent disk
+- 1 GB egress per month (excluding China & Australia)
+- 5 GB snapshot storage
+
+**After 12-month trial ($300 credits):**
+- Still FREE if you stay within the Always Free limits
+- No automatic charges (billing account required but won't be charged)
+
+### Troubleshooting
+
+**VM not accessible:**
+```bash
+# Check firewall rules
+gcloud compute firewall-rules list
+
+# Check instance status
+gcloud compute instances list
+
+# View instance logs
+gcloud compute instances get-serial-port-output goud-chain-dev-vm
+```
+
+**Docker not starting:**
+```bash
+ssh ubuntu@<INSTANCE_IP>
+sudo systemctl status docker
+sudo systemctl start docker
+sudo journalctl -u docker -f
+```
+
+**Out of memory:**
+```bash
+# Check memory usage
+ssh ubuntu@<INSTANCE_IP> "free -h"
+
+# Restart containers to free memory
+docker-compose -f docker-compose.gcp.yml restart
+```
+
+### Cloudflare DNS Setup (Optional)
+
+**1. Get your Zone ID:**
+- Login to Cloudflare Dashboard
+- Select your domain → Overview
+- Copy "Zone ID" from the right sidebar
+
+**2. Create API Token:**
+- Profile → API Tokens → Create Token
+- Template: "Edit zone DNS"
+- Zone Resources: Include → Specific zone → your domain
+- Copy the generated token
+
+**3. Add to terraform.tfvars:**
+```hcl
+enable_dns              = true
+domain_name             = "goudchain.com"
+cloudflare_api_token    = "your-api-token"
+cloudflare_zone_id      = "your-zone-id"
+enable_cloudflare_proxy = true
+```
+
+**4. Configure SSL/TLS:**
+- Cloudflare Dashboard → SSL/TLS → Overview
+- Set encryption mode to "Flexible"
+- (Optional) Enable "Always Use HTTPS"
+
+**5. Redeploy:**
+```bash
+./scripts/deploy.sh
+```
+
+DNS records will be created automatically:
+- `dev-api.goudchain.com` → VM IP
+- `dev-dashboard.goudchain.com` → VM IP
+
+### Production Considerations
+
+**For production deployments:**
+1. **Security:**
+   - Restrict `allowed_ssh_cidrs` to your IP only
+   - Restrict `allowed_http_cidrs` to known clients
+   - Enable Cloudflare proxy for DDoS protection
+   - Implement authentication for write operations
+
+2. **Scaling:**
+   - Upgrade to e2-small or e2-medium for better performance
+   - Add monitoring (Stackdriver)
+   - Implement automated backups
+   - Use Cloud SQL for persistent metadata
+
+3. **Cost:**
+   - e2-small: ~$13/month
+   - e2-medium: ~$27/month
+   - Still much cheaper than Oracle Cloud (~$15/month) or other providers
 
 ## License
 
