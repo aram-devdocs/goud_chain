@@ -1,16 +1,11 @@
 name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'Dockerfile'
-      - 'dashboard/**'
-      - '.github/workflows/build-images.yml'
+  workflow_run:
+    workflows: ["Test"]
+    types:
+      - completed
+    branches: [ main ]
   workflow_dispatch:
 
 env:
@@ -19,6 +14,10 @@ env:
 
 jobs:
   build-and-push:
+    # Only run if tests passed (or if manually triggered)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,7 +83,7 @@ jobs:
 
       - name: Image summary
         run: |
-          echo "### Docker Images Published :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Docker Images Published Successfully :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Blockchain Node:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -96,8 +95,28 @@ jobs:
           echo "${{ steps.meta-dashboard.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All images built and pushed to ghcr.io" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Step:** Deploy Dev workflow will automatically trigger" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "To use these images in deployment:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "export USE_PREBUILT_IMAGES=true" >> $GITHUB_STEP_SUMMARY
           echo "./scripts/deploy.sh" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Status check job - ensures workflow only passes if all images built successfully
+  status-check:
+    name: Build Status Check
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: always()
+
+    steps:
+      - name: Check build success
+        run: |
+          if [ "${{ needs.build-and-push.result }}" != "success" ]; then
+            echo "❌ Image build failed"
+            exit 1
+          fi
+          echo "✅ All images built successfully"

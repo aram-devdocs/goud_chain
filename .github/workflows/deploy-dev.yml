@@ -6,7 +6,7 @@ name: Deploy Dev
 on:
   workflow_dispatch:  # Manual trigger
   workflow_run:
-    workflows: ["Test"]
+    workflows: ["Build and Push Docker Images"]
     types:
       - completed
     branches: [ main ]
@@ -20,7 +20,7 @@ env:
 jobs:
   # Terraform plan and apply
   terraform-deploy:
-    # Only run if tests passed (or if manually triggered)
+    # Only run if build succeeded (or if manually triggered)
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
@@ -178,9 +178,14 @@ jobs:
           EOF
 
       - name: Deploy application to GCP VM
+        env:
+          USE_PREBUILT_IMAGES: "true"
         run: |
           ssh -i ~/.ssh/goud_chain_rsa ubuntu@${{ needs.terraform-deploy.outputs.instance_ip }} << 'EOF'
             set -e
+
+            # Enable pre-built image mode
+            export USE_PREBUILT_IMAGES=true
 
             # Create app directory
             sudo mkdir -p /opt/goud-chain
@@ -200,23 +205,19 @@ jobs:
             sudo mkdir -p /data
             sudo chown ubuntu:ubuntu /data
 
-            # Build images
-            echo "Building Docker images..."
-            docker-compose -f docker-compose.gcp.yml build
-
-            # Start services
-            echo "Starting services..."
-            docker-compose -f docker-compose.gcp.yml up -d
+            # Run deployment script with pre-built images
+            # The script will detect USE_PREBUILT_IMAGES and pull from ghcr.io
+            bash -c 'cd /opt/goud-chain && source scripts/deploy.sh' || {
+              echo "Deployment script failed, trying docker-compose fallback..."
+              docker-compose -f docker-compose.gcp.yml up -d
+            }
 
             # Wait for services to start
             sleep 30
 
             # Show status
             echo "=== Container Status ==="
-            docker-compose -f docker-compose.gcp.yml ps
-
-            echo "=== Recent Logs ==="
-            docker-compose -f docker-compose.gcp.yml logs --tail=20
+            docker ps --filter "name=goud_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           EOF
 
       - name: Verify deployment
@@ -242,25 +243,36 @@ jobs:
 
           echo "✅ All health checks passed!"
 
-  # Post-deployment notifications
+  # Post-deployment notifications and status check
   notify:
-    name: Notify Deployment Status
+    name: Deployment Status Check
     runs-on: ubuntu-latest
     needs: [terraform-deploy, deploy-containers]
     if: always()
 
     steps:
-      - name: Deployment Success
-        if: ${{ needs.deploy-containers.result == 'success' }}
+      - name: Check all jobs succeeded
         run: |
-          echo "✅ Deployment successful!"
-          echo "🚀 API Endpoint: ${{ needs.terraform-deploy.outputs.load_balancer_url }}"
-          echo "🌐 Dashboard: ${{ needs.terraform-deploy.outputs.dashboard_url }}"
-          echo "📡 Direct IP: http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080"
+          TERRAFORM_STATUS="${{ needs.terraform-deploy.result }}"
+          DEPLOY_STATUS="${{ needs.deploy-containers.result }}"
 
-      - name: Deployment Failed
-        if: ${{ needs.deploy-containers.result == 'failure' }}
-        run: |
-          echo "❌ Deployment failed!"
-          echo "Check the logs above for details"
-          exit 1
+          echo "### Deployment Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform: $TERRAFORM_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- Container Deploy: $DEPLOY_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$TERRAFORM_STATUS" != "success" ] || [ "$DEPLOY_STATUS" != "success" ]; then
+            echo "❌ Deployment failed!"
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Deployment Failed**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "✅ Deployment successful!"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Deployment Successful**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 API Endpoint: ${{ needs.terraform-deploy.outputs.load_balancer_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 Dashboard: ${{ needs.terraform-deploy.outputs.dashboard_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "📡 Direct IP: http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080" >> $GITHUB_STEP_SUMMARY

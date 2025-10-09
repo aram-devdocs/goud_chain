@@ -1,6 +1,11 @@
 #!/bin/bash
 # Deploy Goud Chain infrastructure and application to Google Cloud Platform
 # Usage: ./scripts/deploy.sh
+#
+# Deployment Strategy:
+# - GitHub Actions (CI=true): Pull pre-built images from ghcr.io
+# - Local machine: Build locally, transfer to VM, deploy
+# - VM fallback: Build on VM if images unavailable
 
 set -e
 
@@ -10,6 +15,21 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 TERRAFORM_DIR="terraform/environments/dev"
+
+# Detect environment
+IS_LOCAL=false
+IS_CI="${CI:-false}"
+IS_VM=false
+
+if [ "$CI" = "true" ]; then
+    echo -e "${GREEN}Running in CI environment (GitHub Actions)${NC}"
+elif [ -d ".git" ] && [ ! -f "/etc/cloud/cloud.cfg" ]; then
+    IS_LOCAL=true
+    echo -e "${GREEN}Running on local machine${NC}"
+else
+    IS_VM=true
+    echo -e "${YELLOW}Running on VM (fallback mode)${NC}"
+fi
 
 echo -e "${GREEN}=== Deploying Goud Chain to Google Cloud Platform ===${NC}"
 echo ""
@@ -73,6 +93,30 @@ echo ""
 
 cd ../../..
 
+# Step 1.5: Build images locally if running from local machine
+if [ "$IS_LOCAL" = true ]; then
+    echo -e "${YELLOW}Step 1.5: Building Docker images locally...${NC}"
+    echo "Building on local machine for faster deployment..."
+
+    # Build blockchain node image
+    echo "Building blockchain node image..."
+    docker build -t goud-chain:latest .
+
+    # Build dashboard image
+    echo "Building dashboard image..."
+    docker build -t goud-chain-dashboard:latest ./dashboard
+
+    # Save images to compressed tar files
+    echo "Saving images..."
+    mkdir -p /tmp/goud-chain-deploy
+    docker save goud-chain:latest | gzip > /tmp/goud-chain-deploy/node.tar.gz
+    docker save goud-chain-dashboard:latest | gzip > /tmp/goud-chain-deploy/dashboard.tar.gz
+
+    echo -e "${GREEN}✅ Images built locally${NC}"
+    echo "Node image size: $(du -h /tmp/goud-chain-deploy/node.tar.gz | cut -f1)"
+    echo "Dashboard image size: $(du -h /tmp/goud-chain-deploy/dashboard.tar.gz | cut -f1)"
+fi
+
 # Step 2: Wait for VM to be ready (only if resources changed)
 if [ "$RESOURCES_CHANGED" -gt 0 ]; then
     echo -e "${YELLOW}Step 2: Waiting for VM to complete startup script (2 minutes)...${NC}"
@@ -113,6 +157,23 @@ else
     echo "Skipping Docker verification (no infrastructure changes)"
 fi
 
+# Step 3.5: Transfer images if built locally
+if [ "$IS_LOCAL" = true ]; then
+    echo -e "${YELLOW}Step 3.5: Transferring images to VM...${NC}"
+    echo "Uploading node image..."
+    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
+        /tmp/goud-chain-deploy/node.tar.gz ubuntu@$INSTANCE_IP:/tmp/
+
+    echo "Uploading dashboard image..."
+    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
+        /tmp/goud-chain-deploy/dashboard.tar.gz ubuntu@$INSTANCE_IP:/tmp/
+
+    echo -e "${GREEN}✅ Images transferred${NC}"
+
+    # Cleanup local temp files
+    rm -rf /tmp/goud-chain-deploy
+fi
+
 # Deploy application
 echo "Deploying application containers..."
 ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
@@ -137,7 +198,7 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
     # Rolling deployment functions
     wait_for_health() {
         local container=$1
-        local max_wait=60
+        local max_wait=90
         local elapsed=0
 
         echo "Waiting for $container to become healthy..."
@@ -163,6 +224,11 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
 
         echo ""
         echo "❌ $container failed to become healthy after ${max_wait}s"
+        echo "Debug info:"
+        echo "  Health status: $HEALTH"
+        echo "  Container running: $(sudo docker inspect --format='{{.State.Running}}' $container 2>/dev/null || echo 'unknown')"
+        echo "  Last 20 log lines:"
+        sudo docker logs $container --tail 20 2>&1 || echo "  Failed to retrieve logs"
         return 1
     }
 
@@ -174,13 +240,28 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
 
         echo "===  Rolling update: $node_name ==="
 
-        # Build or pull new image
-        if sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest 2>/dev/null; then
-            echo "✅ Pulled pre-built image"
-            sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
+        # Load or build images based on deployment source
+        if [ -f /tmp/node.tar.gz ]; then
+            # Local deployment: Load transferred image
+            echo "Loading locally-built image..."
+            sudo docker load < /tmp/node.tar.gz
+            echo "✅ Image loaded from local build"
+        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
+            # CI deployment: Pull from GitHub Container Registry
+            echo "Pulling pre-built image from ghcr.io..."
+            if sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest 2>/dev/null; then
+                sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
+                echo "✅ Pulled pre-built image"
+            else
+                echo "⚠️  Failed to pull, falling back to local build..."
+                cd /opt/goud-chain
+                sudo docker build -t goud-chain:latest .
+            fi
         else
-            echo "Building image locally..."
-            sudo docker-compose -f docker-compose.gcp.yml build ${node_name}
+            # Fallback: Build on VM
+            echo "Building image on VM (fallback)..."
+            cd /opt/goud-chain
+            sudo docker build -t goud-chain:latest .
         fi
 
         # Start new container alongside old one (temporary port)
@@ -193,6 +274,11 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
             -e HTTP_PORT=8080 \
             -e P2P_PORT=9000 \
             -e PEERS=${peers} \
+            --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=30s \
             goud-chain:latest
 
         # Wait for new container to be healthy
@@ -221,6 +307,11 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
                 -e HTTP_PORT=8080 \
                 -e P2P_PORT=9000 \
                 -e PEERS=${peers} \
+                --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=30s \
                 --restart unless-stopped \
                 goud-chain:latest
 
@@ -293,35 +384,45 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
 
         # Update dashboard (can have brief downtime, non-critical)
         echo "Updating dashboard..."
-        if sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest 2>/dev/null; then
-            echo "✅ Pulled pre-built dashboard image"
-            sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
 
-            # Graceful dashboard update
-            sudo docker stop goud_dashboard 2>/dev/null || true
-            sudo docker rm goud_dashboard 2>/dev/null || true
-            sudo docker run -d \
-                --name goud_dashboard \
-                --network goud_network \
-                -p 3000:8080 \
-                --restart unless-stopped \
-                goud-chain-dashboard:latest
+        # Load or build dashboard based on deployment source
+        if [ -f /tmp/dashboard.tar.gz ]; then
+            # Local deployment: Load transferred image
+            echo "Loading locally-built dashboard image..."
+            sudo docker load < /tmp/dashboard.tar.gz
+            echo "✅ Dashboard image loaded from local build"
+        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
+            # CI deployment: Pull from GitHub Container Registry
+            echo "Pulling pre-built dashboard image from ghcr.io..."
+            if sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest 2>/dev/null; then
+                sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
+                echo "✅ Pulled pre-built dashboard image"
+            else
+                echo "⚠️  Failed to pull dashboard, falling back to local build..."
+                cd /opt/goud-chain/dashboard
+                sudo docker build -t goud-chain-dashboard:latest .
+                cd /opt/goud-chain
+            fi
         else
-            echo "Building dashboard locally..."
-            cd dashboard
+            # Fallback: Build on VM
+            echo "Building dashboard on VM (fallback)..."
+            cd /opt/goud-chain/dashboard
             sudo docker build -t goud-chain-dashboard:latest .
-            cd ..
-
-            # Graceful dashboard update
-            sudo docker stop goud_dashboard 2>/dev/null || true
-            sudo docker rm goud_dashboard 2>/dev/null || true
-            sudo docker run -d \
-                --name goud_dashboard \
-                --network goud_network \
-                -p 3000:8080 \
-                --restart unless-stopped \
-                goud-chain-dashboard:latest
+            cd /opt/goud-chain
         fi
+
+        # Graceful dashboard update
+        sudo docker stop goud_dashboard 2>/dev/null || true
+        sudo docker rm goud_dashboard 2>/dev/null || true
+        sudo docker run -d \
+            --name goud_dashboard \
+            --network goud_network \
+            -p 3000:8080 \
+            --restart unless-stopped \
+            goud-chain-dashboard:latest
+
+        # Cleanup transferred images
+        rm -f /tmp/node.tar.gz /tmp/dashboard.tar.gz
 
         echo "✅ Rolling deployment complete"
     fi
