@@ -740,7 +740,7 @@
                 debugResponse: '',
 
                 // Initialize
-                init() {
+                async init() {
                     this.apiKey = localStorage.getItem('goud_api_key');
                     this.accountId = localStorage.getItem('goud_account_id');
 
@@ -757,6 +757,14 @@
                         return;
                     }
 
+                    // Validate API key against backend (catches schema changes)
+                    const isValid = await this.validateApiKey();
+                    if (!isValid) {
+                        alert('Your API key is no longer valid (blockchain schema may have changed). Please login again.');
+                        this.logout();
+                        return;
+                    }
+
                     // Initial data load
                     this.refresh();
 
@@ -766,6 +774,23 @@
                         this.loadChain();
                         this.loadNetworkInfo();
                     }, 10000);
+                },
+
+                // Validate API key against backend
+                async validateApiKey() {
+                    try {
+                        const res = await fetch(`${API_BASE}/data/list`, {
+                            headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                        });
+
+                        // 401 = invalid API key
+                        // 200 = valid (even if empty collections list)
+                        return res.ok;
+                    } catch (e) {
+                        console.error('Failed to validate API key:', e);
+                        // On network error, assume valid to avoid unnecessary logouts
+                        return true;
+                    }
                 },
 
                 // ==================== Submit Data ====================

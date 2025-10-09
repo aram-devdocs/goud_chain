@@ -3,11 +3,15 @@ use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use super::{block::Block, encrypted_collection::EncryptedCollection, user_account::UserAccount};
+use super::{
+    block::{generate_block_salt, Block, BlockConfig},
+    encrypted_collection::EncryptedCollection,
+    user_account::UserAccount,
+};
 use crate::constants::{
     CHECKPOINT_INTERVAL, GENESIS_PREVIOUS_HASH, SCHEMA_VERSION, TIMESTAMP_TOLERANCE_SECONDS,
 };
-use crate::crypto::generate_signing_key;
+use crate::crypto::{generate_account_blind_index_with_salt, generate_signing_key};
 use crate::types::{GoudChainError, Result};
 
 /// Get the current validator for a given block number (round-robin)
@@ -29,21 +33,26 @@ pub struct Blockchain {
     pub pending_collections: Vec<EncryptedCollection>,
     #[serde(skip)]
     pub node_signing_key: Option<SigningKey>,
+    #[serde(skip)]
+    pub master_chain_key: Vec<u8>,
 }
 
 impl Blockchain {
     /// Create a new blockchain with genesis block
-    pub fn new(node_id: String) -> Result<Self> {
+    pub fn new(node_id: String, master_chain_key: Vec<u8>) -> Result<Self> {
         let signing_key = generate_signing_key();
         let validator = get_current_validator(0);
 
-        let genesis = Block::new(
-            0,
-            Vec::new(),
-            Vec::new(),
-            GENESIS_PREVIOUS_HASH.to_string(),
+        let genesis = Block::new(BlockConfig {
+            index: 0,
+            user_accounts: Vec::new(),
+            encrypted_collections: Vec::new(),
+            previous_hash: GENESIS_PREVIOUS_HASH.to_string(),
             validator,
-        );
+            blind_indexes: Vec::new(),
+            block_salt: String::from("genesis_salt"),
+            master_key: &master_chain_key,
+        })?;
 
         Ok(Blockchain {
             schema_version: SCHEMA_VERSION.to_string(),
@@ -53,6 +62,7 @@ impl Blockchain {
             pending_accounts: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: Some(signing_key),
+            master_chain_key,
         })
     }
 
@@ -85,17 +95,44 @@ impl Blockchain {
         let block_number = previous_block.index + 1;
         let validator = get_current_validator(block_number);
 
-        let new_block = Block::new(
-            block_number,
-            self.pending_accounts.clone(),
-            self.pending_collections.clone(),
-            previous_block.hash.clone(),
-            validator,
-        );
+        // Generate random salt for this block
+        let block_salt = generate_block_salt();
+
+        // Generate blind indexes for all accounts and collections using block-specific salt
+        let mut blind_indexes = Vec::new();
+
+        for account in &self.pending_accounts {
+            let blind_index =
+                generate_account_blind_index_with_salt(&account.api_key_hash, &block_salt)?;
+            blind_indexes.push(blind_index);
+        }
+
+        // Collections already have owner_api_key_hash for blind index generation
+        // We generate a blind index for each collection owner
+        for collection in &self.pending_collections {
+            let blind_index = generate_account_blind_index_with_salt(
+                &collection.owner_api_key_hash,
+                &block_salt,
+            )?;
+            if !blind_indexes.contains(&blind_index) {
+                blind_indexes.push(blind_index);
+            }
+        }
+
+        let new_block = Block::new(BlockConfig {
+            index: block_number,
+            user_accounts: self.pending_accounts.clone(),
+            encrypted_collections: self.pending_collections.clone(),
+            previous_hash: previous_block.hash.clone(),
+            validator: validator.clone(),
+            blind_indexes,
+            block_salt,
+            master_key: &self.master_chain_key,
+        })?;
 
         info!(
             block_number = new_block.index,
-            validator = %new_block.validator,
+            validator = %validator,
             accounts = self.pending_accounts.len(),
             collections = self.pending_collections.len(),
             "Block created with accounts and collections"
@@ -144,23 +181,24 @@ impl Blockchain {
             // Validate merkle root
             if current.merkle_root
                 != Block::calculate_merkle_root(
-                    &current.user_accounts,
-                    &current.encrypted_collections,
+                    &current.encrypted_block_data,
+                    &current.blind_indexes,
                 )
             {
                 return Err(GoudChainError::InvalidMerkleRoot(i as u64));
             }
 
-            // Validate all encrypted data
-            current.verify_data()?;
+            // Validate all encrypted data (decrypt and verify signatures)
+            current.verify_data(&self.master_chain_key)?;
 
-            // Validate validator authorization
+            // Validate validator authorization (decrypt to get validator name)
+            let block_data = current.decrypt_data(&self.master_chain_key)?;
             let expected_validator = get_current_validator(current.index);
-            if current.validator != expected_validator {
+            if block_data.validator != expected_validator {
                 return Err(GoudChainError::InvalidValidator {
                     index: i as u64,
                     expected: expected_validator,
-                    actual: current.validator.clone(),
+                    actual: block_data.validator.clone(),
                 });
             }
         }
@@ -189,6 +227,7 @@ impl Blockchain {
             pending_accounts: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: None,
+            master_chain_key: self.master_chain_key.clone(),
         };
 
         // Use chain length (longest chain wins in PoA)
@@ -206,28 +245,75 @@ impl Blockchain {
         Ok(false)
     }
 
-    /// Find an account by API key hash
+    /// Find an account by API key hash using per-block salted blind indexes
     pub fn find_account(&self, api_key_hash: &str) -> Option<UserAccount> {
+        // Search blocks - must try each block's salt
         for block in &self.chain {
-            for account in &block.user_accounts {
-                if account.api_key_hash == api_key_hash {
-                    return Some(account.clone());
+            // Generate blind index using this block's salt
+            let blind_index =
+                match generate_account_blind_index_with_salt(api_key_hash, &block.block_salt) {
+                    Ok(idx) => idx,
+                    Err(_) => continue,
+                };
+
+            // Check if this block contains the blind index
+            if block.blind_indexes.contains(&blind_index) {
+                // Decrypt block data
+                if let Ok(block_data) = block.decrypt_data(&self.master_chain_key) {
+                    for account in &block_data.accounts {
+                        if account.api_key_hash == api_key_hash {
+                            return Some(account.clone());
+                        }
+                    }
                 }
             }
         }
         None
     }
 
-    /// Find a collection by ID
+    /// Find a collection by ID using blind indexes
     pub fn find_collection(&self, collection_id: &str) -> Option<EncryptedCollection> {
+        // We need to search all blocks since we don't know the owner's API key hash
         for block in &self.chain {
-            for collection in &block.encrypted_collections {
-                if collection.collection_id == collection_id {
-                    return Some(collection.clone());
+            // Decrypt block data
+            if let Ok(block_data) = block.decrypt_data(&self.master_chain_key) {
+                for collection in &block_data.collections {
+                    if collection.collection_id == collection_id {
+                        return Some(collection.clone());
+                    }
                 }
             }
         }
         None
+    }
+
+    /// Find all collections owned by an API key hash using per-block salted blind indexes
+    pub fn find_collections_by_owner(&self, api_key_hash: &str) -> Vec<EncryptedCollection> {
+        let mut results = Vec::new();
+
+        // Search blocks - must try each block's salt
+        for block in &self.chain {
+            // Generate blind index using this block's salt
+            let blind_index =
+                match generate_account_blind_index_with_salt(api_key_hash, &block.block_salt) {
+                    Ok(idx) => idx,
+                    Err(_) => continue,
+                };
+
+            // Check if this block contains the blind index
+            if block.blind_indexes.contains(&blind_index) {
+                // Decrypt block data
+                if let Ok(block_data) = block.decrypt_data(&self.master_chain_key) {
+                    for collection in &block_data.collections {
+                        if collection.owner_api_key_hash == api_key_hash {
+                            results.push(collection.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        results
     }
 }
 
@@ -237,14 +323,16 @@ mod tests {
 
     #[test]
     fn test_blockchain_creation() {
-        let blockchain = Blockchain::new("test-node".to_string()).unwrap();
+        let master_key = b"test_master_key_32_bytes_long!!".to_vec();
+        let blockchain = Blockchain::new("test-node".to_string(), master_key).unwrap();
         assert_eq!(blockchain.chain.len(), 1);
         assert!(blockchain.is_valid().is_ok());
     }
 
     #[test]
     fn test_add_block() {
-        let blockchain = Blockchain::new("test-node".to_string()).unwrap();
+        let master_key = b"test_master_key_32_bytes_long!!".to_vec();
+        let blockchain = Blockchain::new("test-node".to_string(), master_key).unwrap();
         assert_eq!(blockchain.chain.len(), 1); // Genesis block
         assert!(blockchain.is_valid().is_ok());
     }

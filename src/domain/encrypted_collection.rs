@@ -1,7 +1,6 @@
 use chrono::Utc;
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::constants::ENCRYPTION_SALT;
@@ -121,17 +120,6 @@ impl EncryptedCollection {
     pub fn decrypt_payload(&self, api_key: &[u8]) -> Result<String> {
         let encryption_key = derive_encryption_key(api_key, ENCRYPTION_SALT);
         decrypt_data_with_key(&self.encrypted_payload, &encryption_key)
-    }
-
-    /// Calculate hash for Merkle tree
-    pub fn hash(&self) -> String {
-        let content = format!(
-            "{}{}{}",
-            self.collection_id, self.encrypted_payload, self.mac
-        );
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        format!("{:x}", hasher.finalize())
     }
 }
 

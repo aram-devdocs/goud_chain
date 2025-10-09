@@ -36,7 +36,8 @@ fn main() {
     }
 
     // Load or create blockchain
-    let blockchain = match load_blockchain(config.node_id.clone()) {
+    let blockchain = match load_blockchain(config.node_id.clone(), config.master_chain_key.clone())
+    {
         Ok(bc) => Arc::new(Mutex::new(bc)),
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");

@@ -182,42 +182,41 @@ pub fn handle_list_data(
         );
     }
 
-    // Find all collections for this user
+    // Find all collections for this user using blind index lookup
+    let collections = blockchain.find_collections_by_owner(&api_key_hash);
     let mut result = Vec::new();
 
-    for block in &blockchain.chain {
-        for collection in &block.encrypted_collections {
-            if collection.owner_api_key_hash == api_key_hash {
-                // Try to decrypt metadata if we have the API key
-                let label = if let Some(ref key) = api_key {
-                    match collection.decrypt_metadata(key) {
-                        Ok(metadata) => metadata["label"]
-                            .as_str()
-                            .unwrap_or("[decryption failed]")
-                            .to_string(),
-                        Err(_) => "[encrypted]".to_string(),
-                    }
-                } else {
-                    "[encrypted - use API key to decrypt]".to_string()
-                };
-
-                let created_at = if let Some(ref key) = api_key {
-                    match collection.decrypt_metadata(key) {
-                        Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
-                        Err(_) => 0,
-                    }
-                } else {
-                    0
-                };
-
-                result.push(CollectionListItem {
-                    collection_id: collection.collection_id.clone(),
-                    label,
-                    created_at,
-                    block_number: block.index,
-                });
+    for collection in collections {
+        // Try to decrypt metadata if we have the API key
+        let label = if let Some(ref key) = api_key {
+            match collection.decrypt_metadata(key) {
+                Ok(metadata) => metadata["label"]
+                    .as_str()
+                    .unwrap_or("[decryption failed]")
+                    .to_string(),
+                Err(_) => "[encrypted]".to_string(),
             }
-        }
+        } else {
+            "[encrypted - use API key to decrypt]".to_string()
+        };
+
+        let created_at = if let Some(ref key) = api_key {
+            match collection.decrypt_metadata(key) {
+                Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
+                Err(_) => 0,
+            }
+        } else {
+            0
+        };
+
+        // Note: We don't have block_number readily available in the new structure
+        // This would require additional lookup. For now, set to 0
+        result.push(CollectionListItem {
+            collection_id: collection.collection_id.clone(),
+            label,
+            created_at,
+            block_number: 0, // TODO: Add block number lookup if needed
+        });
     }
 
     let response = CollectionListResponse {

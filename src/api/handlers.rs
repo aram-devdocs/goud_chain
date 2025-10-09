@@ -64,7 +64,7 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
 
     let chain = blockchain.lock().unwrap();
 
-    // Calculate statistics
+    // Calculate statistics (requires decrypting blocks)
     let total_blocks = chain.chain.len() as u64;
 
     let mut total_collections = 0u64;
@@ -72,11 +72,14 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
     let mut validator_distribution: HashMap<String, u64> = HashMap::new();
 
     for block in &chain.chain {
-        total_collections += block.encrypted_collections.len() as u64;
-        total_accounts += block.user_accounts.len() as u64;
-        *validator_distribution
-            .entry(block.validator.clone())
-            .or_insert(0) += 1;
+        // Decrypt block data to get counts
+        if let Ok(block_data) = block.decrypt_data(&chain.master_chain_key) {
+            total_collections += block_data.collections.len() as u64;
+            total_accounts += block_data.accounts.len() as u64;
+            *validator_distribution
+                .entry(block_data.validator.clone())
+                .or_insert(0) += 1;
+        }
     }
 
     // Calculate average block time

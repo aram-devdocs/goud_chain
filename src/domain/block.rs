@@ -1,72 +1,125 @@
 use chrono::Utc;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::{encrypted_collection::EncryptedCollection, user_account::UserAccount};
-use crate::constants::EMPTY_MERKLE_ROOT;
-use crate::types::Result;
+use crate::constants::{EMPTY_MERKLE_ROOT, ENCRYPTION_SALT, TIMESTAMP_GRANULARITY_SECONDS};
+use crate::crypto::{decrypt_data_with_key, derive_encryption_key, encrypt_data_with_key};
+use crate::types::{GoudChainError, Result};
 
+/// Generate a random 32-byte salt for blind index generation
+pub fn generate_block_salt() -> String {
+    let mut rng = rand::thread_rng();
+    let salt_bytes: [u8; 32] = rng.gen();
+    hex::encode(salt_bytes)
+}
+
+/// Obfuscate timestamp to hourly granularity for privacy
+/// Rounds down to the nearest hour to hide exact activity timing
+fn obfuscate_timestamp(timestamp: i64) -> i64 {
+    timestamp - (timestamp % TIMESTAMP_GRANULARITY_SECONDS)
+}
+
+/// Internal structure for block contents before encryption
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockData {
+    pub accounts: Vec<UserAccount>,
+    pub collections: Vec<EncryptedCollection>,
+    pub validator: String,
+}
+
+/// Configuration for creating a new block
+pub struct BlockConfig<'a> {
+    pub index: u64,
+    pub user_accounts: Vec<UserAccount>,
+    pub encrypted_collections: Vec<EncryptedCollection>,
+    pub previous_hash: String,
+    pub validator: String,
+    pub blind_indexes: Vec<String>,
+    pub block_salt: String,
+    pub master_key: &'a [u8],
+}
+
+/// Privacy-preserving block structure (v3)
+/// All sensitive data is encrypted, only structural metadata exposed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub index: u64,
     pub timestamp: i64,
-    pub user_accounts: Vec<UserAccount>,
-    pub encrypted_collections: Vec<EncryptedCollection>,
+    pub encrypted_block_data: String,
+    pub blind_indexes: Vec<String>,
+    pub block_salt: String, // Random salt for blind index generation (prevents correlation)
+    pub validator_index: u64,
     pub previous_hash: String,
     pub merkle_root: String,
     pub hash: String,
-    pub validator: String,
+    pub nonce: String,
 }
 
 impl Block {
-    /// Create a new block with accounts and collections
-    pub fn new(
-        index: u64,
-        user_accounts: Vec<UserAccount>,
-        encrypted_collections: Vec<EncryptedCollection>,
-        previous_hash: String,
-        validator: String,
-    ) -> Self {
-        let timestamp = Utc::now().timestamp();
-        let merkle_root = Self::calculate_merkle_root(&user_accounts, &encrypted_collections);
+    /// Create a new privacy-preserving block with encrypted data
+    pub fn new(config: BlockConfig) -> Result<Self> {
+        let timestamp = obfuscate_timestamp(Utc::now().timestamp());
+
+        // Create block data structure
+        let block_data = BlockData {
+            accounts: config.user_accounts,
+            collections: config.encrypted_collections,
+            validator: config.validator.clone(),
+        };
+
+        // Serialize block data
+        let block_data_json = serde_json::to_string(&block_data).map_err(|e| {
+            GoudChainError::Internal(format!("Failed to serialize block data: {}", e))
+        })?;
+
+        // Encrypt block data with master key
+        let encryption_key = derive_encryption_key(config.master_key, ENCRYPTION_SALT);
+        let (encrypted_block_data, nonce) =
+            encrypt_data_with_key(&block_data_json, &encryption_key)?;
+
+        // Calculate validator index (obfuscated)
+        let validator_index = Self::calculate_validator_index(&config.validator, config.index);
+
+        // Calculate merkle root
+        let merkle_root = Self::calculate_merkle_root(&encrypted_block_data, &config.blind_indexes);
 
         let mut block = Block {
-            index,
+            index: config.index,
             timestamp,
-            user_accounts,
-            encrypted_collections,
-            previous_hash,
+            encrypted_block_data,
+            blind_indexes: config.blind_indexes,
+            block_salt: config.block_salt,
+            validator_index,
+            previous_hash: config.previous_hash,
             merkle_root,
             hash: String::new(),
-            validator,
+            nonce,
         };
 
         block.hash = block.calculate_hash();
-        block
+        Ok(block)
     }
 
-    /// Calculate the merkle root from accounts and collections
-    pub fn calculate_merkle_root(
-        accounts: &[UserAccount],
-        collections: &[EncryptedCollection],
-    ) -> String {
-        if accounts.is_empty() && collections.is_empty() {
+    /// Calculate the merkle root from encrypted block data and blind indexes
+    pub fn calculate_merkle_root(encrypted_data: &str, blind_indexes: &[String]) -> String {
+        if encrypted_data.is_empty() && blind_indexes.is_empty() {
             return EMPTY_MERKLE_ROOT.to_string();
         }
 
         let mut hashes: Vec<String> = Vec::new();
 
-        // Hash all accounts
-        for account in accounts {
-            let account_hash = format!("{}{}", account.account_id, account.api_key_hash);
-            let mut hasher = Sha256::new();
-            hasher.update(account_hash.as_bytes());
-            hashes.push(format!("{:x}", hasher.finalize()));
-        }
+        // Hash encrypted block data
+        let mut hasher = Sha256::new();
+        hasher.update(encrypted_data.as_bytes());
+        hashes.push(format!("{:x}", hasher.finalize()));
 
-        // Hash all collections
-        for collection in collections {
-            hashes.push(collection.hash());
+        // Hash all blind indexes
+        for index in blind_indexes {
+            let mut hasher = Sha256::new();
+            hasher.update(index.as_bytes());
+            hashes.push(format!("{:x}", hasher.finalize()));
         }
 
         // Build Merkle tree
@@ -88,26 +141,51 @@ impl Block {
         hashes[0].clone()
     }
 
+    /// Calculate obfuscated validator index
+    fn calculate_validator_index(validator: &str, block_index: u64) -> u64 {
+        let combined = format!("{}{}", validator, block_index);
+        let mut hasher = Sha256::new();
+        hasher.update(combined.as_bytes());
+        let hash_bytes = hasher.finalize();
+
+        // Use first 8 bytes of hash as u64
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&hash_bytes[0..8]);
+        u64::from_le_bytes(bytes)
+    }
+
     /// Calculate the hash of this block
     pub fn calculate_hash(&self) -> String {
         let content = format!(
             "{}{}{}{}{}",
-            self.index, self.timestamp, self.merkle_root, self.previous_hash, self.validator
+            self.index, self.timestamp, self.merkle_root, self.previous_hash, self.validator_index
         );
         let mut hasher = Sha256::new();
         hasher.update(content.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 
+    /// Decrypt block data with master key
+    pub fn decrypt_data(&self, master_key: &[u8]) -> Result<BlockData> {
+        let encryption_key = derive_encryption_key(master_key, ENCRYPTION_SALT);
+        let decrypted_json = decrypt_data_with_key(&self.encrypted_block_data, &encryption_key)?;
+
+        serde_json::from_str(&decrypted_json).map_err(|e| {
+            GoudChainError::Internal(format!("Failed to deserialize block data: {}", e))
+        })
+    }
+
     /// Verify all encrypted data in this block
-    pub fn verify_data(&self) -> Result<()> {
+    pub fn verify_data(&self, master_key: &[u8]) -> Result<()> {
+        let block_data = self.decrypt_data(master_key)?;
+
         // Verify all accounts
-        for account in &self.user_accounts {
+        for account in &block_data.accounts {
             account.verify()?;
         }
 
         // Verify all collections (signature only, not MAC)
-        for collection in &self.encrypted_collections {
+        for collection in &block_data.collections {
             collection.verify(None)?;
         }
 
@@ -121,23 +199,62 @@ mod tests {
 
     #[test]
     fn test_block_creation() {
-        let block = Block::new(
-            1,
-            Vec::new(),
-            Vec::new(),
-            "previous_hash".to_string(),
-            "Validator_1".to_string(),
-        );
+        let master_key = b"test_master_key_32_bytes_long!!";
+        let block = Block::new(BlockConfig {
+            index: 1,
+            user_accounts: Vec::new(),
+            encrypted_collections: Vec::new(),
+            previous_hash: "previous_hash".to_string(),
+            validator: "Validator_1".to_string(),
+            blind_indexes: Vec::new(),
+            block_salt: "test_salt".to_string(),
+            master_key,
+        })
+        .unwrap();
 
         assert_eq!(block.index, 1);
         assert_eq!(block.previous_hash, "previous_hash");
         assert!(!block.hash.is_empty());
         assert_eq!(block.hash, block.calculate_hash());
+        assert!(!block.encrypted_block_data.is_empty());
     }
 
     #[test]
     fn test_empty_merkle_root() {
-        let merkle_root = Block::calculate_merkle_root(&[], &[]);
+        let merkle_root = Block::calculate_merkle_root("", &[]);
         assert_eq!(merkle_root, EMPTY_MERKLE_ROOT);
+    }
+
+    #[test]
+    fn test_decrypt_block_data() {
+        let master_key = b"test_master_key_32_bytes_long!!";
+        let block = Block::new(BlockConfig {
+            index: 1,
+            user_accounts: Vec::new(),
+            encrypted_collections: Vec::new(),
+            previous_hash: "previous_hash".to_string(),
+            validator: "Validator_1".to_string(),
+            blind_indexes: Vec::new(),
+            block_salt: "test_salt".to_string(),
+            master_key,
+        })
+        .unwrap();
+
+        let decrypted = block.decrypt_data(master_key).unwrap();
+        assert_eq!(decrypted.accounts.len(), 0);
+        assert_eq!(decrypted.collections.len(), 0);
+        assert_eq!(decrypted.validator, "Validator_1");
+    }
+
+    #[test]
+    fn test_validator_index_obfuscation() {
+        let index1 = Block::calculate_validator_index("Validator_1", 1);
+        let index2 = Block::calculate_validator_index("Validator_1", 2);
+        let index3 = Block::calculate_validator_index("Validator_2", 1);
+
+        // Different block indexes should produce different validator indexes
+        assert_ne!(index1, index2);
+        // Different validators should produce different indexes
+        assert_ne!(index1, index3);
     }
 }

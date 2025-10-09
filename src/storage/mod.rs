@@ -24,7 +24,7 @@ pub fn save_blockchain(blockchain: &Blockchain) -> Result<()> {
 
 /// Load the blockchain from disk or create a new one
 /// Validates schema version and auto-migrates by deleting old data
-pub fn load_blockchain(node_id: String) -> Result<Blockchain> {
+pub fn load_blockchain(node_id: String, master_chain_key: Vec<u8>) -> Result<Blockchain> {
     match fs::read_to_string(BLOCKCHAIN_FILE_PATH) {
         Ok(content) => {
             // Try to extract just the schema_version field to check compatibility
@@ -51,25 +51,40 @@ pub fn load_blockchain(node_id: String) -> Result<Blockchain> {
                             .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
 
                         info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-                        return Blockchain::new(node_id);
+                        return Blockchain::new(node_id, master_chain_key);
                     }
 
                     // Schema matches, try full deserialization
-                    let blockchain: Blockchain = serde_json::from_str(&content)
-                        .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+                    match serde_json::from_str::<Blockchain>(&content) {
+                        Ok(blockchain) => {
+                            let mut blockchain = blockchain;
+                            blockchain.node_id = node_id;
+                            blockchain.pending_accounts = Vec::new();
+                            blockchain.pending_collections = Vec::new();
+                            blockchain.node_signing_key = Some(generate_signing_key());
+                            blockchain.master_chain_key = master_chain_key;
 
-                    let mut blockchain = blockchain;
-                    blockchain.node_id = node_id;
-                    blockchain.pending_accounts = Vec::new();
-                    blockchain.pending_collections = Vec::new();
-                    blockchain.node_signing_key = Some(generate_signing_key());
+                            info!(
+                                chain_length = blockchain.chain.len(),
+                                schema_version = %blockchain.schema_version,
+                                "Blockchain loaded from disk"
+                            );
+                            Ok(blockchain)
+                        }
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                "Failed to deserialize blockchain (likely schema mismatch) - deleting and starting fresh"
+                            );
 
-                    info!(
-                        chain_length = blockchain.chain.len(),
-                        schema_version = %blockchain.schema_version,
-                        "Blockchain loaded from disk"
-                    );
-                    Ok(blockchain)
+                            // Delete incompatible file
+                            fs::remove_file(BLOCKCHAIN_FILE_PATH)
+                                .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+
+                            info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
+                            Blockchain::new(node_id, master_chain_key)
+                        }
+                    }
                 }
                 Err(e) => {
                     warn!(
@@ -82,13 +97,13 @@ pub fn load_blockchain(node_id: String) -> Result<Blockchain> {
                         .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
 
                     info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-                    Blockchain::new(node_id)
+                    Blockchain::new(node_id, master_chain_key.clone())
                 }
             }
         }
         Err(_) => {
             info!("No existing blockchain found, creating new one");
-            Blockchain::new(node_id)
+            Blockchain::new(node_id, master_chain_key)
         }
     }
 }

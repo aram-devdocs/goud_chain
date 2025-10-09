@@ -2,7 +2,7 @@
 //! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
-pub const SCHEMA_VERSION: &str = "v2_api_key";
+pub const SCHEMA_VERSION: &str = "v3_privacy_preserving";
 
 // Storage paths
 pub const BLOCKCHAIN_FILE_PATH: &str = "/data/blockchain.json";
@@ -11,6 +11,7 @@ pub const DATA_DIRECTORY: &str = "/data";
 // Blockchain parameters
 pub const CHECKPOINT_INTERVAL: u64 = 100;
 pub const TIMESTAMP_TOLERANCE_SECONDS: i64 = 120;
+pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 3600; // 1 hour (privacy: hides exact timing)
 
 // Cryptography constants
 pub const ENCRYPTION_SALT: &[u8] = b"goud_chain_salt_v2";

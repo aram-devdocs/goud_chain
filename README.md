@@ -41,14 +41,18 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 ## Features
 
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
+- **Privacy-Preserving Architecture** - Full metadata encryption with blind indexes
+- **Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks
+- **Timestamp Obfuscation** - Hourly granularity hides exact activity timing
 - **API Key Authentication** - Cryptographically secure 256-bit keys
-- **AES-256-GCM Encryption** - API key-based symmetric encryption with HMAC integrity verification
-- **HKDF Key Derivation** - Separate encryption, MAC, and search keys derived from single API key (100k iterations)
+- **Dual-Layer Encryption** - Master key for block data, API keys for collections
+- **HKDF Key Derivation** - Separate encryption, MAC, and search keys (100k iterations)
 - **JWT Sessions** - Token-based authentication with 1-hour expiry
 - **Collection-Based Storage** - Group encrypted data by user account
 - **Ed25519 Signatures** - Digital signatures for blockchain integrity
-- **Merkle Trees** - Tamper detection with accounts and collections
-- **Schema Versioning** - Automatic migration on architecture changes
+- **Merkle Trees** - Tamper detection with encrypted data and blind indexes
+- **Auto Schema Migration** - Seamless upgrades during development
+- **Environment Variable Key Management** - Production-ready configuration
 - **Load Balanced** - NGINX reverse proxy with health checks
 - **Cloud-Native** - Runs on GCP free tier ($0/month)
 
@@ -131,8 +135,8 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 1. Account Creation → Generate 256-bit API Key → Hash with SHA-256 → Store on Blockchain
 2. Authentication → API Key → JWT Session Token (1hr expiry)
 3. Data Submission → JSON → Encrypt with API-derived key (HKDF) → HMAC → Sign (Ed25519) → Collection
-4. Block Creation → Validator creates block with accounts + collections → Merkle Root → Blockchain
-5. Data Retrieval → Decrypt with API key → Verify HMAC → Return JSON
+4. Block Creation → Validator creates block → Encrypt with master key → Generate blind indexes → Merkle Root → Blockchain
+5. Data Retrieval → Find via blind index → Decrypt block → Decrypt collection with API key → Verify HMAC → Return JSON
 ```
 
 **Consensus:** Proof of Authority (PoA)
@@ -155,13 +159,15 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 ```rust
 Block {
     index: u64,
-    timestamp: i64,
-    user_accounts: Vec<UserAccount>,
-    encrypted_collections: Vec<EncryptedCollection>,
+    timestamp: i64,                   // Obfuscated to hourly granularity
+    encrypted_block_data: String,     // All accounts + collections encrypted
+    blind_indexes: Vec<String>,       // HMAC-based searchable indexes
+    block_salt: String,               // Random salt per block (prevents correlation)
+    validator_index: u64,             // Obfuscated validator identity
     previous_hash: String,
-    merkle_root: String,
+    merkle_root: String,              // Hash of encrypted data + blind indexes
     hash: String,
-    validator: String,
+    nonce: String,                    // Encryption nonce
 }
 ```
 
@@ -596,34 +602,37 @@ This starts the blockchain with `cargo-watch` for automatic recompilation on fil
 goud_chain/
 ├── src/
 │   ├── main.rs                     # Entry point
+│   ├── lib.rs                      # Library exports for testing
+│   ├── config.rs                   # Environment configuration & master key loading
 │   ├── constants.rs                # Configuration constants & schema version
 │   ├── crypto/
 │   │   ├── api_key.rs              # API key generation & validation
+│   │   ├── blind_index.rs          # HMAC-based searchable encryption
 │   │   ├── encryption.rs           # AES-256-GCM encryption
 │   │   ├── hkdf.rs                 # HKDF key derivation (100k iterations)
 │   │   ├── mac.rs                  # HMAC-SHA256 message authentication
 │   │   └── signature.rs            # Ed25519 signatures
 │   ├── domain/
-│   │   ├── blockchain.rs           # Blockchain logic with schema versioning
-│   │   ├── block.rs                # Block structure (accounts + collections)
+│   │   ├── blockchain.rs           # Blockchain logic with blind index queries
+│   │   ├── block.rs                # Privacy-preserving block structure
 │   │   ├── user_account.rs         # User account model
-│   │   ├── encrypted_collection.rs # Encrypted data collection
-│   │   └── encrypted_data.rs       # Legacy encrypted data (deprecated)
+│   │   └── encrypted_collection.rs # Encrypted data collection
 │   ├── api/
 │   │   ├── handlers.rs             # Main router
 │   │   ├── account_handlers.rs     # Account creation & login
 │   │   ├── data_handlers.rs        # Data submission & retrieval
 │   │   ├── auth.rs                 # JWT authentication middleware
 │   │   └── middleware.rs           # CORS & request handling
-│   ├── network/
-│   │   └── p2p.rs                  # Peer-to-peer networking
+│   ├── p2p/
+│   │   └── mod.rs                  # Peer-to-peer networking & validator selection
 │   ├── storage/
-│   │   └── mod.rs                  # Blockchain persistence with schema migration
+│   │   └── mod.rs                  # Blockchain persistence with auto-migration
 │   └── types/
 │       ├── api.rs                  # Request/response types
 │       └── errors.rs               # Error types
 ├── tests/
-│   └── module_dependencies.rs  # Circular dependency prevention
+│   ├── module_dependencies.rs      # Circular dependency prevention
+│   └── privacy_verification.rs     # Privacy architecture tests
 ├── scripts/
 │   ├── setup-gcp.sh                    # GCP project setup
 │   ├── deploy.sh                       # Deploy to GCP
@@ -650,13 +659,16 @@ goud_chain/
 │           ├── main.tf         # Environment-specific config
 │           ├── variables.tf    # Environment variables
 │           └── terraform.tfvars.example  # Example configuration
+├── .env.example                # Environment variable template
 ├── docker-compose.yml          # Local 3-node network
 ├── docker-compose.dev.yml      # Local dev with hot reload
 ├── docker-compose.gcp.yml      # GCP 2-node network (optimized for 1GB RAM)
+├── docker-compose.local.yml    # Local development with custom config
 ├── Dockerfile                  # Rust production build
 ├── Dockerfile.dev              # Rust dev build with cargo-watch
 ├── run                         # CLI script
-└── README.md                   # This file
+├── README.md                   # This file
+└── CLAUDE.md                   # AI assistant guidelines
 ```
 
 ## Tech Stack
@@ -715,10 +727,17 @@ enum P2PMessage {
 
 **Environment Variables:**
 ```bash
-NODE_ID=node1              # Node identifier
-HTTP_PORT=8081             # API server port
-P2P_PORT=9000              # P2P network port
-PEERS=node2:9000           # Comma-separated peers
+# Node configuration
+NODE_ID=node1                                      # Node identifier
+HTTP_PORT=8081                                     # API server port
+P2P_PORT=9000                                      # P2P network port
+PEERS=node2:9000                                   # Comma-separated peers
+
+# Master chain key (production)
+MASTER_CHAIN_KEY=abc123...def                      # 64-char hex (32 bytes)
+
+# Master key passphrase (development fallback)
+MASTER_KEY_PASSPHRASE=my_secure_passphrase         # SHA-256 hashed to derive key
 ```
 
 **Docker Compose:**
@@ -729,7 +748,53 @@ node1:
     - HTTP_PORT=8080
     - P2P_PORT=9000
     - PEERS=node2:9000,node3:9000
+    - MASTER_KEY_PASSPHRASE=${MASTER_KEY_PASSPHRASE:-goud_chain_dev_passphrase}
 ```
+
+## Privacy Architecture
+
+**Design Goals:**
+- Hide all metadata unless user has valid API key
+- Prevent correlation attacks across blocks
+- Obfuscate validator identity and timing information
+- Enable efficient queries without exposing data
+
+**Blind Indexes:**
+- HMAC-SHA256 based searchable encryption
+- Per-block random salt (32 bytes) prevents correlation
+- Deterministic for same API key + block salt combination
+- One-way: cannot reverse to find API key hash
+- Query complexity: O(n) blocks (trade-off for privacy)
+
+**Block Encryption:**
+- All accounts and collections encrypted with master chain key
+- Master key loaded from `MASTER_CHAIN_KEY` env var (production)
+- Development fallback: `MASTER_KEY_PASSPHRASE` hashed with SHA-256
+- Encrypted data includes validator identity (hidden from observers)
+
+**Timestamp Obfuscation:**
+- Timestamps rounded to hourly granularity (3600 seconds)
+- Hides exact activity timing
+- Prevents timing-based correlation attacks
+
+**Validator Obfuscation:**
+- Validator identity stored inside encrypted block data
+- Public `validator_index` is hash-based (validator + block index)
+- Prevents identifying validator from blockchain inspection
+
+**What's Visible On-Chain:**
+- Block index, obfuscated timestamp, previous hash
+- Encrypted block data (opaque ciphertext)
+- Blind indexes (random-looking hex strings)
+- Obfuscated validator index (not validator name)
+- Merkle root, block hash, nonce
+
+**What's Hidden:**
+- Account IDs, API key hashes, public keys
+- Collection IDs, labels, data contents
+- Validator names (encrypted in block data)
+- Exact timestamps (obfuscated to hour)
+- Number of accounts/collections per block
 
 ## Security Model
 
@@ -764,10 +829,10 @@ node1:
 - Signatures verified during chain validation
 
 **Schema Versioning:**
-- Automatic detection of architecture changes
-- Old blockchain data deleted on schema mismatch
-- Prevents compatibility issues during PoC development
-- Current schema: `v2_api_key`
+- Automatic detection of schema changes
+- Auto-deletion of incompatible blockchain data
+- Seamless migration during development
+- Dashboard validates API keys on load
 
 **Limitations (Proof of Concept):**
 - API key security is symmetric (anyone with API key can decrypt)
