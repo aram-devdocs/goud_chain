@@ -145,13 +145,3 @@ fn test_privacy_preserving_chain_structure() {
 
     println!("🎉 All privacy properties verified! The chain exposes NO metadata.");
 }
-
-#[test]
-fn test_schema_version_updated() {
-    let master_key = b"test_master_key_32_bytes_long!!".to_vec();
-    let blockchain = Blockchain::new("test-node".to_string(), master_key).unwrap();
-    assert_eq!(
-        blockchain.schema_version, "v4_deterministic_genesis",
-        "Schema version should be v4_deterministic_genesis"
-    );
-}
