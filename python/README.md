@@ -43,7 +43,32 @@ python/
 
 ## Getting Started
 
-### 1. Start the Development Environment
+### 1. Initial Setup (First Time Only)
+
+Before running notebooks, set up `nbstripout` to prevent execution outputs from being committed to git:
+
+```bash
+# Install Python dependencies (includes nbstripout)
+cd python
+pip install -r requirements.txt
+
+# Configure git filter to automatically strip notebook outputs
+nbstripout --install --attributes ../.gitattributes
+```
+
+**What this does:**
+- Installs a git filter that removes cell outputs before committing
+- Prevents API keys, timestamps, and execution results from leaking into git history
+- Keeps your local notebook outputs intact while you work
+- Works automatically on every `git add`
+
+**Verify it's working:**
+```bash
+git config --local --list | grep nbstripout
+# Should show: filter.nbstripout.clean=...
+```
+
+### 2. Start the Development Environment
 
 From the project root:
 
@@ -57,7 +82,7 @@ This starts:
 - Dashboard
 - **Jupyter Lab** at `http://localhost:8888`
 
-### 2. Access Jupyter Lab
+### 3. Access Jupyter Lab
 
 Open your browser to: **http://localhost:8888**
 
@@ -65,7 +90,7 @@ You'll see two directories:
 - `notebooks/` - Main test suite (read-only)
 - `scratch/` - Your experimental space (read-write)
 
-### 3. Run the Test Notebook
+### 4. Run the Test Notebook
 
 1. Navigate to `notebooks/test_goud_chain.ipynb`
 2. Run the cells in order (Shift + Enter)
@@ -75,7 +100,9 @@ You'll see two directories:
    - Retrieve and decrypt collections
    - Generate performance reports
 
-### 4. Edit Notebooks (Hybrid Workflow)
+**Note:** Execution outputs stay local and won't be committed to git thanks to `nbstripout` 🎉
+
+### 5. Edit Notebooks (Hybrid Workflow)
 
 **Option A: Execute in Browser** (Recommended)
 - Open notebook in Jupyter Lab

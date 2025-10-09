@@ -1,0 +1,17 @@
+# Git attributes for Goud Chain repository
+
+# Automatically strip Jupyter notebook outputs before committing
+# This prevents execution results, API keys, and sensitive data from leaking into git
+*.ipynb filter=nbstripout
+*.ipynb diff=ipynb
+
+# Normalize line endings
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
