@@ -128,6 +128,38 @@ pub fn handle_get_metrics(
     json_response(serde_json::to_string(&metrics).unwrap())
 }
 
+/// Handle GET /validator/current - Get current validator for next block
+/// Used by load balancer to route write requests to the correct node
+pub fn handle_get_current_validator(
+    blockchain: Arc<Mutex<Blockchain>>,
+) -> Response<std::io::Cursor<Vec<u8>>> {
+    use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
+
+    let chain = blockchain.lock().unwrap();
+    let latest_block = chain.chain.last();
+    let next_block_number = latest_block.map(|b| b.index + 1).unwrap_or(1);
+    let expected_validator = get_current_validator(next_block_number);
+    let is_this_node = is_authorized_validator(&chain.node_id, next_block_number);
+
+    // Map validator to node name for routing
+    let validator_node = match expected_validator.as_str() {
+        "Validator_1" => "node1",
+        "Validator_2" => "node2",
+        "Validator_3" => "node3",
+        _ => "unknown",
+    };
+
+    let response = serde_json::json!({
+        "next_block_number": next_block_number,
+        "expected_validator": expected_validator,
+        "validator_node": validator_node,
+        "is_this_node_validator": is_this_node,
+        "current_node_id": chain.node_id,
+    });
+
+    json_response(serde_json::to_string(&response).unwrap())
+}
+
 /// Route and handle HTTP requests
 pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: Arc<P2PNode>) {
     let method = request.method().clone();
@@ -178,6 +210,11 @@ pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: 
         }
         (Method::Get, "/metrics") => {
             let _ = request.respond(handle_get_metrics(blockchain, p2p));
+        }
+
+        // ========== Validator Info (for load balancer routing) ==========
+        (Method::Get, "/validator/current") => {
+            let _ = request.respond(handle_get_current_validator(blockchain));
         }
 
         _ => {

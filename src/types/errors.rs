@@ -43,6 +43,13 @@ pub enum GoudChainError {
         actual: String,
     },
 
+    #[error("Node {node_id} not authorized to create block {block_number}: only validator {expected_validator} can create this block (Proof of Authority)")]
+    NotAuthorizedValidator {
+        node_id: String,
+        expected_validator: String,
+        block_number: u64,
+    },
+
     #[error("Empty blockchain: cannot get latest block")]
     EmptyBlockchain,
 
@@ -110,7 +117,8 @@ impl GoudChainError {
             | Self::InvalidMerkleRoot(_)
             | Self::FutureTimestamp(_)
             | Self::InvalidTimestamp(_)
-            | Self::InvalidValidator { .. } => 422,
+            | Self::InvalidValidator { .. }
+            | Self::NotAuthorizedValidator { .. } => 422,
             _ => 500,
         }
     }

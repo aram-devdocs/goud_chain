@@ -21,6 +21,26 @@ pub fn get_current_validator(block_number: u64) -> String {
     validators[index].to_string()
 }
 
+/// Check if a node is authorized to be a validator for a given block
+/// In PoA, we map node IDs to validator names deterministically
+pub fn is_authorized_validator(node_id: &str, block_number: u64) -> bool {
+    let expected_validator = get_current_validator(block_number);
+
+    // Map node IDs to validator names
+    // node1 -> Validator_1, node2 -> Validator_2, etc.
+    let node_validator = match node_id {
+        "node1" => "Validator_1",
+        "node2" => "Validator_2",
+        "node3" => "Validator_3",
+        _ => {
+            // For unknown node IDs, check if node_id matches validator name directly
+            return node_id == expected_validator;
+        }
+    };
+
+    node_validator == expected_validator
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
     pub schema_version: String,
@@ -103,6 +123,7 @@ impl Blockchain {
     }
 
     /// Create a block from pending accounts and collections
+    /// Only the designated PoA validator can create blocks (enforces consensus)
     pub fn add_block(&mut self) -> Result<Block> {
         if self.pending_accounts.is_empty() && self.pending_collections.is_empty() {
             return Err(GoudChainError::NoPendingData);
@@ -111,6 +132,21 @@ impl Blockchain {
         let previous_block = self.get_latest_block()?;
         let block_number = previous_block.index + 1;
         let validator = get_current_validator(block_number);
+
+        // Proof of Authority: Only the designated validator can create this block
+        if !is_authorized_validator(&self.node_id, block_number) {
+            warn!(
+                node_id = %self.node_id,
+                block_number = block_number,
+                expected_validator = %validator,
+                "Node not authorized to create block - only designated PoA validator can create blocks"
+            );
+            return Err(GoudChainError::NotAuthorizedValidator {
+                node_id: self.node_id.clone(),
+                expected_validator: validator,
+                block_number,
+            });
+        }
 
         // Generate random salt for this block
         let block_salt = generate_block_salt();
@@ -247,13 +283,84 @@ impl Blockchain {
             master_chain_key: self.master_chain_key.clone(),
         };
 
-        // Use chain length (longest chain wins in PoA)
-        if new_chain.len() > self.chain.len() {
+        // Chain selection logic with tie-breaking
+        let should_replace = if new_chain.len() > self.chain.len() {
+            // Longer chain always wins
+            true
+        } else if new_chain.len() == self.chain.len() && new_chain.len() > 1 {
+            // Equal length chains: use tie-breaking rules
+            // This handles the case where nodes create different blocks simultaneously
+
+            // First, check if chains are identical (common case after sync)
+            if self
+                .chain
+                .iter()
+                .zip(&new_chain)
+                .all(|(a, b)| a.hash == b.hash)
+            {
+                // Chains are identical, no replacement needed
+                false
+            } else {
+                // Chains have diverged - use tie-breaking rules
+                warn!(
+                    our_length = self.chain.len(),
+                    their_length = new_chain.len(),
+                    "Chain divergence detected with equal lengths - applying tie-breaking rules"
+                );
+
+                // Tie-breaker 1: Prefer chain with blocks from proper validators
+                // (This prevents non-validator nodes from creating conflicting blocks)
+                // Compare the last block's validator (most recent divergence point)
+                let our_last = &self.chain[self.chain.len() - 1];
+                let their_last = &new_chain[new_chain.len() - 1];
+
+                // Decrypt both blocks to check validator authorization
+                match (
+                    our_last.decrypt_data(&self.master_chain_key),
+                    their_last.decrypt_data(&self.master_chain_key),
+                ) {
+                    (Ok(our_data), Ok(their_data)) => {
+                        let our_validator = &our_data.validator;
+                        let their_validator = &their_data.validator;
+                        let expected_validator = get_current_validator(our_last.index);
+
+                        let our_is_valid = our_validator == &expected_validator;
+                        let their_is_valid = their_validator == &expected_validator;
+
+                        if their_is_valid && !our_is_valid {
+                            // Their chain has proper validator, ours doesn't - accept theirs
+                            info!("Accepting peer chain: created by proper PoA validator");
+                            true
+                        } else if our_is_valid && !their_is_valid {
+                            // Our chain has proper validator - keep ours
+                            info!("Rejecting peer chain: not created by proper PoA validator");
+                            false
+                        } else {
+                            // Both valid or both invalid - use hash tie-breaker
+                            // Lexicographically smaller hash wins (deterministic)
+                            their_last.hash < our_last.hash
+                        }
+                    }
+                    _ => {
+                        // If we can't decrypt, fall back to hash comparison
+                        their_last.hash < our_last.hash
+                    }
+                }
+            }
+        } else {
+            // Shorter or equal length (genesis only) - keep our chain
+            false
+        };
+
+        if should_replace {
+            // Validate the new chain before accepting
             temp_blockchain.is_valid()?;
             info!(
                 old_length = self.chain.len(),
                 new_length = new_chain.len(),
-                "Replacing chain"
+                old_last_hash = %self.chain.last().map(|b| b.hash.clone()).unwrap_or_default(),
+                new_last_hash = %new_chain.last().map(|b| b.hash.clone()).unwrap_or_default(),
+                "Replacing chain (tie-breaker applied if equal length)"
             );
             self.chain = new_chain;
             return Ok(true);

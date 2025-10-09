@@ -210,8 +210,7 @@ if [ "$IS_LOCAL" = true ]; then
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=3 \
               -o TCPKeepAlive=yes \
-              -o Compression=yes \
-              -o CompressionLevel=9"
+              -o Compression=yes"
 
     # Function to transfer with retry
     transfer_with_retry() {

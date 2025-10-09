@@ -5,8 +5,9 @@ use goud_chain::domain::{Blockchain, EncryptedCollection, UserAccount};
 #[test]
 fn test_privacy_preserving_chain_structure() {
     // Create a blockchain
+    // Use node2 which maps to Validator_2 (authorized for block #1)
     let master_key = b"test_master_key_32_bytes_long!!".to_vec();
-    let mut blockchain = Blockchain::new("test-node".to_string(), master_key).unwrap();
+    let mut blockchain = Blockchain::new("node2".to_string(), master_key).unwrap();
 
     // Create an account
     let api_key = generate_api_key();
