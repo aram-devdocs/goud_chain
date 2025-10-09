@@ -305,19 +305,6 @@ The system uses a **reverse proxy load balancer** as the single entry point for 
 
 The system is designed to be **cloud-native** and **Terraform-ready**:
 
-**AWS Deployment Pattern:**
-- Application Load Balancer (ALB) or Network Load Balancer (NLB)
-- ECS Fargate tasks for blockchain nodes (stateless, scalable)
-- Elastic File System (EFS) for persistent blockchain storage
-- CloudWatch for logs and metrics
-- Secrets Manager for cryptographic material
-
-**Key Design Decisions:**
-- **Stateless nodes** - Blockchain state persists to shared storage
-- **Service discovery** - Load balancer handles routing, not service mesh
-- **Health checks** - Both load balancer and application-level health endpoints
-- **Observability** - Structured logging, metrics export, distributed tracing ready
-
 ### Monitoring & Observability
 
 **Health Check Strategy:**

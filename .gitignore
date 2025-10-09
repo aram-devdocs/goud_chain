@@ -48,3 +48,26 @@ wallets/
 # OS
 .DS_Store
 Thumbs.db
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl
+tfplan
+terraform.tfplan
+
+# GCP/Cloud credentials
+*.json
+!package.json
+!package-lock.json
+*.pem
+*.key
+~/.gcloud/
+~/.ssh/goud_chain_rsa*
+
+# Backups
+*.backup
+*.bak

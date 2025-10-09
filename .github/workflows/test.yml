@@ -100,13 +100,13 @@ jobs:
         run: terraform fmt -check -recursive
         working-directory: ./terraform
 
-      - name: Terraform Init (free-tier)
+      - name: Terraform Init (dev)
         run: terraform init -backend=false
-        working-directory: ./terraform/environments/free-tier
+        working-directory: ./terraform/environments/dev
 
-      - name: Terraform Validate (free-tier)
+      - name: Terraform Validate (dev)
         run: terraform validate
-        working-directory: ./terraform/environments/free-tier
+        working-directory: ./terraform/environments/dev
 
   # Security scanning
   security-scan:

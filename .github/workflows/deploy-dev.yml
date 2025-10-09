@@ -1,16 +1,15 @@
 # Deploy to Google Cloud Platform Development Environment
-# Triggered manually or on push to main branch
+# Triggered manually or on push to main branch (after tests pass)
 
 name: Deploy Dev
 
 on:
   workflow_dispatch:  # Manual trigger
-  push:
+  workflow_run:
+    workflows: ["Test"]
+    types:
+      - completed
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
 
 env:
   ENVIRONMENT: dev
@@ -21,6 +20,10 @@ env:
 jobs:
   # Terraform plan and apply
   terraform-deploy:
+    # Only run if tests passed (or if manually triggered)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     name: Terraform Deploy
     runs-on: ubuntu-latest
     environment: dev
