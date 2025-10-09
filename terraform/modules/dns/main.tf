@@ -37,20 +37,6 @@ resource "cloudflare_record" "api" {
   comment = "Goud Chain ${var.environment} API - managed by Terraform"
 }
 
-# A record for Jupyter Notebook (dev-notebook.goudchain.com)
-resource "cloudflare_record" "notebook" {
-  count = var.enable_dns ? 1 : 0
-
-  zone_id = var.cloudflare_zone_id
-  name    = var.environment == "production" ? var.notebook_subdomain : "${var.environment}-${var.notebook_subdomain}"
-  content = var.load_balancer_ip
-  type    = "A"
-  ttl     = 1 # Auto TTL when proxied
-  proxied = var.enable_cloudflare_proxy
-
-  comment = "Goud Chain ${var.environment} Jupyter Notebook - managed by Terraform"
-}
-
 # Optional: A records for individual nodes (for debugging)
 resource "cloudflare_record" "nodes" {
   count = var.enable_dns && var.enable_node_dns ? var.node_count : 0

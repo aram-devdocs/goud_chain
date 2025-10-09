@@ -150,44 +150,6 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # Jupyter Lab - API Testing & Development
-  jupyter:
-    image: goud-chain-jupyter:latest
-    build: ./python
-    container_name: goud_jupyter
-    ports:
-      - "8888:8888"  # Jupyter Lab access
-    volumes:
-      # Read-only mount for git-tracked notebooks
-      - ./python/notebooks:/home/jovyan/work/notebooks:ro
-      # Read-write mount for scratch/experimental notebooks (persisted)
-      - jupyter_scratch:/home/jovyan/work/scratch
-    networks:
-      - goud_network
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-}  # Token from env or empty for dev
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.15'
-          memory: 128M
-        reservations:
-          cpus: '0.05'
-          memory: 64M
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
-
 networks:
   goud_network:
     driver: bridge
@@ -195,4 +157,3 @@ networks:
 volumes:
   node1_data:
   node2_data:
-  jupyter_scratch:

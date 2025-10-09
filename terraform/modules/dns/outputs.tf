@@ -28,16 +28,6 @@ output "api_url" {
   value       = var.enable_dns ? (var.enable_cloudflare_proxy ? "https://${var.environment == "production" ? "${var.api_subdomain}.${var.domain_name}" : "${var.environment}-${var.api_subdomain}.${var.domain_name}"}" : "http://${var.environment == "production" ? "${var.api_subdomain}.${var.domain_name}" : "${var.environment}-${var.api_subdomain}.${var.domain_name}"}:8080") : null
 }
 
-output "notebook_fqdn" {
-  description = "Fully qualified domain name for Jupyter notebook"
-  value       = var.enable_dns ? (var.environment == "production" ? "${var.notebook_subdomain}.${var.domain_name}" : "${var.environment}-${var.notebook_subdomain}.${var.domain_name}") : null
-}
-
-output "notebook_url" {
-  description = "Full HTTPS URL for Jupyter notebook"
-  value       = var.enable_dns ? (var.enable_cloudflare_proxy ? "https://${var.environment == "production" ? "${var.notebook_subdomain}.${var.domain_name}" : "${var.environment}-${var.notebook_subdomain}.${var.domain_name}"}" : "http://${var.environment == "production" ? "${var.notebook_subdomain}.${var.domain_name}" : "${var.environment}-${var.notebook_subdomain}.${var.domain_name}"}:8888") : null
-}
-
 output "dns_records_created" {
   description = "Summary of DNS records created"
   value = var.enable_dns ? {
@@ -48,11 +38,6 @@ output "dns_records_created" {
     }
     api = {
       fqdn    = var.environment == "production" ? "${var.api_subdomain}.${var.domain_name}" : "${var.environment}-${var.api_subdomain}.${var.domain_name}"
-      ip      = var.load_balancer_ip
-      proxied = var.enable_cloudflare_proxy
-    }
-    notebook = {
-      fqdn    = var.environment == "production" ? "${var.notebook_subdomain}.${var.domain_name}" : "${var.environment}-${var.notebook_subdomain}.${var.domain_name}"
       ip      = var.load_balancer_ip
       proxied = var.enable_cloudflare_proxy
     }

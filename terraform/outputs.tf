@@ -21,11 +21,6 @@ output "dashboard_url" {
   value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : "http://${module.compute.public_ip}:3000"
 }
 
-output "notebook_url" {
-  description = "Jupyter Notebook URL"
-  value       = var.enable_dns && module.dns.notebook_url != null ? module.dns.notebook_url : "http://${module.compute.public_ip}:8888"
-}
-
 output "ssh_command" {
   description = "SSH command to connect to the instance"
   value       = "ssh ${var.ssh_username}@${module.compute.public_ip}"
@@ -65,7 +60,6 @@ output "dns_configuration" {
     domain_name           = var.domain_name
     dashboard_fqdn        = module.dns.dashboard_fqdn
     api_fqdn              = module.dns.api_fqdn
-    notebook_fqdn         = module.dns.notebook_fqdn
     cloudflare_proxy      = var.enable_cloudflare_proxy
     dns_records           = module.dns.dns_records_created
     https_enabled         = var.enable_cloudflare_proxy
@@ -76,7 +70,6 @@ output "dns_configuration" {
     domain_name           = null
     dashboard_fqdn        = null
     api_fqdn              = null
-    notebook_fqdn         = null
     cloudflare_proxy      = false
     dns_records           = null
     https_enabled         = false

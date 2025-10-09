@@ -15,13 +15,15 @@ RUN mkdir -p src && \
     echo "pub fn dummy() {}" > src/lib.rs
 
 # Build dependencies (this layer is cached unless Cargo.toml changes)
+# Remove intermediate binaries to force rebuild when real source is copied
 RUN cargo build --release && \
-    rm -rf src
+    rm -rf src target/release/goud_chain target/release/deps/goud_chain*
 
 # Now copy the real source code
 COPY src ./src
 
 # Build the actual application (only this rebuilds when code changes)
+# This will rebuild because we removed the binary above
 RUN cargo build --release
 
 # Runtime stage

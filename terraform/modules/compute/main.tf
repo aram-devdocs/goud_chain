@@ -123,20 +123,6 @@ resource "google_compute_firewall" "dashboard" {
   target_tags   = ["blockchain-node"]
 }
 
-# Firewall rule for Jupyter Notebook (port 8888)
-resource "google_compute_firewall" "jupyter" {
-  name    = "${var.project_name}-${var.environment}-allow-jupyter"
-  network = "default"
-
-  allow {
-    protocol = "tcp"
-    ports    = ["8888"]
-  }
-
-  source_ranges = var.allowed_http_cidrs
-  target_tags   = ["blockchain-node"]
-}
-
 # Firewall rule for HTTP/HTTPS (for Cloudflare origin requests)
 resource "google_compute_firewall" "http_https" {
   name    = "${var.project_name}-${var.environment}-allow-http-https"

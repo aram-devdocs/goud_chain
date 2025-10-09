@@ -95,32 +95,69 @@ cd ../../..
 
 # Step 1.5: Build images locally if running from local machine
 if [ "$IS_LOCAL" = true ]; then
-    echo -e "${YELLOW}Step 1.5: Building Docker images locally...${NC}"
-    echo "Building on local machine for faster deployment..."
+    echo -e "${YELLOW}Step 1.5: Checking if rebuild is needed...${NC}"
 
-    # Build blockchain node image
-    echo "Building blockchain node image..."
-    docker build -t goud-chain:latest .
+    # Calculate hash of source code to detect changes
+    NODE_HASH=$(find src Cargo.toml Cargo.lock Dockerfile -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+    DASHBOARD_HASH=$(find dashboard -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
 
-    # Build dashboard image
-    echo "Building dashboard image..."
-    docker build -t goud-chain-dashboard:latest ./dashboard
+    HASH_FILE="/tmp/goud-chain-deploy/.build_hashes"
+    REBUILD_NEEDED=false
 
-    # Build jupyter image
-    echo "Building jupyter image..."
-    docker build -t goud-chain-jupyter:latest ./python
+    # Check if we need to rebuild
+    if [ -f "$HASH_FILE" ]; then
+        PREV_NODE_HASH=$(grep "NODE=" "$HASH_FILE" | cut -d'=' -f2)
+        PREV_DASHBOARD_HASH=$(grep "DASHBOARD=" "$HASH_FILE" | cut -d'=' -f2)
 
-    # Save images to compressed tar files
-    echo "Saving images..."
-    mkdir -p /tmp/goud-chain-deploy
-    docker save goud-chain:latest | gzip > /tmp/goud-chain-deploy/node.tar.gz
-    docker save goud-chain-dashboard:latest | gzip > /tmp/goud-chain-deploy/dashboard.tar.gz
-    docker save goud-chain-jupyter:latest | gzip > /tmp/goud-chain-deploy/jupyter.tar.gz
+        if [ "$NODE_HASH" != "$PREV_NODE_HASH" ] || [ "$DASHBOARD_HASH" != "$PREV_DASHBOARD_HASH" ]; then
+            echo "Source code changed, rebuild required"
+            REBUILD_NEEDED=true
+        else
+            echo "Source code unchanged, checking if images exist..."
+            if [ -f /tmp/goud-chain-deploy/node.tar.gz ] && [ -f /tmp/goud-chain-deploy/dashboard.tar.gz ]; then
+                echo -e "${GREEN}✅ Using existing images (no changes detected)${NC}"
+                echo "Node image size: $(du -h /tmp/goud-chain-deploy/node.tar.gz | cut -f1)"
+                echo "Dashboard image size: $(du -h /tmp/goud-chain-deploy/dashboard.tar.gz | cut -f1)"
+            else
+                echo "Images not found, rebuild required"
+                REBUILD_NEEDED=true
+            fi
+        fi
+    else
+        echo "No previous build found, rebuild required"
+        REBUILD_NEEDED=true
+    fi
 
-    echo -e "${GREEN}✅ Images built locally${NC}"
-    echo "Node image size: $(du -h /tmp/goud-chain-deploy/node.tar.gz | cut -f1)"
-    echo "Dashboard image size: $(du -h /tmp/goud-chain-deploy/dashboard.tar.gz | cut -f1)"
-    echo "Jupyter image size: $(du -h /tmp/goud-chain-deploy/jupyter.tar.gz | cut -f1)"
+    # Build only if needed
+    if [ "$REBUILD_NEEDED" = true ]; then
+        echo -e "${YELLOW}Building Docker images locally...${NC}"
+        echo "Building on local machine for faster deployment..."
+
+        # Build blockchain node image for AMD64 (GCP VMs are x86_64)
+        # Use --no-cache to ensure cross-platform builds don't use stale cache
+        echo "Building blockchain node image for AMD64 platform..."
+        docker buildx build --platform linux/amd64 --no-cache -t goud-chain:latest --load .
+
+        # Build dashboard image for AMD64
+        echo "Building dashboard image for AMD64 platform..."
+        docker buildx build --platform linux/amd64 -t goud-chain-dashboard:latest --load ./dashboard
+
+        # Save images to compressed tar files (overwrite existing)
+        echo "Saving images..."
+        mkdir -p /tmp/goud-chain-deploy
+        docker save goud-chain:latest | gzip > /tmp/goud-chain-deploy/node.tar.gz
+        docker save goud-chain-dashboard:latest | gzip > /tmp/goud-chain-deploy/dashboard.tar.gz
+
+        # Save hashes for next run
+        cat > "$HASH_FILE" << EOF
+NODE=$NODE_HASH
+DASHBOARD=$DASHBOARD_HASH
+EOF
+
+        echo -e "${GREEN}✅ Images built locally${NC}"
+        echo "Node image size: $(du -h /tmp/goud-chain-deploy/node.tar.gz | cut -f1)"
+        echo "Dashboard image size: $(du -h /tmp/goud-chain-deploy/dashboard.tar.gz | cut -f1)"
+    fi
 fi
 
 # Step 2: Wait for VM to be ready (only if resources changed)
@@ -166,19 +203,46 @@ fi
 # Step 3.5: Transfer images if built locally
 if [ "$IS_LOCAL" = true ]; then
     echo -e "${YELLOW}Step 3.5: Transferring images to VM...${NC}"
-    echo "Uploading node image..."
-    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
-        /tmp/goud-chain-deploy/node.tar.gz ubuntu@$INSTANCE_IP:/tmp/
 
-    echo "Uploading dashboard image..."
-    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
-        /tmp/goud-chain-deploy/dashboard.tar.gz ubuntu@$INSTANCE_IP:/tmp/
+    # SCP options for reliable transfer
+    SCP_OPTS="-i ~/.ssh/goud_chain_rsa \
+              -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o TCPKeepAlive=yes \
+              -o Compression=yes \
+              -o CompressionLevel=9"
 
-    echo "Uploading jupyter image..."
-    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
-        /tmp/goud-chain-deploy/jupyter.tar.gz ubuntu@$INSTANCE_IP:/tmp/
+    # Function to transfer with retry
+    transfer_with_retry() {
+        local file=$1
+        local name=$2
+        local max_retries=3
+        local retry=0
 
-    echo -e "${GREEN}✅ Images transferred${NC}"
+        while [ $retry -lt $max_retries ]; do
+            echo "Uploading $name (attempt $((retry + 1))/$max_retries)..."
+            if scp $SCP_OPTS "$file" ubuntu@$INSTANCE_IP:/tmp/; then
+                echo -e "${GREEN}✅ $name transferred${NC}"
+                return 0
+            else
+                retry=$((retry + 1))
+                if [ $retry -lt $max_retries ]; then
+                    echo -e "${YELLOW}⚠️  Transfer failed, retrying in 5 seconds...${NC}"
+                    sleep 5
+                fi
+            fi
+        done
+
+        echo -e "${RED}❌ Failed to transfer $name after $max_retries attempts${NC}"
+        return 1
+    }
+
+    # Transfer images with retry logic
+    transfer_with_retry "/tmp/goud-chain-deploy/node.tar.gz" "node image" || exit 1
+    transfer_with_retry "/tmp/goud-chain-deploy/dashboard.tar.gz" "dashboard image" || exit 1
+
+    echo -e "${GREEN}✅ All images transferred${NC}"
 
     # Cleanup local temp files
     rm -rf /tmp/goud-chain-deploy
@@ -431,47 +495,8 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
             --restart unless-stopped \
             goud-chain-dashboard:latest
 
-        # Update Jupyter Lab
-        echo "Updating Jupyter Lab..."
-
-        # Load Jupyter image if available
-        if [ -f /tmp/jupyter.tar.gz ]; then
-            echo "Loading Jupyter image..."
-            sudo docker load < /tmp/jupyter.tar.gz
-        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
-            echo "Pulling Jupyter image from ghcr.io..."
-            if sudo docker pull ghcr.io/aram-devdocs/goud_chain-jupyter:latest 2>/dev/null; then
-                sudo docker tag ghcr.io/aram-devdocs/goud_chain-jupyter:latest goud-chain-jupyter:latest
-                echo "✅ Pulled pre-built Jupyter image"
-            else
-                echo "⚠️  Failed to pull Jupyter, falling back to local build..."
-                cd /opt/goud-chain/python
-                sudo docker build -t goud-chain-jupyter:latest .
-                cd /opt/goud-chain
-            fi
-        else
-            echo "Building Jupyter on VM (fallback)..."
-            cd /opt/goud-chain/python
-            sudo docker build -t goud-chain-jupyter:latest .
-            cd /opt/goud-chain
-        fi
-
-        # Graceful Jupyter update
-        sudo docker stop goud_jupyter 2>/dev/null || true
-        sudo docker rm goud_jupyter 2>/dev/null || true
-        sudo docker run -d \
-            --name goud_jupyter \
-            --network goud_network \
-            -p 8888:8888 \
-            -v /opt/goud-chain/python/notebooks:/home/jovyan/work/notebooks:ro \
-            -v jupyter_scratch:/home/jovyan/work/scratch \
-            -e JUPYTER_ENABLE_LAB=yes \
-            -e JUPYTER_TOKEN= \
-            --restart unless-stopped \
-            goud-chain-jupyter:latest
-
         # Cleanup transferred images
-        rm -f /tmp/node.tar.gz /tmp/dashboard.tar.gz /tmp/jupyter.tar.gz
+        rm -f /tmp/node.tar.gz /tmp/dashboard.tar.gz
 
         echo "✅ Rolling deployment complete"
     fi
