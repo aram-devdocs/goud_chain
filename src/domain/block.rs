@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::encrypted_data::EncryptedData;
+use super::{encrypted_collection::EncryptedCollection, user_account::UserAccount};
 use crate::constants::EMPTY_MERKLE_ROOT;
 use crate::types::Result;
 
@@ -10,7 +10,8 @@ use crate::types::Result;
 pub struct Block {
     pub index: u64,
     pub timestamp: i64,
-    pub encrypted_data: Vec<EncryptedData>,
+    pub user_accounts: Vec<UserAccount>,
+    pub encrypted_collections: Vec<EncryptedCollection>,
     pub previous_hash: String,
     pub merkle_root: String,
     pub hash: String,
@@ -18,20 +19,22 @@ pub struct Block {
 }
 
 impl Block {
-    /// Create a new block with the given data
+    /// Create a new block with accounts and collections
     pub fn new(
         index: u64,
-        encrypted_data: Vec<EncryptedData>,
+        user_accounts: Vec<UserAccount>,
+        encrypted_collections: Vec<EncryptedCollection>,
         previous_hash: String,
         validator: String,
     ) -> Self {
         let timestamp = Utc::now().timestamp();
-        let merkle_root = Self::calculate_merkle_root(&encrypted_data);
+        let merkle_root = Self::calculate_merkle_root(&user_accounts, &encrypted_collections);
 
         let mut block = Block {
             index,
             timestamp,
-            encrypted_data,
+            user_accounts,
+            encrypted_collections,
             previous_hash,
             merkle_root,
             hash: String::new(),
@@ -42,14 +45,34 @@ impl Block {
         block
     }
 
-    /// Calculate the merkle root from encrypted data entries
-    pub fn calculate_merkle_root(encrypted_data: &[EncryptedData]) -> String {
-        if encrypted_data.is_empty() {
+    /// Calculate the merkle root from accounts and collections
+    pub fn calculate_merkle_root(
+        accounts: &[UserAccount],
+        collections: &[EncryptedCollection],
+    ) -> String {
+        if accounts.is_empty() && collections.is_empty() {
             return EMPTY_MERKLE_ROOT.to_string();
         }
 
-        let mut hashes: Vec<String> = encrypted_data.iter().map(|d| d.hash()).collect();
+        let mut hashes: Vec<String> = Vec::new();
 
+        // Hash all accounts
+        for account in accounts {
+            let account_hash = format!(
+                "{}{}",
+                account.account_id, account.api_key_hash
+            );
+            let mut hasher = Sha256::new();
+            hasher.update(account_hash.as_bytes());
+            hashes.push(format!("{:x}", hasher.finalize()));
+        }
+
+        // Hash all collections
+        for collection in collections {
+            hashes.push(collection.hash());
+        }
+
+        // Build Merkle tree
         while hashes.len() > 1 {
             let mut next_level = Vec::new();
             for chunk in hashes.chunks(2) {
@@ -81,9 +104,16 @@ impl Block {
 
     /// Verify all encrypted data in this block
     pub fn verify_data(&self) -> Result<()> {
-        for data in &self.encrypted_data {
-            data.verify()?;
+        // Verify all accounts
+        for account in &self.user_accounts {
+            account.verify()?;
         }
+
+        // Verify all collections (signature only, not MAC)
+        for collection in &self.encrypted_collections {
+            collection.verify(None)?;
+        }
+
         Ok(())
     }
 }
@@ -91,22 +121,13 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::generate_signing_key;
 
     #[test]
     fn test_block_creation() {
-        let signing_key = generate_signing_key();
-        let data = EncryptedData::new(
-            "Test".to_string(),
-            r#"{"value": 42}"#.to_string(),
-            "1234",
-            &signing_key,
-        )
-        .unwrap();
-
         let block = Block::new(
             1,
-            vec![data],
+            Vec::new(),
+            Vec::new(),
             "previous_hash".to_string(),
             "Validator_1".to_string(),
         );
@@ -119,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_empty_merkle_root() {
-        let merkle_root = Block::calculate_merkle_root(&[]);
+        let merkle_root = Block::calculate_merkle_root(&[], &[]);
         assert_eq!(merkle_root, EMPTY_MERKLE_ROOT);
     }
 }

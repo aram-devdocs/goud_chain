@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{Block, EncryptedData};
+use crate::domain::{Block, EncryptedCollection, UserAccount};
 
 /// P2P network message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,5 +9,6 @@ pub enum P2PMessage {
     RequestChain,
     ResponseChain(Vec<Block>),
     Peers(Vec<String>),
-    NewData(EncryptedData),
+    NewAccount(UserAccount),
+    NewCollection(EncryptedCollection),
 }

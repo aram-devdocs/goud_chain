@@ -1,6 +1,6 @@
 # Goud Chain
 
-Encrypted blockchain with PIN-based access control. Store any JSON data on an immutable, distributed ledger using Proof of Authority consensus.
+Encrypted blockchain with API key-based authentication. Store any JSON data on an immutable, distributed ledger using Proof of Authority consensus.
 
 [![API Status](https://img.shields.io/badge/API-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-api.goudchain.com/)
 [![Dashboard Status](https://img.shields.io/badge/Dashboard-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-dashboard.goudchain.com/)
@@ -14,10 +14,21 @@ Encrypted blockchain with PIN-based access control. Store any JSON data on an im
 
 **Quick Test:**
 ```bash
-# Submit encrypted data
+# Create account and get API key
+curl -X POST https://dev-api.goudchain.com/account/create \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": null}'
+
+# Login with API key to get session token
+curl -X POST https://dev-api.goudchain.com/account/login \
+  -H "Content-Type: application/json" \
+  -d '{"api_key": "YOUR_API_KEY_HERE"}'
+
+# Submit encrypted data (use session token or API key)
 curl -X POST https://dev-api.goudchain.com/data/submit \
   -H "Content-Type: application/json" \
-  -d '{"label": "test", "pin": "1234", "data": {"message": "Hello Blockchain!"}}'
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"label": "test", "data": "{\"message\": \"Hello Blockchain!\"}"}'
 
 # View the blockchain
 curl https://dev-api.goudchain.com/chain
@@ -30,11 +41,14 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 ## Features
 
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
-- **AES-256-GCM Encryption** - PIN-based symmetric encryption
-- **Proof of Authority** - 2 validators rotate block creation
-- **Ed25519 Signatures** - Cryptographic verification
-- **Merkle Trees** - Tamper detection
-- **JSON Storage** - Store any valid JSON object
+- **API Key Authentication** - Cryptographically secure 256-bit keys
+- **AES-256-GCM Encryption** - API key-based symmetric encryption with HMAC integrity verification
+- **HKDF Key Derivation** - Separate encryption, MAC, and search keys derived from single API key (100k iterations)
+- **JWT Sessions** - Token-based authentication with 1-hour expiry
+- **Collection-Based Storage** - Group encrypted data by user account
+- **Ed25519 Signatures** - Digital signatures for blockchain integrity
+- **Merkle Trees** - Tamper detection with accounts and collections
+- **Schema Versioning** - Automatic migration on architecture changes
 - **Load Balanced** - NGINX reverse proxy with health checks
 - **Cloud-Native** - Runs on GCP free tier ($0/month)
 
@@ -114,7 +128,11 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 ### Data Flow
 
 ```
-JSON Data → Encrypt (AES-256-GCM + PIN) → Sign (Ed25519) → Block (Validator) → Blockchain
+1. Account Creation → Generate 256-bit API Key → Hash with SHA-256 → Store on Blockchain
+2. Authentication → API Key → JWT Session Token (1hr expiry)
+3. Data Submission → JSON → Encrypt with API-derived key (HKDF) → HMAC → Sign (Ed25519) → Collection
+4. Block Creation → Validator creates block with accounts + collections → Merkle Root → Blockchain
+5. Data Retrieval → Decrypt with API key → Verify HMAC → Return JSON
 ```
 
 **Consensus:** Proof of Authority (PoA)
@@ -122,12 +140,24 @@ JSON Data → Encrypt (AES-256-GCM + PIN) → Sign (Ed25519) → Block (Validato
 - Deterministic round-robin rotation per block
 - No mining, instant block creation
 
+**Cryptography Architecture:**
+- **Key Generation**: 256-bit random API keys (base64-encoded)
+- **Key Storage**: SHA-256 hash stored on blockchain (not the key itself)
+- **Key Derivation**: HKDF with 100k iterations produces:
+  - Encryption key (32 bytes for AES-256)
+  - MAC key (32 bytes for HMAC-SHA256)
+  - Search key (32 bytes, future use)
+- **Encryption**: AES-256-GCM with 12-byte random nonce
+- **Integrity**: HMAC-SHA256 over encrypted payload
+- **Authentication**: Constant-time comparison prevents timing attacks
+
 **Block Structure:**
 ```rust
 Block {
     index: u64,
     timestamp: i64,
-    encrypted_data: Vec<EncryptedData>,
+    user_accounts: Vec<UserAccount>,
+    encrypted_collections: Vec<EncryptedCollection>,
     previous_hash: String,
     merkle_root: String,
     hash: String,
@@ -135,74 +165,125 @@ Block {
 }
 ```
 
-**Encrypted Data:**
+**User Account:**
 ```rust
-EncryptedData {
-    data_id: String,
-    label: String,              // Public metadata
-    encrypted_payload: String,  // Encrypted JSON
-    encryption_hint: String,    // SHA256(PIN) for verification
-    timestamp: i64,
-    signature: String,          // Ed25519 signature
-    public_key: String,
+UserAccount {
+    account_id: String,           // UUID
+    api_key_hash: String,         // SHA-256 hash (for verification)
+    public_key: String,           // Ed25519 public key
+    created_at: i64,
+    metadata_encrypted: Option<String>,  // Optional encrypted metadata
+    signature: String,            // Ed25519 signature
+}
+```
+
+**Encrypted Collection:**
+```rust
+EncryptedCollection {
+    collection_id: String,        // UUID
+    owner_api_key_hash: String,   // Links to UserAccount
+    encrypted_metadata: String,   // Encrypted label/tags
+    encrypted_payload: String,    // Encrypted JSON data
+    mac: String,                  // HMAC-SHA256 for integrity
+    nonce: String,                // 12-byte random nonce
+    signature: String,            // Ed25519 signature
+    public_key: String,           // Ed25519 public key
 }
 ```
 
 ## API Reference
+
+### Create Account
+
+```bash
+curl -X POST http://localhost:8080/account/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": null
+  }'
+
+# Response:
+{
+  "account_id": "550e8400-e29b-41d4-a716-446655440000",
+  "api_key": "abcd1234efgh5678ijkl9012mnop3456qrst7890uvwx1234yzab5678cdef9012",
+  "warning": "IMPORTANT: Save this API key! It will only be shown once and cannot be recovered."
+}
+```
+
+**⚠️ Important:** The API key is shown only once. Store it securely - it cannot be recovered.
+
+### Login
+
+```bash
+curl -X POST http://localhost:8080/account/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key": "abcd1234efgh5678ijkl9012mnop3456qrst7890uvwx1234yzab5678cdef9012"
+  }'
+
+# Response:
+{
+  "session_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expires_in": 3600,
+  "account_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Note:** Session tokens expire after 1 hour. You can use either the API key or session token for authenticated requests.
 
 ### Submit Encrypted Data
 
 ```bash
 curl -X POST http://localhost:8080/data/submit \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "label": "my-data",
-    "pin": "1234",
-    "data": {"key": "value"}
+    "data": "{\"key\": \"value\"}"
   }'
 
 # Response:
 {
-  "data_id": "550e8400-e29b-41d4-a716-446655440000",
+  "collection_id": "650e8400-e29b-41d4-a716-446655440000",
   "label": "my-data",
-  "timestamp": 1704067200,
-  "signature": "abc123...",
-  "public_key": "def456..."
+  "block_number": 5
 }
 ```
 
-### Decrypt Data
+**Authentication Methods:**
+- Header: `Authorization: Bearer YOUR_API_KEY`
+- Header: `Authorization: Bearer YOUR_SESSION_TOKEN`
+
+### List My Collections
 
 ```bash
-curl -X POST http://localhost:8080/data/decrypt \
-  -H "Content-Type: application/json" \
-  -d '{
-    "data_id": "550e8400-e29b-41d4-a716-446655440000",
-    "pin": "1234"
-  }'
+curl -X GET http://localhost:8080/data/list \
+  -H "Authorization: Bearer YOUR_API_KEY"
 
 # Response:
 {
-  "data_id": "550e8400-e29b-41d4-a716-446655440000",
-  "label": "my-data",
-  "data": {"key": "value"},
-  "timestamp": 1704067200
+  "collections": [
+    {
+      "collection_id": "650e8400-e29b-41d4-a716-446655440000",
+      "label": "my-data",
+      "created_at": 1704067200,
+      "block_number": 5
+    }
+  ]
 }
 ```
 
-### List All Data
+### Decrypt Collection
 
 ```bash
-curl http://localhost:8080/data/list
+curl -X POST http://localhost:8080/data/decrypt/650e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer YOUR_API_KEY"
 
 # Response:
-[
-  {
-    "data_id": "550e8400-e29b-41d4-a716-446655440000",
-    "label": "my-data",
-    "timestamp": 1704067200
-  }
-]
+{
+  "collection_id": "650e8400-e29b-41d4-a716-446655440000",
+  "data": "{\"key\": \"value\"}"
+}
 ```
 
 ### View Blockchain
@@ -514,24 +595,33 @@ This starts the blockchain with `cargo-watch` for automatic recompilation on fil
 ```
 goud_chain/
 ├── src/
-│   ├── main.rs                 # Entry point
-│   ├── constants.rs            # Configuration constants
+│   ├── main.rs                     # Entry point
+│   ├── constants.rs                # Configuration constants & schema version
 │   ├── crypto/
-│   │   ├── encryption.rs       # AES-256-GCM encryption
-│   │   ├── signature.rs        # Ed25519 signatures
-│   │   └── hashing.rs          # SHA-256 hashing
+│   │   ├── api_key.rs              # API key generation & validation
+│   │   ├── encryption.rs           # AES-256-GCM encryption
+│   │   ├── hkdf.rs                 # HKDF key derivation (100k iterations)
+│   │   ├── mac.rs                  # HMAC-SHA256 message authentication
+│   │   └── signature.rs            # Ed25519 signatures
 │   ├── domain/
-│   │   ├── blockchain.rs       # Blockchain logic
-│   │   ├── block.rs            # Block structure
-│   │   └── encrypted_data.rs   # Encrypted data model
+│   │   ├── blockchain.rs           # Blockchain logic with schema versioning
+│   │   ├── block.rs                # Block structure (accounts + collections)
+│   │   ├── user_account.rs         # User account model
+│   │   ├── encrypted_collection.rs # Encrypted data collection
+│   │   └── encrypted_data.rs       # Legacy encrypted data (deprecated)
+│   ├── api/
+│   │   ├── handlers.rs             # Main router
+│   │   ├── account_handlers.rs     # Account creation & login
+│   │   ├── data_handlers.rs        # Data submission & retrieval
+│   │   ├── auth.rs                 # JWT authentication middleware
+│   │   └── middleware.rs           # CORS & request handling
 │   ├── network/
-│   │   └── p2p.rs              # Peer-to-peer networking
-│   ├── persistence/
-│   │   └── file_storage.rs     # Blockchain persistence
-│   ├── presentation/
-│   │   └── http_api.rs         # HTTP API server
-│   └── utility/
-│       └── config.rs           # Configuration loading
+│   │   └── p2p.rs                  # Peer-to-peer networking
+│   ├── storage/
+│   │   └── mod.rs                  # Blockchain persistence with schema migration
+│   └── types/
+│       ├── api.rs                  # Request/response types
+│       └── errors.rs               # Error types
 ├── tests/
 │   └── module_dependencies.rs  # Circular dependency prevention
 ├── scripts/
@@ -544,7 +634,8 @@ goud_chain/
 │   ├── nginx.conf              # Load balancer (local, 3 nodes)
 │   └── nginx.gcp.conf          # Load balancer (GCP, 2 nodes)
 ├── dashboard/
-│   ├── index.html              # Web UI
+│   ├── index.html              # Main dashboard (authenticated)
+│   ├── auth.html               # Login & signup page
 │   ├── server.js               # Dashboard server
 │   └── Dockerfile              # Dashboard container
 ├── terraform/
@@ -570,19 +661,29 @@ goud_chain/
 
 ## Tech Stack
 
+**Backend:**
 - **Rust** - Core blockchain implementation
+- **AES-256-GCM** - Symmetric encryption (aes-gcm crate)
+- **HKDF** - Key derivation with 100k iterations (hkdf crate)
+- **HMAC-SHA256** - Message authentication (hmac + sha2)
+- **Ed25519** - Digital signatures (ed25519-dalek)
+- **SHA-256** - Hashing (sha2)
+- **JWT** - Session tokens (jsonwebtoken)
+- **Base64** - API key encoding (base64)
+- **JSON** - Serialization (serde_json)
+- **HTTP** - API server (tiny_http)
+
+**Infrastructure:**
 - **NGINX** - Load balancer and reverse proxy
 - **Docker & Docker Compose** - Containerization
 - **Google Cloud Platform** - Cloud hosting (free tier)
 - **Terraform** - Infrastructure as Code
 - **Cloudflare** - DNS and CDN (free tier)
-- **AES-GCM** - Encryption (aes-gcm crate)
-- **Ed25519** - Signatures (ed25519-dalek)
-- **SHA-256** - Hashing (sha2)
-- **JSON** - Serialization (serde_json)
-- **HTTP** - API (tiny_http)
-- **AlpineJS** - Web UI reactivity
-- **TailwindCSS** - Web UI styling
+
+**Frontend:**
+- **AlpineJS** - Reactive UI components
+- **TailwindCSS** - Styling
+- **localStorage** - Session management
 
 ## P2P Networking
 
@@ -593,7 +694,8 @@ enum P2PMessage {
     RequestChain,
     ResponseChain(Vec<Block>),
     Peers(Vec<String>),
-    NewData(EncryptedData),
+    NewAccount(UserAccount),
+    NewCollection(EncryptedCollection),
 }
 ```
 
@@ -631,21 +733,61 @@ node1:
 
 ## Security Model
 
+**Key Generation & Storage:**
+- 256-bit API keys generated using cryptographically secure random number generator
+- Only SHA-256 hash of API key stored on blockchain (not the key itself)
+- Keys cannot be recovered if lost - users must save them securely
+
+**Key Derivation:**
+- HKDF (HMAC-based Key Derivation Function) with 100,000 iterations
+- Derives separate keys from single API key:
+  - **Encryption key** (32 bytes for AES-256)
+  - **MAC key** (32 bytes for HMAC-SHA256)
+  - **Search key** (32 bytes, reserved for future use)
+- Each derivation uses unique context strings to ensure key separation
+
 **Encryption:**
 - AES-256-GCM with authenticated encryption
-- PIN-derived keys using SHA-256
-- Each data item encrypted independently
+- 12-byte random nonce per collection (prevents replay attacks)
+- HMAC-SHA256 for additional integrity verification
+- Each collection encrypted independently
+
+**Authentication:**
+- Constant-time comparison prevents timing attacks on API key verification
+- JWT session tokens with 1-hour expiry reduce API key exposure
+- Dual-mode auth: API key (long-lived) or session token (short-lived)
 
 **Signatures:**
-- Ed25519 public-key cryptography
-- Every encrypted data item is signed
+- Ed25519 public-key cryptography for blockchain data
+- Every account and collection is digitally signed
 - Prevents tampering and ensures authenticity
+- Signatures verified during chain validation
+
+**Schema Versioning:**
+- Automatic detection of architecture changes
+- Old blockchain data deleted on schema mismatch
+- Prevents compatibility issues during PoC development
+- Current schema: `v2_api_key`
 
 **Limitations (Proof of Concept):**
-- PIN security is symmetric (anyone with PIN can decrypt)
-- No rate limiting on PIN attempts
+- API key security is symmetric (anyone with API key can decrypt)
+- No rate limiting on login attempts
 - No key rotation mechanism
+- No password recovery (keys lost = data lost)
+- JWT secret hardcoded in constants (use env var in production)
+- No audit logging of authentication events
 - Suitable for PoC only, not production use
+
+**Production Hardening Recommendations:**
+- Implement rate limiting on authentication endpoints
+- Add HTTPS/TLS for all connections
+- Use environment variables for JWT secret
+- Implement account recovery mechanism (with security questions or backup keys)
+- Add audit logging for security events
+- Implement IP-based access controls
+- Add multi-factor authentication
+- Implement key rotation with backward compatibility
+- Use hardware security modules (HSM) for validator keys
 
 ## License
 

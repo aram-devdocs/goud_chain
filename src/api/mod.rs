@@ -1,3 +1,6 @@
+pub mod account_handlers;
+pub mod auth;
+pub mod data_handlers;
 pub mod handlers;
 pub mod middleware;
 

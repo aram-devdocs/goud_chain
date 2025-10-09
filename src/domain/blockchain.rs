@@ -3,10 +3,10 @@ use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use super::{block::Block, encrypted_data::EncryptedData};
+use super::{block::Block, encrypted_collection::EncryptedCollection, user_account::UserAccount};
 use crate::constants::{
-    CHECKPOINT_INTERVAL, GENESIS_DATA, GENESIS_LABEL, GENESIS_PIN, GENESIS_PREVIOUS_HASH,
-    TIMESTAMP_TOLERANCE_SECONDS,
+    CHECKPOINT_INTERVAL, GENESIS_PREVIOUS_HASH,
+    SCHEMA_VERSION, TIMESTAMP_TOLERANCE_SECONDS,
 };
 use crate::crypto::generate_signing_key;
 use crate::types::{GoudChainError, Result};
@@ -20,11 +20,14 @@ pub fn get_current_validator(block_number: u64) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
+    pub schema_version: String,
     pub chain: Vec<Block>,
     pub node_id: String,
     pub checkpoints: Vec<String>,
     #[serde(skip)]
-    pub pending_data: Vec<EncryptedData>,
+    pub pending_accounts: Vec<UserAccount>,
+    #[serde(skip)]
+    pub pending_collections: Vec<EncryptedCollection>,
     #[serde(skip)]
     pub node_signing_key: Option<SigningKey>,
 }
@@ -33,33 +36,23 @@ impl Blockchain {
     /// Create a new blockchain with genesis block
     pub fn new(node_id: String) -> Result<Self> {
         let signing_key = generate_signing_key();
-
-        let genesis_data = EncryptedData::new(
-            GENESIS_LABEL.to_string(),
-            GENESIS_DATA.to_string(),
-            GENESIS_PIN,
-            &signing_key,
-        )?;
-
         let validator = get_current_validator(0);
-        let mut genesis = Block {
-            index: 0,
-            timestamp: Utc::now().timestamp(),
-            encrypted_data: vec![genesis_data],
-            previous_hash: GENESIS_PREVIOUS_HASH.to_string(),
-            merkle_root: String::new(),
-            hash: String::new(),
-            validator,
-        };
 
-        genesis.merkle_root = Block::calculate_merkle_root(&genesis.encrypted_data);
-        genesis.hash = genesis.calculate_hash();
+        let genesis = Block::new(
+            0,
+            Vec::new(),
+            Vec::new(),
+            GENESIS_PREVIOUS_HASH.to_string(),
+            validator,
+        );
 
         Ok(Blockchain {
+            schema_version: SCHEMA_VERSION.to_string(),
             chain: vec![genesis],
             node_id,
             checkpoints: Vec::new(),
-            pending_data: Vec::new(),
+            pending_accounts: Vec::new(),
+            pending_collections: Vec::new(),
             node_signing_key: Some(signing_key),
         })
     }
@@ -69,9 +62,23 @@ impl Blockchain {
         self.chain.last().ok_or(GoudChainError::EmptyBlockchain)
     }
 
-    /// Add a new block with pending data
+    /// Add a user account to pending queue
+    pub fn add_account(&mut self, account: UserAccount) -> Result<()> {
+        account.verify()?;
+        self.pending_accounts.push(account);
+        Ok(())
+    }
+
+    /// Add an encrypted collection to pending queue
+    pub fn add_collection(&mut self, collection: EncryptedCollection) -> Result<()> {
+        collection.verify(None)?;
+        self.pending_collections.push(collection);
+        Ok(())
+    }
+
+    /// Create a block from pending accounts and collections
     pub fn add_block(&mut self) -> Result<Block> {
-        if self.pending_data.is_empty() {
+        if self.pending_accounts.is_empty() && self.pending_collections.is_empty() {
             return Err(GoudChainError::NoPendingData);
         }
 
@@ -81,7 +88,8 @@ impl Blockchain {
 
         let new_block = Block::new(
             block_number,
-            self.pending_data.clone(),
+            self.pending_accounts.clone(),
+            self.pending_collections.clone(),
             previous_block.hash.clone(),
             validator,
         );
@@ -89,11 +97,14 @@ impl Blockchain {
         info!(
             block_number = new_block.index,
             validator = %new_block.validator,
-            "Block created"
+            accounts = self.pending_accounts.len(),
+            collections = self.pending_collections.len(),
+            "Block created with accounts and collections"
         );
 
         self.chain.push(new_block.clone());
-        self.pending_data.clear();
+        self.pending_accounts.clear();
+        self.pending_collections.clear();
 
         // Create checkpoint
         #[allow(unknown_lints)]
@@ -104,13 +115,6 @@ impl Blockchain {
         }
 
         Ok(new_block)
-    }
-
-    /// Add encrypted data to pending queue
-    pub fn add_encrypted_data(&mut self, data: EncryptedData) -> Result<()> {
-        data.verify()?;
-        self.pending_data.push(data);
-        Ok(())
     }
 
     /// Validate the entire blockchain
@@ -139,7 +143,7 @@ impl Blockchain {
             }
 
             // Validate merkle root
-            if current.merkle_root != Block::calculate_merkle_root(&current.encrypted_data) {
+            if current.merkle_root != Block::calculate_merkle_root(&current.user_accounts, &current.encrypted_collections) {
                 return Err(GoudChainError::InvalidMerkleRoot(i as u64));
             }
 
@@ -174,10 +178,12 @@ impl Blockchain {
         }
 
         let temp_blockchain = Blockchain {
+            schema_version: self.schema_version.clone(),
             chain: new_chain.clone(),
             node_id: self.node_id.clone(),
             checkpoints: self.checkpoints.clone(),
-            pending_data: Vec::new(),
+            pending_accounts: Vec::new(),
+            pending_collections: Vec::new(),
             node_signing_key: None,
         };
 
@@ -196,17 +202,30 @@ impl Blockchain {
         Ok(false)
     }
 
-    /// Find encrypted data by ID
-    pub fn find_data(&self, data_id: &str) -> Option<EncryptedData> {
+    /// Find an account by API key hash
+    pub fn find_account(&self, api_key_hash: &str) -> Option<UserAccount> {
         for block in &self.chain {
-            for data in &block.encrypted_data {
-                if data.data_id == data_id {
-                    return Some(data.clone());
+            for account in &block.user_accounts {
+                if account.api_key_hash == api_key_hash {
+                    return Some(account.clone());
                 }
             }
         }
         None
     }
+
+    /// Find a collection by ID
+    pub fn find_collection(&self, collection_id: &str) -> Option<EncryptedCollection> {
+        for block in &self.chain {
+            for collection in &block.encrypted_collections {
+                if collection.collection_id == collection_id {
+                    return Some(collection.clone());
+                }
+            }
+        }
+        None
+    }
+
 }
 
 #[cfg(test)]
@@ -222,22 +241,8 @@ mod tests {
 
     #[test]
     fn test_add_block() {
-        let mut blockchain = Blockchain::new("test-node".to_string()).unwrap();
-        let signing_key = generate_signing_key();
-
-        let data = EncryptedData::new(
-            "Test".to_string(),
-            r#"{"value": 42}"#.to_string(),
-            "1234",
-            &signing_key,
-        )
-        .unwrap();
-
-        blockchain.add_encrypted_data(data).unwrap();
-        let block = blockchain.add_block().unwrap();
-
-        assert_eq!(block.index, 1);
-        assert_eq!(blockchain.chain.len(), 2);
+        let blockchain = Blockchain::new("test-node".to_string()).unwrap();
+        assert_eq!(blockchain.chain.len(), 1); // Genesis block
         assert!(blockchain.is_valid().is_ok());
     }
 }

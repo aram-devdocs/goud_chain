@@ -1,8 +1,8 @@
 use std::fs;
 use std::io::Write;
-use tracing::info;
+use tracing::{info, warn};
 
-use crate::constants::{BLOCKCHAIN_FILE_PATH, DATA_DIRECTORY};
+use crate::constants::{BLOCKCHAIN_FILE_PATH, DATA_DIRECTORY, SCHEMA_VERSION};
 use crate::crypto::generate_signing_key;
 use crate::domain::Blockchain;
 use crate::types::{GoudChainError, Result};
@@ -23,24 +23,70 @@ pub fn save_blockchain(blockchain: &Blockchain) -> Result<()> {
 }
 
 /// Load the blockchain from disk or create a new one
+/// Validates schema version and auto-migrates by deleting old data
 pub fn load_blockchain(node_id: String) -> Result<Blockchain> {
     match fs::read_to_string(BLOCKCHAIN_FILE_PATH) {
         Ok(content) => {
-            let mut blockchain: Blockchain = serde_json::from_str(&content)
-                .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+            // Try to extract just the schema_version field to check compatibility
+            let schema_check: serde_json::Result<serde_json::Value> = serde_json::from_str(&content);
 
-            blockchain.node_id = node_id;
-            blockchain.pending_data = Vec::new();
-            blockchain.node_signing_key = Some(generate_signing_key());
+            match schema_check {
+                Ok(value) => {
+                    let file_schema = value
+                        .get("schema_version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
 
-            info!(
-                chain_length = blockchain.chain.len(),
-                "Blockchain loaded from disk"
-            );
-            Ok(blockchain)
+                    // Check if schema versions match
+                    if file_schema != SCHEMA_VERSION {
+                        warn!(
+                            old_schema = %file_schema,
+                            new_schema = %SCHEMA_VERSION,
+                            "Schema version mismatch detected - deleting old blockchain and starting fresh"
+                        );
+
+                        // Delete the old file
+                        fs::remove_file(BLOCKCHAIN_FILE_PATH)
+                            .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+
+                        info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
+                        return Blockchain::new(node_id);
+                    }
+
+                    // Schema matches, try full deserialization
+                    let blockchain: Blockchain = serde_json::from_str(&content)
+                        .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+
+                    let mut blockchain = blockchain;
+                    blockchain.node_id = node_id;
+                    blockchain.pending_accounts = Vec::new();
+                    blockchain.pending_collections = Vec::new();
+                    blockchain.node_signing_key = Some(generate_signing_key());
+
+                    info!(
+                        chain_length = blockchain.chain.len(),
+                        schema_version = %blockchain.schema_version,
+                        "Blockchain loaded from disk"
+                    );
+                    Ok(blockchain)
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        "Failed to parse blockchain file - deleting and starting fresh"
+                    );
+
+                    // Delete corrupted file
+                    fs::remove_file(BLOCKCHAIN_FILE_PATH)
+                        .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+
+                    info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
+                    Blockchain::new(node_id)
+                }
+            }
         }
         Err(_) => {
-            info!("Creating new blockchain");
+            info!("No existing blockchain found, creating new one");
             Blockchain::new(node_id)
         }
     }

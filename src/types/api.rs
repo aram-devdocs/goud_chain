@@ -1,53 +1,77 @@
 use serde::{Deserialize, Serialize};
 
-/// Request to submit encrypted data to the blockchain
+// ============ Account Management ============
+
+/// Request to create a new user account
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateAccountRequest {
+    pub metadata: Option<String>, // Optional encrypted metadata (e.g., email, username)
+}
+
+/// Response after creating an account
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateAccountResponse {
+    pub account_id: String,
+    pub api_key: String, // Base64-encoded, ONLY shown once
+    pub warning: String,
+}
+
+/// Request to login with API key
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoginRequest {
+    pub api_key: String,
+}
+
+/// Response after successful login
+#[derive(Debug, Clone, Serialize)]
+pub struct LoginResponse {
+    pub session_token: String, // JWT
+    pub expires_in: i64,       // Seconds
+    pub account_id: String,
+}
+
+// ============ Data Operations ============
+
+/// Request to submit data (requires API key auth)
 #[derive(Debug, Clone, Deserialize)]
 pub struct SubmitDataRequest {
     pub label: String,
     pub data: String,
-    pub pin: String,
 }
 
-/// Response after successfully submitting data
+/// Response after submitting data
 #[derive(Debug, Clone, Serialize)]
 pub struct SubmitDataResponse {
     pub message: String,
-    pub data_id: String,
+    pub collection_id: String,
     pub block_number: u64,
 }
 
-/// Request to decrypt data with a PIN
-#[derive(Debug, Clone, Deserialize)]
-pub struct DecryptDataRequest {
-    pub data_id: String,
-    pub pin: String,
-}
-
-/// Response containing decrypted data
+/// Collection list item (decrypted metadata)
 #[derive(Debug, Clone, Serialize)]
-pub struct DecryptDataResponse {
-    pub data_id: String,
-    pub label: String,
-    pub decrypted_data: String,
-    pub timestamp: i64,
-}
-
-/// Data listing item (encrypted data metadata without content)
-#[derive(Debug, Clone, Serialize)]
-pub struct DataListItem {
-    pub data_id: String,
-    pub label: String,
-    pub encrypted: bool,
-    pub timestamp: i64,
+pub struct CollectionListItem {
+    pub collection_id: String,
+    pub label: String, // Decrypted
+    pub created_at: i64,
     pub block_number: u64,
-    pub validator: String,
 }
 
-/// Response for listing all data
+/// Response for listing collections
 #[derive(Debug, Clone, Serialize)]
-pub struct DataListResponse {
-    pub data: Vec<DataListItem>,
+pub struct CollectionListResponse {
+    pub collections: Vec<CollectionListItem>,
 }
+
+/// Response for decrypting a collection
+#[derive(Debug, Clone, Serialize)]
+pub struct DecryptCollectionResponse {
+    pub collection_id: String,
+    pub label: String,
+    pub data: String,
+    pub created_at: i64,
+}
+
+// ============ Blockchain Explorer ============
 
 /// Peer information response
 #[derive(Debug, Clone, Serialize)]
@@ -80,4 +104,27 @@ impl ErrorResponse {
         serde_json::to_string(self)
             .unwrap_or_else(|_| r#"{"error":"Serialization failed"}"#.to_string())
     }
+}
+
+// ============ Analytics & Statistics ============
+
+/// Chain statistics response
+#[derive(Debug, Clone, Serialize)]
+pub struct ChainStatsResponse {
+    pub total_blocks: u64,
+    pub total_collections: u64,
+    pub total_accounts: u64,
+    pub avg_block_time_seconds: f64,
+    pub validator_distribution: std::collections::HashMap<String, u64>,
+}
+
+/// Node health metrics
+#[derive(Debug, Clone, Serialize)]
+pub struct NodeMetricsResponse {
+    pub node_id: String,
+    pub chain_length: u64,
+    pub peer_count: usize,
+    pub latest_block_index: u64,
+    pub latest_block_timestamp: i64,
+    pub status: String,
 }

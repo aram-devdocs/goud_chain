@@ -20,6 +20,7 @@ aes-gcm = "0.10"  # For PIN-based encryption
 thiserror = "2.0"  # For custom error types
 tracing = "0.1"  # For structured logging
 tracing-subscriber = "0.3"  # For logging initialization
+jsonwebtoken = "9.3.1"
 
 # Pin to avoid edition2024 requirement
 [dependencies.base64ct]

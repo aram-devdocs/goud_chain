@@ -168,10 +168,15 @@ impl P2PNode {
                         REPUTATION_PENALTY_INVALID_BLOCK;
                 }
             }
-            P2PMessage::NewData(data) => {
+            P2PMessage::NewAccount(account) => {
                 let mut blockchain = blockchain.lock().unwrap();
-                blockchain.add_encrypted_data(data)?;
-                info!("Received valid encrypted data");
+                blockchain.add_account(account)?;
+                info!("Received valid account");
+            }
+            P2PMessage::NewCollection(collection) => {
+                let mut blockchain = blockchain.lock().unwrap();
+                blockchain.add_collection(collection)?;
+                info!("Received valid collection");
             }
             P2PMessage::RequestChain => {
                 let blockchain = blockchain.lock().unwrap();

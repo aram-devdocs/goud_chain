@@ -4,34 +4,13 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
-use sha2::{Digest, Sha256};
 
-use crate::constants::{AES_KEY_SIZE_BYTES, ENCRYPTION_SALT, NONCE_SIZE_BYTES};
+use crate::constants::{AES_KEY_SIZE_BYTES, NONCE_SIZE_BYTES};
 use crate::types::{GoudChainError, Result};
 
-/// Derive a 32-byte AES key from a PIN using SHA-256 with salt
-pub fn derive_key_from_pin(pin: &str) -> [u8; AES_KEY_SIZE_BYTES] {
-    let mut hasher = Sha256::new();
-    hasher.update(pin.as_bytes());
-    hasher.update(ENCRYPTION_SALT);
-    let result = hasher.finalize();
-
-    let mut key = [0u8; AES_KEY_SIZE_BYTES];
-    key.copy_from_slice(&result);
-    key
-}
-
-/// Hash a PIN for verification without decrypting
-pub fn hash_pin(pin: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(pin.as_bytes());
-    format!("{:x}", hasher.finalize())
-}
-
-/// Encrypt data using AES-256-GCM with a PIN-derived key
-pub fn encrypt_data(data: &str, pin: &str) -> Result<String> {
-    let key_bytes = derive_key_from_pin(pin);
-    let key = GenericArray::from_slice(&key_bytes);
+/// Encrypt data using AES-256-GCM with a derived key from API key
+pub fn encrypt_data_with_key(data: &str, encryption_key: &[u8; AES_KEY_SIZE_BYTES]) -> Result<(String, String)> {
+    let key = GenericArray::from_slice(encryption_key);
     let cipher = Aes256Gcm::new(key);
 
     // Generate random nonce
@@ -46,19 +25,16 @@ pub fn encrypt_data(data: &str, pin: &str) -> Result<String> {
     // Combine nonce + ciphertext and encode as base64
     let mut combined = nonce_bytes.to_vec();
     combined.extend_from_slice(&ciphertext);
-    Ok(general_purpose::STANDARD.encode(combined))
+    let encrypted_payload = general_purpose::STANDARD.encode(combined);
+
+    // Return both encrypted payload and nonce separately for storage
+    let nonce_hex = hex::encode(nonce_bytes);
+    Ok((encrypted_payload, nonce_hex))
 }
 
-/// Decrypt data using AES-256-GCM with a PIN-derived key
-/// Returns None if PIN is incorrect or data is corrupted
-pub fn decrypt_data(encrypted_payload: &str, pin: &str, encryption_hint: &str) -> Result<String> {
-    // Verify PIN hash first
-    if hash_pin(pin) != encryption_hint {
-        return Err(GoudChainError::DecryptionFailed);
-    }
-
-    let key_bytes = derive_key_from_pin(pin);
-    let key = GenericArray::from_slice(&key_bytes);
+/// Decrypt data using AES-256-GCM with a derived key from API key
+pub fn decrypt_data_with_key(encrypted_payload: &str, encryption_key: &[u8; AES_KEY_SIZE_BYTES]) -> Result<String> {
+    let key = GenericArray::from_slice(encryption_key);
     let cipher = Aes256Gcm::new(key);
 
     // Decode base64
@@ -89,24 +65,22 @@ mod tests {
     #[test]
     fn test_encryption_decryption() {
         let data = "Hello, World!";
-        let pin = "1234";
+        let key = [42u8; AES_KEY_SIZE_BYTES];
 
-        let encrypted = encrypt_data(data, pin).unwrap();
-        let hint = hash_pin(pin);
-        let decrypted = decrypt_data(&encrypted, pin, &hint).unwrap();
+        let (encrypted, _nonce) = encrypt_data_with_key(data, &key).unwrap();
+        let decrypted = decrypt_data_with_key(&encrypted, &key).unwrap();
 
         assert_eq!(data, decrypted);
     }
 
     #[test]
-    fn test_wrong_pin() {
+    fn test_wrong_key() {
         let data = "Hello, World!";
-        let pin = "1234";
-        let wrong_pin = "5678";
+        let key = [42u8; AES_KEY_SIZE_BYTES];
+        let wrong_key = [99u8; AES_KEY_SIZE_BYTES];
 
-        let encrypted = encrypt_data(data, pin).unwrap();
-        let hint = hash_pin(pin);
-        let result = decrypt_data(&encrypted, wrong_pin, &hint);
+        let (encrypted, _nonce) = encrypt_data_with_key(data, &key).unwrap();
+        let result = decrypt_data_with_key(&encrypted, &wrong_key);
 
         assert!(result.is_err());
     }

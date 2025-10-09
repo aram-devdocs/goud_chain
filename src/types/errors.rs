@@ -76,8 +76,8 @@ pub enum GoudChainError {
     #[error("Data not found: {0}")]
     DataNotFound(String),
 
-    #[error("Unauthorized: invalid PIN")]
-    Unauthorized,
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
 
     // Configuration errors
     #[error("Configuration error: {0}")]
@@ -102,7 +102,7 @@ impl GoudChainError {
     pub fn status_code(&self) -> u16 {
         match self {
             Self::InvalidRequestBody(_) => 400,
-            Self::Unauthorized | Self::DecryptionFailed => 403,
+            Self::Unauthorized(_) | Self::DecryptionFailed => 403,
             Self::DataNotFound(_) => 404,
             Self::InvalidSignature
             | Self::InvalidBlockHash(_)

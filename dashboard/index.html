@@ -3,124 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Goud Chain - Encrypted Blockchain</title>
+    <title>Goud Chain - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* Minimalist design system */
+        [x-cloak] { display: none !important; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+        }
+
+        code, pre {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+        }
+
+        button {
+            transition: background-color 0.15s ease;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.2s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .tooltip { position: relative; }
+        .tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            position: absolute;
+            z-index: 50;
+            background: #111;
+            color: #888;
+            border: 1px solid #1a1a1a;
+            padding: 6px 10px;
+            font-size: 11px;
+            white-space: nowrap;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100">
-    <div x-data="blockchainApp()" x-init="init()" class="min-h-screen">
+<body class="bg-black text-white">
+    <div x-data="dashboardApp()" x-init="init()" class="min-h-screen" x-cloak>
         <!-- Header -->
-        <header class="bg-gray-800 border-b border-gray-700">
+        <header class="bg-black border-b border-zinc-800 sticky top-0 z-40">
             <div class="container mx-auto px-6 py-4">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-bold text-blue-400">🔗 Goud Chain</h1>
-                        <p class="text-gray-400 text-sm">Encrypted Blockchain PoC</p>
+                        <h1 class="text-2xl font-semibold text-white">Goud Chain</h1>
+                        <p class="text-zinc-500 text-xs mt-1">Encrypted Blockchain</p>
                     </div>
-                    <button @click="loadData(); loadChain()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition">
-                        🔄 Refresh
-                    </button>
+                    <div class="flex items-center gap-4">
+                        <!-- Account Info -->
+                        <span class="text-xs text-zinc-400" x-show="accountId">
+                            <span x-text="accountId.substring(0, 12) + '...'"></span>
+                        </span>
+
+                        <!-- Refresh Button -->
+                        <button @click="refresh()" class="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-sm border border-zinc-700 transition">
+                            <span x-show="!isRefreshing">Refresh</span>
+                            <span x-show="isRefreshing">...</span>
+                        </button>
+
+                        <!-- Logout Button -->
+                        <button @click="logout()" class="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-sm border border-zinc-700 transition">
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
 
-        <!-- Info Banner -->
-        <section class="bg-blue-900/30 border-b border-blue-700">
-            <div class="container mx-auto px-6 py-3">
-                <div class="flex items-center gap-4 text-sm">
-                    <span class="text-blue-400 font-bold">⚡ Instant Blocks</span>
-                    <span class="text-gray-400">|</span>
-                    <span>🔐 AES-256-GCM Encryption</span>
-                    <span class="text-gray-400">|</span>
-                    <span>🎯 Proof of Authority</span>
-                    <span class="text-gray-400">|</span>
-                    <span>⏱️ &lt;1s Block Time</span>
-                </div>
-            </div>
-        </section>
-
         <!-- Tab Navigation -->
-        <section class="container mx-auto px-6 py-4">
-            <div class="flex gap-4 border-b border-gray-700">
+        <section class="container mx-auto px-6 py-3">
+            <div class="flex gap-1 border-b border-zinc-800 overflow-x-auto">
                 <button @click="activeTab = 'submit'"
-                        :class="activeTab === 'submit' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
-                        class="px-4 py-2 border-b-2 transition">
-                    📝 Submit Data
+                        :class="activeTab === 'submit' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Submit Data
                 </button>
-                <button @click="activeTab = 'data'"
-                        :class="activeTab === 'data' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
-                        class="px-4 py-2 border-b-2 transition">
-                    📦 Encrypted Data
+                <button @click="activeTab = 'collections'"
+                        :class="activeTab === 'collections' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Collections
+                    <span x-show="collections.length > 0" class="ml-1 bg-zinc-700 text-xs px-1.5 py-0.5" x-text="collections.length"></span>
                 </button>
                 <button @click="activeTab = 'blockchain'"
-                        :class="activeTab === 'blockchain' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400'"
-                        class="px-4 py-2 border-b-2 transition">
-                    ⛓️ Blockchain Explorer
+                        :class="activeTab === 'blockchain' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Explorer
+                </button>
+                <button @click="activeTab = 'network'"
+                        :class="activeTab === 'network' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Network
+                </button>
+                <button @click="activeTab = 'analytics'"
+                        :class="activeTab === 'analytics' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Analytics
+                </button>
+                <button @click="activeTab = 'debug'"
+                        :class="activeTab === 'debug' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Debug
                 </button>
             </div>
         </section>
 
         <!-- Submit Data Tab -->
         <section x-show="activeTab === 'submit'" class="container mx-auto px-6 py-8">
-            <div class="max-w-3xl mx-auto">
-                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <h2 class="text-2xl font-bold mb-4">Submit Encrypted JSON Data</h2>
-                    <p class="text-gray-400 text-sm mb-6">
-                        Store any JSON data on the blockchain. Your data is encrypted with a PIN and can only be decrypted with the correct PIN.
+            <div class="max-w-4xl mx-auto">
+                <!-- Main Submit Form -->
+                <div class="bg-zinc-950 p-6 border border-zinc-800">
+                    <h2 class="text-xl font-semibold mb-4">Submit Encrypted Data</h2>
+
+                    <p class="text-zinc-500 text-sm mb-6">
+                        Data is encrypted with your API key before storage on the blockchain.
                     </p>
 
                     <div class="space-y-4">
                         <!-- Label -->
                         <div>
-                            <label class="block text-sm font-medium mb-2">
-                                Label <span class="text-gray-500">(public, visible to all)</span>
-                            </label>
-                            <input x-model="form.label" type="text" placeholder="e.g., 'Customer Database' or 'API Keys'"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <p class="text-xs text-gray-500 mt-1">This label helps you identify your data later</p>
+                            <label class="block text-xs font-medium mb-2 text-zinc-400">Label</label>
+                            <input x-model="form.label" type="text" placeholder="e.g., API Keys"
+                                   class="w-full bg-black border border-zinc-800 px-3 py-2 text-sm focus:outline-none focus:border-zinc-600">
                         </div>
 
                         <!-- Mode Toggle -->
-                        <div class="flex items-center gap-4 pb-2">
-                            <button @click="inputMode = 'form'; syncFormToJSON()"
-                                    :class="inputMode === 'form' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-700'"
-                                    class="px-4 py-2 rounded transition text-sm">
-                                📋 Form Builder
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-zinc-500">Mode:</span>
+                            <button @click="switchMode('form')"
+                                    :class="inputMode === 'form' ? 'bg-zinc-700 border-zinc-600' : 'bg-black border-zinc-800 hover:border-zinc-700'"
+                                    class="px-3 py-1.5 border transition text-xs">
+                                Form
                             </button>
-                            <button @click="inputMode = 'json'; syncJSONToForm()"
-                                    :class="inputMode === 'json' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-700'"
-                                    class="px-4 py-2 rounded transition text-sm">
-                                📝 Raw JSON
+                            <button @click="switchMode('json')"
+                                    :class="inputMode === 'json' ? 'bg-zinc-700 border-zinc-600' : 'bg-black border-zinc-800 hover:border-zinc-700'"
+                                    class="px-3 py-1.5 border transition text-xs">
+                                JSON
                             </button>
                         </div>
 
                         <!-- Form Builder Mode -->
                         <div x-show="inputMode === 'form'" class="space-y-3">
                             <div class="flex items-center justify-between">
-                                <label class="block text-sm font-medium">
-                                    Fields <span class="text-gray-500">(will be encrypted)</span>
-                                </label>
-                                <button @click="addField()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition">
+                                <label class="block text-sm font-medium">Data Fields</label>
+                                <button @click="addField()" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded text-sm transition">
                                     + Add Field
                                 </button>
                             </div>
 
-                            <div x-show="formFields.length === 0" class="bg-gray-700/50 rounded p-4 text-center text-gray-400 text-sm">
-                                No fields yet. Click "Add Field" to start building your data.
+                            <div x-show="formFields.length === 0" class="bg-gray-700/50 rounded p-6 text-center text-gray-400 text-sm">
+                                No fields yet. Click "Add Field" or use a template to get started.
                             </div>
 
                             <div class="space-y-2">
                                 <template x-for="(field, index) in formFields" :key="index">
                                     <div class="bg-gray-700 rounded p-3 space-y-2">
                                         <div class="grid grid-cols-12 gap-2">
-                                            <!-- Key -->
                                             <div class="col-span-4">
-                                                <input x-model="field.key" type="text" placeholder="Key (e.g., api_key)"
+                                                <input x-model="field.key" type="text" placeholder="Key"
                                                        @input="updateJSONFromForm()"
                                                        class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                             </div>
-
-                                            <!-- Type -->
                                             <div class="col-span-2">
                                                 <select x-model="field.type" @change="updateJSONFromForm()"
                                                         class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -129,8 +188,6 @@
                                                     <option value="boolean">Boolean</option>
                                                 </select>
                                             </div>
-
-                                            <!-- Value -->
                                             <div class="col-span-5">
                                                 <input x-show="field.type !== 'boolean'" x-model="field.value"
                                                        :type="field.type === 'number' ? 'number' : 'text'"
@@ -143,11 +200,9 @@
                                                     <option value="false">false</option>
                                                 </select>
                                             </div>
-
-                                            <!-- Delete -->
-                                            <div class="col-span-1 flex items-center">
-                                                <button @click="removeField(index)" class="text-red-400 hover:text-red-300 text-sm">
-                                                    ✕
+                                            <div class="col-span-1 flex items-center justify-center">
+                                                <button @click="removeField(index)" class="text-red-400 hover:text-red-300 text-lg">
+                                                    ×
                                                 </button>
                                             </div>
                                         </div>
@@ -156,160 +211,273 @@
                             </div>
 
                             <!-- JSON Preview -->
-                            <div class="bg-gray-900 rounded p-3 border border-gray-600">
-                                <p class="text-xs text-gray-500 mb-1">JSON Preview:</p>
-                                <pre class="text-xs text-green-400 font-mono" x-text="form.data || '{}'"></pre>
+                            <div class="bg-gray-900 rounded p-4 border border-gray-600">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-xs text-gray-400">Preview:</p>
+                                    <button @click="copyToClipboard(form.data)" class="text-xs text-blue-400 hover:text-blue-300">
+                                        Copy
+                                    </button>
+                                </div>
+                                <pre class="text-xs text-green-400 font-mono overflow-x-auto" x-text="form.data || '{}'"></pre>
                             </div>
                         </div>
 
                         <!-- Raw JSON Mode -->
                         <div x-show="inputMode === 'json'">
-                            <label class="block text-sm font-medium mb-2">
-                                JSON Data <span class="text-gray-500">(encrypted, requires PIN to decrypt)</span>
-                            </label>
+                            <label class="block text-sm font-medium mb-2">JSON Data *</label>
                             <textarea x-model="form.data"
-                                      placeholder='{"api_key": "secret123", "database": "prod"}'
-                                      class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 h-48 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder='{"key": "value", "another": 42}'
+                                      class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 h-64 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                       @input="validateJSON()"></textarea>
-                            <div class="flex items-center justify-between mt-1">
+                            <div class="flex items-center justify-between mt-2">
                                 <p class="text-xs text-gray-500">Enter any valid JSON object</p>
-                                <span x-show="jsonValid" class="text-xs text-green-400">✓ Valid JSON</span>
-                                <span x-show="!jsonValid && form.data" class="text-xs text-red-400">✗ Invalid JSON</span>
+                                <span x-show="jsonValid" class="text-xs text-green-400">Valid JSON</span>
+                                <span x-show="!jsonValid && form.data" class="text-xs text-red-400">Invalid JSON</span>
                             </div>
-                        </div>
-
-                        <!-- PIN -->
-                        <div>
-                            <label class="block text-sm font-medium mb-2">
-                                PIN <span class="text-gray-500">(for encryption/decryption)</span>
-                            </label>
-                            <input x-model="form.pin" type="password" placeholder="Enter a PIN"
-                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <p class="text-xs text-yellow-400 mt-1">⚠️ Remember this PIN - you'll need it to decrypt your data!</p>
                         </div>
 
                         <!-- Submit Button -->
                         <button @click="submitData()"
-                                :disabled="!isFormValid()"
-                                :class="isFormValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-600 cursor-not-allowed'"
-                                class="w-full px-6 py-3 rounded-lg transition text-lg font-bold">
-                            🔐 Encrypt & Submit to Blockchain
+                                :disabled="!isFormValid() || isSubmitting"
+                                :class="isFormValid() && !isSubmitting ? 'bg-white text-black hover:bg-zinc-200' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'"
+                                class="w-full px-4 py-2 border border-zinc-800 transition text-sm font-medium">
+                            <span x-show="!isSubmitting">Submit</span>
+                            <span x-show="isSubmitting">Submitting...</span>
                         </button>
                     </div>
 
                     <!-- Result Message -->
-                    <div x-show="submitResult" class="mt-4 p-4 rounded"
-                         :class="submitResult.includes('✅') ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'">
-                        <p class="text-sm" x-html="submitResult"></p>
+                    <div x-show="submitResult" class="mt-4 p-3 border fade-in text-sm"
+                         :class="submitResult?.success ? 'bg-zinc-950 border-zinc-700 text-zinc-300' : 'bg-zinc-950 border-red-900 text-red-400'">
+                        <p x-html="submitResult?.message"></p>
                     </div>
-                </div>
-
-                <!-- How It Works -->
-                <div class="mt-6 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                    <h3 class="font-bold mb-2">How it works:</h3>
-                    <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                        <li>Your JSON data is encrypted with AES-256-GCM using your PIN</li>
-                        <li>The encrypted data is signed with Ed25519</li>
-                        <li>A block is created instantly by the current validator (&lt;1s)</li>
-                        <li>The block is added to the blockchain with Merkle tree verification</li>
-                        <li>Only someone with the correct PIN can decrypt the data</li>
-                    </ol>
                 </div>
             </div>
         </section>
 
-        <!-- Encrypted Data Tab -->
-        <section x-show="activeTab === 'data'" class="container mx-auto px-6 py-8">
-            <h2 class="text-2xl font-bold mb-6">Encrypted Data Entries</h2>
+        <!-- PHASE 2: Advanced Collections Management -->
+        <section x-show="activeTab === 'collections'" class="container mx-auto px-6 py-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">My Encrypted Collections</h2>
+                
+                <!-- Collection Actions -->
+                <div class="flex gap-2">
+                    <button x-show="selectedCollections.length > 0"
+                            @click="bulkDecryptCollections()"
+                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition">
+                        Decrypt Selected (<span x-text="selectedCollections.length"></span>)
+                    </button>
+                    <button x-show="selectedCollections.length > 0"
+                            @click="exportSelected()"
+                            class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm transition">
+                        Export Selected
+                    </button>
+                    <button @click="clearSelections()"
+                            x-show="selectedCollections.length > 0"
+                            class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-sm transition">
+                        Clear
+                    </button>
+                </div>
+            </div>
 
-            <div x-show="allData.length === 0" class="bg-gray-800 rounded-lg p-12 text-center border border-gray-700">
-                <p class="text-gray-400">No encrypted data yet. Submit some data to get started!</p>
+            <!-- Search and Filter -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <input x-model="searchQuery" @input="filterCollections()" type="text"
+                               placeholder="Search by label or ID..."
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <select x-model="sortBy" @change="sortCollections()"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="label">Label A-Z</option>
+                            <option value="block">Block Number</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-400">Total: <span class="text-blue-400 font-bold" x-text="filteredCollections.length"></span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collections Grid -->
+            <div x-show="filteredCollections.length === 0" class="bg-gray-800 rounded-lg p-12 text-center border border-gray-700">
+                <p class="text-gray-400">
+                    <span x-show="collections.length === 0">No collections yet. Submit some data to get started!</span>
+                    <span x-show="collections.length > 0 && filteredCollections.length === 0">No collections match your search.</span>
+                </p>
             </div>
 
             <div class="grid grid-cols-1 gap-4">
-                <template x-for="item in allData" :key="item.data_id">
-                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div class="flex justify-between items-start mb-4">
+                <template x-for="item in filteredCollections" :key="item.collection_id">
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex items-start gap-4">
+                            <!-- Selection Checkbox -->
+                            <div class="pt-1">
+                                <input type="checkbox" 
+                                       :checked="selectedCollections.includes(item.collection_id)"
+                                       @change="toggleSelection(item.collection_id)"
+                                       class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                            </div>
+                            
+                            <!-- Collection Info -->
                             <div class="flex-1">
-                                <h3 class="text-lg font-bold text-blue-400" x-text="item.label"></h3>
-                                <p class="text-xs text-gray-400">
-                                    ID: <code class="text-gray-500" x-text="item.data_id.substring(0, 8) + '...'"></code>
-                                    • Block #<span x-text="item.block_number"></span>
-                                    • Validator: <span x-text="item.validator"></span>
-                                </p>
-                                <p class="text-xs text-gray-500 mt-1" x-text="new Date(item.timestamp * 1000).toLocaleString()"></p>
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-blue-400" x-text="item.label"></h3>
+                                        <p class="text-xs text-gray-400 mt-1 font-mono">
+                                            ID: <span x-text="item.collection_id.substring(0, 16) + '...'"></span>
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            Block #<span x-text="item.block_number"></span> • 
+                                            <span x-text="new Date(item.created_at * 1000).toLocaleString()"></span>
+                                        </p>
+                                    </div>
+                                    
+                                    <!-- Quick Actions -->
+                                    <div class="flex gap-2">
+                                        <button @click="copyToClipboard(item.collection_id)"
+                                                class="tooltip text-gray-400 hover:text-blue-400 text-sm">
+                                            Copy ID
+                                            <span class="tooltip-text">Copy ID</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Decrypt Section -->
+                                <div x-show="!decryptedData[item.collection_id]">
+                                    <button @click="decryptCollection(item.collection_id)"
+                                            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition">
+                                        Decrypt Data
+                                    </button>
+                                </div>
+
+                                <!-- Decrypted Data -->
+                                <div x-show="decryptedData[item.collection_id]" class="bg-green-900/20 border border-green-700 rounded p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <p class="text-green-400 text-sm font-bold">Decrypted Data:</p>
+                                        <div class="flex gap-2">
+                                            <button @click="copyToClipboard(decryptedData[item.collection_id])"
+                                                    class="text-xs text-blue-400 hover:text-blue-300">
+                                                Copy
+                                            </button>
+                                            <button @click="downloadJSON(item.label, decryptedData[item.collection_id])"
+                                                    class="text-xs text-purple-400 hover:text-purple-300">
+                                                Download
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <pre class="bg-gray-900 rounded p-3 overflow-x-auto text-xs" x-text="JSON.stringify(JSON.parse(decryptedData[item.collection_id] || '{}'), null, 2)"></pre>
+                                    <button @click="delete decryptedData[item.collection_id]"
+                                            class="mt-2 bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-xs transition">
+                                        Hide
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Encrypted Status -->
-                        <div class="bg-gray-700/50 rounded p-3 mb-3">
-                            <div class="flex items-center gap-2 text-sm">
-                                <span class="text-yellow-400">🔒 Encrypted</span>
-                                <span class="text-gray-500">|</span>
-                                <span class="text-gray-400">Requires PIN to decrypt</span>
-                            </div>
-                        </div>
-
-                        <!-- Decrypt Section -->
-                        <div x-show="!decryptedData[item.data_id]">
-                            <button @click="decryptData(item.data_id)"
-                                    class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition">
-                                🔓 Decrypt with PIN
-                            </button>
-                        </div>
-
-                        <!-- Decrypted Data -->
-                        <div x-show="decryptedData[item.data_id]" class="bg-green-900/20 border border-green-700 rounded p-4">
-                            <p class="text-green-400 text-sm font-bold mb-2">✅ Decrypted Data:</p>
-                            <pre class="bg-gray-900 rounded p-3 overflow-x-auto text-xs" x-text="JSON.stringify(JSON.parse(decryptedData[item.data_id] || '{}'), null, 2)"></pre>
-                            <button @click="delete decryptedData[item.data_id]"
-                                    class="mt-2 bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-xs transition">
-                                Hide
-                            </button>
                         </div>
                     </div>
                 </template>
             </div>
         </section>
 
-        <!-- Blockchain Explorer Tab -->
+        <!-- Blockchain Explorer -->
         <section x-show="activeTab === 'blockchain'" class="container mx-auto px-6 py-8">
-            <h2 class="text-2xl font-bold mb-6">Blockchain Explorer</h2>
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">Blockchain Explorer</h2>
+                <div class="text-sm text-gray-400">
+                    Total Blocks: <span class="text-blue-400 font-bold" x-text="blocks.length"></span>
+                </div>
+            </div>
 
+            <!-- Search and Filter -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <input x-model="blockSearch" @input="filterBlocks()" type="text"
+                               placeholder="Search by index, hash, or validator..."
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <select x-model="blockFilter" @change="filterBlocks()"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="all">All Blocks</option>
+                            <option value="with_accounts">With Accounts</option>
+                            <option value="with_collections">With Collections</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-end gap-2">
+                        <span class="text-sm text-gray-400">Showing: <span class="text-blue-400 font-bold" x-text="filteredBlocks.length"></span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blockchain Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-4 border border-blue-700">
+                    <div class="text-sm text-gray-400">Total Blocks</div>
+                    <div class="text-2xl font-bold text-blue-400" x-text="blocks.length"></div>
+                </div>
+                <div class="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg p-4 border border-green-700">
+                    <div class="text-sm text-gray-400">Total Collections</div>
+                    <div class="text-2xl font-bold text-green-400" x-text="getTotalCollections()"></div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg p-4 border border-purple-700">
+                    <div class="text-sm text-gray-400">Total Accounts</div>
+                    <div class="text-2xl font-bold text-purple-400" x-text="getTotalAccounts()"></div>
+                </div>
+                <div class="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 rounded-lg p-4 border border-yellow-700">
+                    <div class="text-sm text-gray-400">Avg Block Time</div>
+                    <div class="text-2xl font-bold text-yellow-400" x-text="getAvgBlockTime()"></div>
+                </div>
+            </div>
+
+            <!-- Blocks List -->
             <div class="space-y-4">
-                <template x-for="block in blocks" :key="block.index">
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-                        <!-- Block Header -->
+                <template x-for="block in filteredBlocks" :key="block.index">
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden hover:border-gray-600 transition">
                         <div class="bg-gray-700/50 px-6 py-4 flex items-center justify-between cursor-pointer"
                              @click="expandedBlock === block.index ? expandedBlock = null : expandedBlock = block.index">
-                            <div>
-                                <h3 class="font-bold text-blue-400">Block #<span x-text="block.index"></span></h3>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-blue-400 mb-1">Block #<span x-text="block.index"></span></h3>
                                 <p class="text-xs text-gray-400">
-                                    Validator: <span x-text="block.validator"></span>
-                                    • <span x-text="block.encrypted_data.length"></span> entries
-                                    • <span x-text="new Date(block.timestamp * 1000).toLocaleString()"></span>
+                                    <span class="font-mono" x-text="block.validator"></span> • 
+                                    <span x-text="(block.user_accounts?.length || 0)"></span> accounts • 
+                                    <span x-text="(block.encrypted_collections?.length || 0)"></span> collections • 
+                                    <span x-text="new Date(block.timestamp * 1000).toLocaleString()"></span>
                                 </p>
                             </div>
-                            <button class="text-gray-400">
-                                <span x-show="expandedBlock !== block.index">▼</span>
-                                <span x-show="expandedBlock === block.index">▲</span>
-                            </button>
+                            <div class="flex items-center gap-4">
+                                <span x-show="block.index > 0" class="text-xs text-gray-500" x-text="getBlockTimeDiff(block.index)"></span>
+                                <button class="text-gray-400">
+                                    <span x-show="expandedBlock !== block.index">▼</span>
+                                    <span x-show="expandedBlock === block.index">▲</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Block Details -->
-                        <div x-show="expandedBlock === block.index" class="px-6 py-4 space-y-3">
-                            <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div x-show="expandedBlock === block.index" class="px-6 py-4 space-y-4">
+                            <!-- Block Details -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span class="text-gray-500">Hash:</span>
-                                    <code class="block text-xs text-blue-400 mt-1 break-all" x-text="block.hash"></code>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <code class="block text-xs text-blue-400 break-all flex-1" x-text="block.hash"></code>
+                                        <button @click="copyToClipboard(block.hash)" class="text-gray-400 hover:text-blue-400 text-xs">Copy</button>
+                                    </div>
                                 </div>
                                 <div>
                                     <span class="text-gray-500">Previous Hash:</span>
-                                    <code class="block text-xs text-gray-400 mt-1 break-all" x-text="block.previous_hash"></code>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <code class="block text-xs text-gray-400 break-all flex-1" x-text="block.previous_hash"></code>
+                                        <button @click="copyToClipboard(block.previous_hash)" class="text-gray-400 hover:text-blue-400 text-xs">Copy</button>
+                                    </div>
                                 </div>
                                 <div>
                                     <span class="text-gray-500">Merkle Root:</span>
-                                    <code class="block text-xs text-gray-400 mt-1 break-all" x-text="block.merkle_root"></code>
+                                    <code class="block text-xs text-gray-400 mt-1 break-all" x-text="block.merkle_root || 'N/A'"></code>
                                 </div>
                                 <div>
                                     <span class="text-gray-500">Timestamp:</span>
@@ -317,19 +485,29 @@
                                 </div>
                             </div>
 
-                            <!-- Encrypted Data in Block -->
-                            <div class="mt-4">
-                                <h4 class="text-sm font-bold mb-2">Encrypted Data in this Block:</h4>
-                                <div class="space-y-2">
-                                    <template x-for="data in block.encrypted_data" :key="data.data_id">
-                                        <div class="bg-gray-700/50 rounded p-3 text-sm">
-                                            <div class="flex items-center justify-between">
-                                                <span class="font-mono text-blue-400" x-text="data.label"></span>
-                                                <span class="text-gray-500 text-xs">🔒 Encrypted</span>
-                                            </div>
-                                            <p class="text-xs text-gray-500 mt-1">ID: <span x-text="data.data_id.substring(0, 16) + '...'"></span></p>
-                                        </div>
-                                    </template>
+                            <!-- Navigation -->
+                            <div class="flex gap-2 pt-2">
+                                <button x-show="block.index > 0" 
+                                        @click="navigateToBlock(block.index - 1)" 
+                                        class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition">
+                                    ← Previous Block
+                                </button>
+                                <button x-show="block.index < blocks.length - 1" 
+                                        @click="navigateToBlock(block.index + 1)" 
+                                        class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition">
+                                    Next Block →
+                                </button>
+                            </div>
+
+                            <!-- Block Content -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <h4 class="text-sm font-bold mb-2">Accounts: <span x-text="block.user_accounts?.length || 0"></span></h4>
+                                    <div class="text-xs text-gray-400" x-show="(block.user_accounts?.length || 0) === 0">No accounts</div>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-bold mb-2">Collections: <span x-text="block.encrypted_collections?.length || 0"></span></h4>
+                                    <div class="text-xs text-gray-400" x-show="(block.encrypted_collections?.length || 0) === 0">No collections</div>
                                 </div>
                             </div>
                         </div>
@@ -337,54 +515,263 @@
                 </template>
             </div>
         </section>
+
+        <!-- Network Status Tab -->
+        <section x-show="activeTab === 'network'" class="container mx-auto px-6 py-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold">Network Status</h2>
+                <button @click="syncWithPeers()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded transition">
+                    Sync Now
+                </button>
+            </div>
+
+            <!-- Node Health -->
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-6">
+                <h3 class="text-lg font-bold mb-4">Current Node Health</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-700 rounded p-4">
+                        <div class="text-sm text-gray-400">Chain Length</div>
+                        <div class="text-2xl font-bold text-green-400" x-text="blocks.length"></div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-4">
+                        <div class="text-sm text-gray-400">Peer Count</div>
+                        <div class="text-2xl font-bold text-blue-400" x-text="networkInfo.peers?.length || 0"></div>
+                    </div>
+                    <div class="bg-gray-700 rounded p-4">
+                        <div class="text-sm text-gray-400">Status</div>
+                        <div class="text-2xl font-bold text-green-400">Healthy</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peer List -->
+            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <h3 class="text-lg font-bold mb-4">Connected Peers</h3>
+                <p class="text-xs text-gray-500 mb-4">Showing peers connected to the current node (load-balanced)</p>
+
+                <div x-show="(networkInfo.peers?.length || 0) === 0" class="text-center py-8 text-gray-400">
+                    No peers connected
+                </div>
+
+                <div class="space-y-2">
+                    <template x-for="peer in networkInfo.peers" :key="peer">
+                        <div class="bg-gray-700 rounded p-4 flex items-center justify-between">
+                            <div>
+                                <div class="font-mono text-sm text-blue-400" x-text="peer"></div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Reputation: <span x-text="networkInfo.reputation?.[peer] || 100"></span>/100
+                                </div>
+                            </div>
+                            <div class="text-green-400">Connected</div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <!-- PHASE 5: Analytics Dashboard -->
+        <section x-show="activeTab === 'analytics'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">Analytics & Statistics</h2>
+
+            <!-- Overview Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-6 border border-blue-700">
+                    <div class="text-sm text-gray-400 mb-1">Total Blocks</div>
+                    <div class="text-3xl font-bold text-blue-400" x-text="blocks.length"></div>
+                    <div class="text-xs text-gray-500 mt-2">Since genesis</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg p-6 border border-green-700">
+                    <div class="text-sm text-gray-400 mb-1">Total Collections</div>
+                    <div class="text-3xl font-bold text-green-400" x-text="getTotalCollections()"></div>
+                    <div class="text-xs text-gray-500 mt-2">Encrypted data entries</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg p-6 border border-purple-700">
+                    <div class="text-sm text-gray-400 mb-1">Total Accounts</div>
+                    <div class="text-3xl font-bold text-purple-400" x-text="getTotalAccounts()"></div>
+                    <div class="text-xs text-gray-500 mt-2">Registered users</div>
+                </div>
+                <div class="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 rounded-lg p-6 border border-yellow-700">
+                    <div class="text-sm text-gray-400 mb-1">Avg Block Time</div>
+                    <div class="text-3xl font-bold text-yellow-400" x-text="getAvgBlockTime()"></div>
+                    <div class="text-xs text-gray-500 mt-2">Seconds per block</div>
+                </div>
+            </div>
+
+            <!-- Charts Placeholder -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">Block Creation Trend</h3>
+                    <div class="h-64 flex items-center justify-center text-gray-500">
+                        <canvas id="blockTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">Data Growth</h3>
+                    <div class="h-64 flex items-center justify-center text-gray-500">
+                        <canvas id="dataGrowthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validator Distribution -->
+            <div class="mt-6 bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <h3 class="text-lg font-bold mb-4">Validator Distribution</h3>
+                <div class="space-y-2">
+                    <template x-for="(count, validator) in getValidatorDistribution()" :key="validator">
+                        <div class="flex items-center gap-4">
+                            <div class="w-32 text-sm text-gray-400 font-mono truncate" x-text="validator"></div>
+                            <div class="flex-1 bg-gray-700 rounded-full h-6">
+                                <div class="bg-blue-500 h-6 rounded-full flex items-center justify-end px-2 text-xs"
+                                     :style="`width: ${(count / blocks.length) * 100}%`">
+                                    <span class="text-white font-bold" x-text="count"></span>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-400" x-text="((count / blocks.length) * 100).toFixed(1) + '%'"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <!-- Debug Tools Tab -->
+        <section x-show="activeTab === 'debug'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">Debug & Developer Tools</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- API Tester -->
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">API Endpoint Tester</h3>
+                    <div class="space-y-3">
+                        <select x-model="debugEndpoint" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="/chain">GET /chain</option>
+                            <option value="/peers">GET /peers</option>
+                            <option value="/health">GET /health</option>
+                            <option value="/data/list">GET /data/list</option>
+                        </select>
+                        <button @click="testEndpoint()" class="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded transition">
+                            Test Endpoint
+                        </button>
+                        <div x-show="debugResponse" class="bg-gray-900 rounded p-3 max-h-64 overflow-auto">
+                            <pre class="text-xs text-green-400" x-text="debugResponse"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export Tools -->
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">Export Tools</h3>
+                    <div class="space-y-3">
+                        <button @click="exportBlockchain()" class="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded transition">
+                            Export Full Blockchain
+                        </button>
+                        <button @click="exportCollections()" class="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded transition">
+                            Export All Collections
+                        </button>
+                        <button @click="copySystemInfo()" class="w-full bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded transition">
+                            Copy System Info
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">System Information</h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">API Base URL:</span>
+                            <code class="text-blue-400 text-xs" x-text="API_BASE"></code>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Blocks:</span>
+                            <code class="text-green-400 text-xs" x-text="blocks.length"></code>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Collections:</span>
+                            <code class="text-blue-400 text-xs" x-text="getTotalCollections()"></code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <script>
-        function blockchainApp() {
+        // Detect API base URL dynamically
+        // In development: http://localhost:8080
+        // In production: same origin as dashboard (proxied through load balancer)
+        const API_BASE = window.location.hostname === 'localhost'
+            ? 'http://localhost:8080'
+            : window.location.origin.replace(/dashboard/, 'api');
+
+        function dashboardApp() {
             return {
+                // State
                 activeTab: 'submit',
+                accountId: null,
+                apiKey: null,
                 inputMode: 'form',
-                allData: [],
+                isRefreshing: false,
+                isSubmitting: false,
+
+                // Data
+                collections: [],
+                filteredCollections: [],
                 blocks: [],
+                filteredBlocks: [],
                 decryptedData: {},
-                submitResult: '',
+                networkInfo: { peers: [], reputation: {} },
+                formFields: [],
+                selectedCollections: [],
+                
+                // Form
+                form: { label: '', data: '' },
+                submitResult: null,
                 jsonValid: false,
                 expandedBlock: null,
-                formFields: [],
-                form: {
-                    label: '',
-                    data: '',
-                    pin: ''
-                },
+                
+                // Search & Filter
+                searchQuery: '',
+                blockSearch: '',
+                sortBy: 'newest',
+                blockFilter: 'all',
+                
+                // Debug
+                debugEndpoint: '/chain',
+                debugResponse: '',
 
+                // Initialize
                 init() {
-                    this.loadData();
-                    this.loadChain();
+                    this.apiKey = localStorage.getItem('goud_api_key');
+                    this.accountId = localStorage.getItem('goud_account_id');
+
+                    if (!this.apiKey) {
+                        window.location.href = '/auth.html';
+                        return;
+                    }
+
+                    // Check session expiry
+                    const expiresAt = localStorage.getItem('goud_session_expires');
+                    if (expiresAt && Date.now() > parseInt(expiresAt)) {
+                        alert('Session expired. Please login again.');
+                        this.logout();
+                        return;
+                    }
+
+                    // Initial data load
+                    this.refresh();
+
+                    // Auto-refresh every 10 seconds
                     setInterval(() => {
-                        this.loadData();
+                        this.loadCollections();
                         this.loadChain();
-                    }, 5000);
+                        this.loadNetworkInfo();
+                    }, 10000);
                 },
 
-                validateJSON() {
-                    try {
-                        if (this.form.data.trim()) {
-                            JSON.parse(this.form.data);
-                            this.jsonValid = true;
-                        } else {
-                            this.jsonValid = false;
-                        }
-                    } catch (e) {
-                        this.jsonValid = false;
-                    }
-                },
+                // ==================== Submit Data ====================
 
                 addField() {
-                    this.formFields.push({
-                        key: '',
-                        value: '',
-                        type: 'string'
-                    });
+                    this.formFields.push({ key: '', value: '', type: 'string' });
                 },
 
                 removeField(index) {
@@ -409,129 +796,466 @@
                     this.validateJSON();
                 },
 
-                syncFormToJSON() {
-                    // When switching to form mode, try to parse existing JSON into form fields
-                    if (this.form.data) {
-                        try {
-                            const obj = JSON.parse(this.form.data);
-                            this.formFields = Object.entries(obj).map(([key, value]) => {
-                                let type = 'string';
-                                if (typeof value === 'number') type = 'number';
-                                else if (typeof value === 'boolean') type = 'boolean';
-
-                                return {
-                                    key: key,
-                                    value: type === 'boolean' ? value.toString() : value,
-                                    type: type
-                                };
-                            });
-                        } catch (e) {
-                            // If JSON is invalid, start fresh
-                            this.formFields = [];
+                switchMode(mode) {
+                    if (mode === 'form' && this.inputMode === 'json') {
+                        // Sync JSON to form
+                        if (this.form.data) {
+                            try {
+                                const obj = JSON.parse(this.form.data);
+                                this.formFields = Object.entries(obj).map(([key, value]) => {
+                                    let type = 'string';
+                                    if (typeof value === 'number') type = 'number';
+                                    else if (typeof value === 'boolean') type = 'boolean';
+                                    return {
+                                        key: key,
+                                        value: type === 'boolean' ? value.toString() : value,
+                                        type: type
+                                    };
+                                });
+                            } catch (e) {
+                                this.formFields = [];
+                            }
                         }
+                    }
+                    this.inputMode = mode;
+                },
+
+                validateJSON() {
+                    try {
+                        if (this.form.data.trim()) {
+                            JSON.parse(this.form.data);
+                            this.jsonValid = true;
+                        } else {
+                            this.jsonValid = false;
+                        }
+                    } catch (e) {
+                        this.jsonValid = false;
                     }
                 },
 
-                syncJSONToForm() {
-                    // Ensure JSON is in sync when switching to JSON mode
-                    this.validateJSON();
-                },
-
                 isFormValid() {
-                    if (!this.form.label || !this.form.pin) return false;
-
+                    if (!this.form.label) return false;
                     if (this.inputMode === 'form') {
-                        // In form mode, need at least one field with a key
                         return this.formFields.some(f => f.key.trim() !== '');
                     } else {
-                        // In JSON mode, need valid JSON
                         return this.jsonValid;
                     }
                 },
 
-                async loadData() {
-                    try {
-                        const res = await fetch('http://localhost:8081/data/list');
-                        const data = await res.json();
-                        this.allData = data.data.reverse();
-                    } catch (e) {
-                        console.error('Failed to load data:', e);
-                    }
-                },
-
-                async loadChain() {
-                    try {
-                        const res = await fetch('http://localhost:8081/chain');
-                        const data = await res.json();
-                        this.blocks = data.chain.reverse();
-                    } catch (e) {
-                        console.error('Failed to load blockchain:', e);
-                    }
-                },
-
                 async submitData() {
-                    // Ensure JSON is up to date from form mode
+                    if (!this.isFormValid()) {
+                        alert('Please fill in all required fields');
+                        return;
+                    }
+
+                    // Ensure JSON is up to date
                     if (this.inputMode === 'form') {
                         this.updateJSONFromForm();
                     }
 
-                    if (!this.isFormValid()) {
-                        alert('Please fill in all fields with valid data');
-                        return;
-                    }
+                    this.isSubmitting = true;
 
                     try {
-                        const res = await fetch('http://localhost:8081/data/submit', {
+                        const res = await fetch(`${API_BASE}/data/submit`, {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.apiKey}`
+                            },
                             body: JSON.stringify(this.form)
                         });
 
                         const data = await res.json();
                         if (data.error) {
-                            this.submitResult = `❌ ${data.error}`;
+                            this.submitResult = { success: false, message: `ERROR: ${data.error}` };
                         } else {
-                            this.submitResult = `✅ Data encrypted and stored on blockchain!<br>
-                                Data ID: <code>${data.data_id.substring(0, 8)}...</code><br>
-                                Block: #${data.block_number}<br>
-                                Status: Encrypted & Immutable`;
+                            this.submitResult = {
+                                success: true,
+                                message: `Data encrypted and stored on blockchain!<br>
+                                    Collection ID: <code>${data.collection_id.substring(0, 16)}...</code><br>
+                                    Block: #${data.block_number}`
+                            };
 
                             // Reset form
-                            this.form = {label: '', data: '', pin: ''};
+                            this.form = { label: '', data: '' };
                             this.formFields = [];
                             this.jsonValid = false;
 
                             // Reload data
                             setTimeout(() => {
-                                this.loadData();
+                                this.loadCollections();
                                 this.loadChain();
                             }, 1000);
                         }
                     } catch (e) {
-                        this.submitResult = `❌ Error: ${e.message}`;
+                        this.submitResult = { success: false, message: `ERROR: ${e.message}` };
+                    } finally {
+                        this.isSubmitting = false;
                     }
                 },
 
-                async decryptData(dataId) {
-                    const pin = prompt('Enter PIN to decrypt:');
-                    if (!pin) return;
+                // ==================== Collections Management ====================
 
+                async loadCollections() {
                     try {
-                        const res = await fetch('http://localhost:8081/data/decrypt', {
+                        const res = await fetch(`${API_BASE}/data/list`, {
+                            headers: { 'Authorization': `Bearer ${this.apiKey}` }
+                        });
+                        const data = await res.json();
+                        if (!data.error) {
+                            this.collections = data.collections;
+                            this.filterCollections();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load collections:', e);
+                    }
+                },
+
+                filterCollections() {
+                    let filtered = [...this.collections];
+
+                    // Search filter
+                    if (this.searchQuery) {
+                        const query = this.searchQuery.toLowerCase();
+                        filtered = filtered.filter(c => 
+                            c.label.toLowerCase().includes(query) ||
+                            c.collection_id.toLowerCase().includes(query)
+                        );
+                    }
+
+                    // Sort
+                    switch (this.sortBy) {
+                        case 'newest':
+                            filtered.sort((a, b) => b.created_at - a.created_at);
+                            break;
+                        case 'oldest':
+                            filtered.sort((a, b) => a.created_at - b.created_at);
+                            break;
+                        case 'label':
+                            filtered.sort((a, b) => a.label.localeCompare(b.label));
+                            break;
+                        case 'block':
+                            filtered.sort((a, b) => b.block_number - a.block_number);
+                            break;
+                    }
+
+                    this.filteredCollections = filtered;
+                },
+
+                sortCollections() {
+                    this.filterCollections();
+                },
+
+                toggleSelection(collectionId) {
+                    const index = this.selectedCollections.indexOf(collectionId);
+                    if (index > -1) {
+                        this.selectedCollections.splice(index, 1);
+                    } else {
+                        this.selectedCollections.push(collectionId);
+                    }
+                },
+
+                clearSelections() {
+                    this.selectedCollections = [];
+                },
+
+                async bulkDecryptCollections() {
+                    for (const id of this.selectedCollections) {
+                        await this.decryptCollection(id);
+                    }
+                },
+
+                exportSelected() {
+                    const selected = this.filteredCollections.filter(c => 
+                        this.selectedCollections.includes(c.collection_id)
+                    );
+                    const exportData = selected.map(c => ({
+                        label: c.label,
+                        collection_id: c.collection_id,
+                        block_number: c.block_number,
+                        created_at: c.created_at,
+                        decrypted_data: this.decryptedData[c.collection_id] ? JSON.parse(this.decryptedData[c.collection_id]) : null
+                    }));
+                    this.downloadJSON('goud-collections-export', JSON.stringify(exportData, null, 2));
+                },
+
+                async decryptCollection(collectionId) {
+                    try {
+                        const res = await fetch(`${API_BASE}/data/decrypt/${collectionId}`, {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({data_id: dataId, pin: pin})
+                            headers: { 'Authorization': `Bearer ${this.apiKey}` }
                         });
 
                         const data = await res.json();
                         if (data.error) {
-                            alert(`❌ ${data.error}`);
+                            alert(`ERROR: ${data.error}`);
                         } else {
-                            this.decryptedData[dataId] = data.decrypted_data;
+                            this.decryptedData[collectionId] = data.data;
                         }
                     } catch (e) {
-                        alert(`❌ Error: ${e.message}`);
+                        alert(`ERROR: ${e.message}`);
                     }
+                },
+
+                // ==================== PHASE 3: Blockchain Explorer ====================
+
+                async loadChain() {
+                    try {
+                        const res = await fetch(`${API_BASE}/chain`);
+                        const data = await res.json();
+                        this.blocks = data.chain.reverse();
+                        this.filterBlocks();
+                        this.renderCharts();
+                    } catch (e) {
+                        console.error('Failed to load blockchain:', e);
+                    }
+                },
+
+                filterBlocks() {
+                    let filtered = [...this.blocks];
+
+                    // Search filter
+                    if (this.blockSearch) {
+                        const query = this.blockSearch.toLowerCase();
+                        filtered = filtered.filter(b =>
+                            b.index.toString().includes(query) ||
+                            b.hash.toLowerCase().includes(query) ||
+                            b.validator.toLowerCase().includes(query)
+                        );
+                    }
+
+                    // Type filter
+                    switch (this.blockFilter) {
+                        case 'with_accounts':
+                            filtered = filtered.filter(b => (b.user_accounts?.length || 0) > 0);
+                            break;
+                        case 'with_collections':
+                            filtered = filtered.filter(b => (b.encrypted_collections?.length || 0) > 0);
+                            break;
+                    }
+
+                    this.filteredBlocks = filtered;
+                },
+
+                navigateToBlock(index) {
+                    this.expandedBlock = index;
+                    // Scroll to block
+                    setTimeout(() => {
+                        document.querySelector(`[x-text="block.index"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                },
+
+                getTotalCollections() {
+                    return this.blocks.reduce((sum, block) => 
+                        sum + (block.encrypted_collections?.length || 0), 0
+                    );
+                },
+
+                getTotalAccounts() {
+                    return this.blocks.reduce((sum, block) => 
+                        sum + (block.user_accounts?.length || 0), 0
+                    );
+                },
+
+                getAvgBlockTime() {
+                    if (this.blocks.length < 2) return 'N/A';
+                    // Blocks array is reversed (newest first), so we need to calculate in reverse
+                    let totalTime = 0;
+                    for (let i = this.blocks.length - 1; i > 0; i--) {
+                        totalTime += this.blocks[i - 1].timestamp - this.blocks[i].timestamp;
+                    }
+                    const avgTime = totalTime / (this.blocks.length - 1);
+                    return (avgTime.toFixed(2) + 's');
+                },
+
+                getBlockTimeDiff(index) {
+                    if (index === 0) return 'Genesis';
+                    const current = this.blocks.find(b => b.index === index);
+                    const previous = this.blocks.find(b => b.index === index - 1);
+                    if (!current || !previous) return 'N/A';
+                    const diff = current.timestamp - previous.timestamp;
+                    return `+${diff.toFixed(2)}s`;
+                },
+
+                getValidatorDistribution() {
+                    const dist = {};
+                    this.blocks.forEach(block => {
+                        dist[block.validator] = (dist[block.validator] || 0) + 1;
+                    });
+                    return dist;
+                },
+
+                // ==================== PHASE 4: Network Status ====================
+
+                async loadNetworkInfo() {
+                    try {
+                        const res = await fetch(`${API_BASE}/peers`);
+                        const data = await res.json();
+                        this.networkInfo = data;
+                    } catch (e) {
+                        console.error('Failed to load network info:', e);
+                    }
+                },
+
+                async syncWithPeers() {
+                    try {
+                        await fetch(`${API_BASE}/sync`);
+                        alert('Sync initiated with peers');
+                        this.loadChain();
+                    } catch (e) {
+                        alert(`ERROR: Sync failed - ${e.message}`);
+                    }
+                },
+
+                // ==================== PHASE 5: Analytics ====================
+
+                renderCharts() {
+                    // Destroy existing charts before creating new ones
+                    if (window.blockTrendChartInstance) {
+                        window.blockTrendChartInstance.destroy();
+                    }
+                    if (window.dataGrowthChartInstance) {
+                        window.dataGrowthChartInstance.destroy();
+                    }
+
+                    // Block trend chart - show cumulative block count over time
+                    const blockCtx = document.getElementById('blockTrendChart');
+                    if (blockCtx && this.blocks.length > 0) {
+                        // Get last 10 blocks in ascending order (oldest to newest)
+                        const recentBlocks = this.blocks.slice(-10).reverse();
+                        const labels = recentBlocks.map(b => `#${b.index}`);
+                        const data = recentBlocks.map((b, idx) => idx + Math.max(0, this.blocks.length - 10) + 1);
+
+                        window.blockTrendChartInstance = new Chart(blockCtx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Total Blocks',
+                                    data: data,
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    tension: 0.4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { beginAtZero: true, grid: { color: '#374151' } },
+                                    x: { grid: { color: '#374151' } }
+                                }
+                            }
+                        });
+                    }
+
+                    // Data growth chart
+                    const dataCtx = document.getElementById('dataGrowthChart');
+                    if (dataCtx && this.blocks.length > 0) {
+                        const labels = this.blocks.slice(-10).map(b => `#${b.index}`);
+                        let cumulative = 0;
+                        const data = this.blocks.slice(-10).map(b => {
+                            cumulative += (b.encrypted_collections?.length || 0);
+                            return cumulative;
+                        });
+
+                        window.dataGrowthChartInstance = new Chart(dataCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Total Collections',
+                                    data: data,
+                                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { beginAtZero: true, grid: { color: '#374151' } },
+                                    x: { grid: { color: '#374151' } }
+                                }
+                            }
+                        });
+                    }
+                },
+
+                // ==================== PHASE 7: Debug Tools ====================
+
+                async testEndpoint() {
+                    try {
+                        const headers = {};
+                        if (this.debugEndpoint === '/data/list') {
+                            headers['Authorization'] = `Bearer ${this.apiKey}`;
+                        }
+                        const res = await fetch(`${API_BASE}${this.debugEndpoint}`, { headers });
+                        const data = await res.json();
+                        this.debugResponse = JSON.stringify(data, null, 2);
+                    } catch (e) {
+                        this.debugResponse = `Error: ${e.message}`;
+                    }
+                },
+
+                exportBlockchain() {
+                    this.downloadJSON('goud-blockchain-export', JSON.stringify(this.blocks, null, 2));
+                },
+
+                exportCollections() {
+                    this.downloadJSON('goud-collections-export', JSON.stringify(this.collections, null, 2));
+                },
+
+                copySystemInfo() {
+                    const info = `
+Goud Chain Dashboard v2.0.0
+API Base: ${API_BASE}
+Account ID: ${this.accountId}
+Total Blocks: ${this.blocks.length}
+Total Collections: ${this.getTotalCollections()}
+Total Accounts: ${this.getTotalAccounts()}
+Peers: ${this.networkInfo.peers?.length || 0}
+                    `.trim();
+                    this.copyToClipboard(info);
+                },
+
+                // ==================== Utilities ====================
+
+                async refresh() {
+                    this.isRefreshing = true;
+                    await Promise.all([
+                        this.loadCollections(),
+                        this.loadChain(),
+                        this.loadNetworkInfo()
+                    ]);
+                    this.isRefreshing = false;
+                },
+
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        // Could show a toast notification here
+                    });
+                },
+
+                downloadJSON(filename, content) {
+                    const blob = new Blob([content], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${filename}-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                logout() {
+                    localStorage.removeItem('goud_session');
+                    localStorage.removeItem('goud_api_key');
+                    localStorage.removeItem('goud_account_id');
+                    localStorage.removeItem('goud_session_expires');
+                    window.location.href = '/auth.html';
                 }
             }
         }
