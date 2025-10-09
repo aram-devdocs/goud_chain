@@ -4,8 +4,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::{encrypted_collection::EncryptedCollection, user_account::UserAccount};
-use crate::constants::{EMPTY_MERKLE_ROOT, ENCRYPTION_SALT, TIMESTAMP_GRANULARITY_SECONDS};
-use crate::crypto::{decrypt_data_with_key, derive_encryption_key, encrypt_data_with_key};
+use crate::constants::{
+    EMPTY_MERKLE_ROOT, ENCRYPTION_SALT, GENESIS_TIMESTAMP, NONCE_SIZE_BYTES,
+    TIMESTAMP_GRANULARITY_SECONDS,
+};
+use crate::crypto::{
+    decrypt_data_with_key, derive_encryption_key, encrypt_data_with_key, encrypt_data_with_nonce,
+};
 use crate::types::{GoudChainError, Result};
 
 /// Generate a random 32-byte salt for blind index generation
@@ -13,6 +18,20 @@ pub fn generate_block_salt() -> String {
     let mut rng = rand::thread_rng();
     let salt_bytes: [u8; 32] = rng.gen();
     hex::encode(salt_bytes)
+}
+
+/// Derive a deterministic nonce for the genesis block
+/// This ensures all nodes create identical genesis blocks
+pub fn derive_genesis_nonce(master_key: &[u8]) -> [u8; NONCE_SIZE_BYTES] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"goud_chain_genesis_nonce_v4");
+    hasher.update(master_key);
+    let hash = hasher.finalize();
+
+    // Take first 12 bytes for nonce
+    let mut nonce = [0u8; NONCE_SIZE_BYTES];
+    nonce.copy_from_slice(&hash[..NONCE_SIZE_BYTES]);
+    nonce
 }
 
 /// Obfuscate timestamp to hourly granularity for privacy
@@ -60,7 +79,12 @@ pub struct Block {
 impl Block {
     /// Create a new privacy-preserving block with encrypted data
     pub fn new(config: BlockConfig) -> Result<Self> {
-        let timestamp = obfuscate_timestamp(Utc::now().timestamp());
+        // Genesis block uses fixed timestamp, regular blocks use current time
+        let timestamp = if config.index == 0 {
+            GENESIS_TIMESTAMP
+        } else {
+            obfuscate_timestamp(Utc::now().timestamp())
+        };
 
         // Create block data structure
         let block_data = BlockData {
@@ -76,8 +100,14 @@ impl Block {
 
         // Encrypt block data with master key
         let encryption_key = derive_encryption_key(config.master_key, ENCRYPTION_SALT);
-        let (encrypted_block_data, nonce) =
-            encrypt_data_with_key(&block_data_json, &encryption_key)?;
+        let (encrypted_block_data, nonce) = if config.index == 0 {
+            // Genesis block: deterministic nonce for identical genesis across all nodes
+            let genesis_nonce = derive_genesis_nonce(config.master_key);
+            encrypt_data_with_nonce(&block_data_json, &encryption_key, &genesis_nonce)?
+        } else {
+            // Regular blocks: random nonce for security
+            encrypt_data_with_key(&block_data_json, &encryption_key)?
+        };
 
         // Calculate validator index (obfuscated)
         let validator_index = Self::calculate_validator_index(&config.validator, config.index);

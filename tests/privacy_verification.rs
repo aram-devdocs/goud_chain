@@ -151,7 +151,7 @@ fn test_schema_version_updated() {
     let master_key = b"test_master_key_32_bytes_long!!".to_vec();
     let blockchain = Blockchain::new("test-node".to_string(), master_key).unwrap();
     assert_eq!(
-        blockchain.schema_version, "v3_privacy_preserving",
-        "Schema version should be v3_privacy_preserving"
+        blockchain.schema_version, "v4_deterministic_genesis",
+        "Schema version should be v4_deterministic_genesis"
     );
 }

@@ -2,7 +2,7 @@
 //! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
-pub const SCHEMA_VERSION: &str = "v3_privacy_preserving";
+pub const SCHEMA_VERSION: &str = "v4_deterministic_genesis";
 
 // Storage paths
 pub const BLOCKCHAIN_FILE_PATH: &str = "/data/blockchain.json";
@@ -34,6 +34,9 @@ pub const SESSION_EXPIRY_SECONDS: i64 = 3600; // 1 hour
 
 // Genesis block
 pub const GENESIS_PREVIOUS_HASH: &str = "0";
+// Fixed genesis timestamp (Jan 1, 2024 00:00:00 UTC) - ensures all nodes create identical genesis
+// Must be in the past to pass validation (TIMESTAMP_TOLERANCE_SECONDS check)
+pub const GENESIS_TIMESTAMP: i64 = 1704067200; // Jan 1, 2024 00:00:00 UTC
 pub const EMPTY_MERKLE_ROOT: &str = "0";
 
 // Default network configuration

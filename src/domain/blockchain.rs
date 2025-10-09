@@ -40,6 +40,16 @@ pub struct Blockchain {
 impl Blockchain {
     /// Create a new blockchain with genesis block
     pub fn new(node_id: String, master_chain_key: Vec<u8>) -> Result<Self> {
+        info!(
+            node_id = %node_id,
+            schema = %SCHEMA_VERSION,
+            "Creating new blockchain with deterministic genesis"
+        );
+        info!(
+            "Master key hash (first 8 bytes): {}",
+            hex::encode(&master_chain_key[..8])
+        );
+
         let signing_key = generate_signing_key();
         let validator = get_current_validator(0);
 
@@ -53,6 +63,13 @@ impl Blockchain {
             block_salt: String::from("genesis_salt"),
             master_key: &master_chain_key,
         })?;
+
+        info!(
+            genesis_hash = %genesis.hash,
+            genesis_nonce = %genesis.nonce,
+            genesis_timestamp = genesis.timestamp,
+            "Genesis block created - ALL NODES MUST HAVE IDENTICAL HASH"
+        );
 
         Ok(Blockchain {
             schema_version: SCHEMA_VERSION.to_string(),

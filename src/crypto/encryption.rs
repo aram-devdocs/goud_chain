@@ -13,12 +13,21 @@ pub fn encrypt_data_with_key(
     data: &str,
     encryption_key: &[u8; AES_KEY_SIZE_BYTES],
 ) -> Result<(String, String)> {
-    let key = GenericArray::from_slice(encryption_key);
-    let cipher = Aes256Gcm::new(key);
-
     // Generate random nonce
     let nonce_bytes: [u8; NONCE_SIZE_BYTES] = rand::random();
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    encrypt_data_with_nonce(data, encryption_key, &nonce_bytes)
+}
+
+/// Encrypt data using AES-256-GCM with a provided nonce
+/// This is used for deterministic genesis block encryption
+pub fn encrypt_data_with_nonce(
+    data: &str,
+    encryption_key: &[u8; AES_KEY_SIZE_BYTES],
+    nonce_bytes: &[u8; NONCE_SIZE_BYTES],
+) -> Result<(String, String)> {
+    let key = GenericArray::from_slice(encryption_key);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(nonce_bytes);
 
     // Encrypt
     let ciphertext = cipher
