@@ -16,7 +16,7 @@ ed25519-dalek = { version = "2.1", features = ["serde"] }
 rand = "0.8"
 hex = "0.4"
 base64 = "0.21"
-aes-gcm = "0.10"  # For PIN-based encryption
+aes-gcm = "0.10"  # For AES-256-GCM encryption
 hmac = "0.12"  # For blind indexes (searchable encryption)
 thiserror = "2.0"  # For custom error types
 tracing = "0.1"  # For structured logging

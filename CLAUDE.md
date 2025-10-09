@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Goud Chain is an encrypted blockchain with PIN-based access control using Proof of Authority (PoA) consensus. This is a proof-of-concept project demonstrating PIN-encrypted JSON storage on an immutable distributed ledger.
+Goud Chain is an encrypted blockchain with API key-based authentication using Proof of Authority (PoA) consensus. This is a proof-of-concept project demonstrating encrypted JSON storage on an immutable distributed ledger.
 
 **Core Technologies:**
 - Rust for blockchain implementation
 - AES-256-GCM for symmetric encryption
 - Ed25519 for digital signatures
-- SHA-256 for hashing (blocks, Merkle trees, PIN derivation)
+- SHA-256 for hashing (blocks, Merkle trees, API key derivation)
 - Docker Compose for multi-node deployment
 
 ## Development Commands
@@ -182,7 +182,7 @@ Entry Point             → Application startup and orchestration
 
 **Cryptography:**
 - Never implement custom crypto primitives; use audited crates
-- Use constant-time comparison for sensitive data (PIN hashes)
+- Use constant-time comparison for sensitive data (API key hashes)
 - Generate cryptographically secure random values for nonces and keys
 - Always use authenticated encryption (AES-GCM, not plain AES)
 
@@ -196,12 +196,6 @@ Entry Point             → Application startup and orchestration
 - Validate JSON structure before encryption/decryption
 - Limit data sizes to prevent DoS attacks
 - Verify signatures before processing any received data
-
-**PIN Security:**
-- Store only hashes of PINs, never plaintext
-- Use timing-safe comparison to prevent timing attacks
-- Consider rate limiting PIN attempts
-- Document that PINs provide symmetric security only (anyone with PIN can decrypt)
 
 **Network Security:**
 - Validate all P2P messages before processing
@@ -231,7 +225,7 @@ Entry Point             → Application startup and orchestration
 **Security Testing:**
 - Test with invalid signatures
 - Attempt to modify blocks after creation
-- Try decrypting with wrong PINs
+- Try decrypting with wrong API keys
 - Test with malformed P2P messages
 
 ### Performance Considerations
@@ -364,7 +358,7 @@ The system is designed to be **cloud-native** and **Terraform-ready**:
 - P2P messages validated before processing
 
 **Cryptographic Operations:**
-- PIN-based encryption uses secure key derivation
+- API key-based encryption uses secure key derivation
 - Digital signatures prevent data tampering
 - Cryptographic hashing for integrity checks
 - All crypto uses audited libraries, no custom primitives

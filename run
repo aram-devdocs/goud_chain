@@ -30,6 +30,9 @@ case "$COMMAND" in
     echo ""
     echo "🌐 Dashboard: http://localhost:3000"
     echo ""
+    echo "📓 Jupyter Lab: http://localhost:8888"
+    echo "   └─ API testing notebooks and experiments"
+    echo ""
     echo "📡 Individual Nodes (for debugging):"
     echo "   Node 1: http://localhost:8081"
     echo "   Node 2: http://localhost:8082"
@@ -38,6 +41,7 @@ case "$COMMAND" in
     echo "✨ Hot reload enabled:"
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
     echo "   - Nodes: Changes to src/ will auto-recompile and restart"
+    echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
     echo ""
     docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml up --build
     ;;

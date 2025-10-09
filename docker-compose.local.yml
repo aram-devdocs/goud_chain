@@ -83,6 +83,26 @@ services:
       - goud_network
     restart: unless-stopped
 
+  jupyter:
+    build: ./python
+    container_name: goud_jupyter
+    ports:
+      - "8888:8888"  # Jupyter Lab access
+    volumes:
+      # Read-only mount for git-tracked notebooks
+      - ./python/notebooks:/home/jovyan/work/notebooks:ro
+      # Read-write mount for scratch/experimental notebooks (persisted)
+      - jupyter_scratch:/home/jovyan/work/scratch
+    networks:
+      - goud_network
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      # No token/password for local development
+      - JUPYTER_TOKEN=
+    restart: unless-stopped
+    depends_on:
+      - nginx
+
 networks:
   goud_network:
     driver: bridge
@@ -91,3 +111,4 @@ volumes:
   node1_data:
   node2_data:
   node3_data:
+  jupyter_scratch:

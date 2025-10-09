@@ -69,7 +69,7 @@ fn main() {
     info!("\n📊 Endpoints:");
     info!("   POST /data/submit      - Submit encrypted JSON data");
     info!("   GET  /data/list        - List all encrypted data");
-    info!("   POST /data/decrypt     - Decrypt specific data with PIN");
+    info!("   POST /data/decrypt     - Decrypt specific data with API key");
     info!("   GET  /chain            - View full blockchain");
     info!("   GET  /peers            - View peers");
     info!("   GET  /sync             - Sync with peers\n");

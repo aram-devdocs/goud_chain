@@ -62,6 +62,12 @@ variable "api_subdomain" {
   default     = "api"
 }
 
+variable "notebook_subdomain" {
+  description = "Subdomain for Jupyter notebook (will be prefixed with environment)"
+  type        = string
+  default     = "notebook"
+}
+
 variable "tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

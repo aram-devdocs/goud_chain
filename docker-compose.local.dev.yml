@@ -42,6 +42,11 @@ services:
       - node3_cargo_cache:/usr/local/cargo/registry
       - node3_target_cache:/app/target
 
+  jupyter:
+    volumes:
+      # Override with read-write for development (still git-tracked but editable)
+      - ./python/notebooks:/home/jovyan/work/notebooks:rw
+
 volumes:
   node1_cargo_cache:
   node1_target_cache:

@@ -8,7 +8,7 @@ pub enum GoudChainError {
     #[error("Encryption failed: {0}")]
     EncryptionFailed(String),
 
-    #[error("Decryption failed: incorrect PIN or corrupted data")]
+    #[error("Decryption failed: incorrect API key or corrupted data")]
     DecryptionFailed,
 
     #[error("Invalid signature")]

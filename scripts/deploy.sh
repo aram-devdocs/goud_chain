@@ -106,15 +106,21 @@ if [ "$IS_LOCAL" = true ]; then
     echo "Building dashboard image..."
     docker build -t goud-chain-dashboard:latest ./dashboard
 
+    # Build jupyter image
+    echo "Building jupyter image..."
+    docker build -t goud-chain-jupyter:latest ./python
+
     # Save images to compressed tar files
     echo "Saving images..."
     mkdir -p /tmp/goud-chain-deploy
     docker save goud-chain:latest | gzip > /tmp/goud-chain-deploy/node.tar.gz
     docker save goud-chain-dashboard:latest | gzip > /tmp/goud-chain-deploy/dashboard.tar.gz
+    docker save goud-chain-jupyter:latest | gzip > /tmp/goud-chain-deploy/jupyter.tar.gz
 
     echo -e "${GREEN}✅ Images built locally${NC}"
     echo "Node image size: $(du -h /tmp/goud-chain-deploy/node.tar.gz | cut -f1)"
     echo "Dashboard image size: $(du -h /tmp/goud-chain-deploy/dashboard.tar.gz | cut -f1)"
+    echo "Jupyter image size: $(du -h /tmp/goud-chain-deploy/jupyter.tar.gz | cut -f1)"
 fi
 
 # Step 2: Wait for VM to be ready (only if resources changed)
@@ -167,6 +173,10 @@ if [ "$IS_LOCAL" = true ]; then
     echo "Uploading dashboard image..."
     scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
         /tmp/goud-chain-deploy/dashboard.tar.gz ubuntu@$INSTANCE_IP:/tmp/
+
+    echo "Uploading jupyter image..."
+    scp -i ~/.ssh/goud_chain_rsa -o StrictHostKeyChecking=no \
+        /tmp/goud-chain-deploy/jupyter.tar.gz ubuntu@$INSTANCE_IP:/tmp/
 
     echo -e "${GREEN}✅ Images transferred${NC}"
 
@@ -421,8 +431,47 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
             --restart unless-stopped \
             goud-chain-dashboard:latest
 
+        # Update Jupyter Lab
+        echo "Updating Jupyter Lab..."
+
+        # Load Jupyter image if available
+        if [ -f /tmp/jupyter.tar.gz ]; then
+            echo "Loading Jupyter image..."
+            sudo docker load < /tmp/jupyter.tar.gz
+        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
+            echo "Pulling Jupyter image from ghcr.io..."
+            if sudo docker pull ghcr.io/aram-devdocs/goud_chain-jupyter:latest 2>/dev/null; then
+                sudo docker tag ghcr.io/aram-devdocs/goud_chain-jupyter:latest goud-chain-jupyter:latest
+                echo "✅ Pulled pre-built Jupyter image"
+            else
+                echo "⚠️  Failed to pull Jupyter, falling back to local build..."
+                cd /opt/goud-chain/python
+                sudo docker build -t goud-chain-jupyter:latest .
+                cd /opt/goud-chain
+            fi
+        else
+            echo "Building Jupyter on VM (fallback)..."
+            cd /opt/goud-chain/python
+            sudo docker build -t goud-chain-jupyter:latest .
+            cd /opt/goud-chain
+        fi
+
+        # Graceful Jupyter update
+        sudo docker stop goud_jupyter 2>/dev/null || true
+        sudo docker rm goud_jupyter 2>/dev/null || true
+        sudo docker run -d \
+            --name goud_jupyter \
+            --network goud_network \
+            -p 8888:8888 \
+            -v /opt/goud-chain/python/notebooks:/home/jovyan/work/notebooks:ro \
+            -v jupyter_scratch:/home/jovyan/work/scratch \
+            -e JUPYTER_ENABLE_LAB=yes \
+            -e JUPYTER_TOKEN= \
+            --restart unless-stopped \
+            goud-chain-jupyter:latest
+
         # Cleanup transferred images
-        rm -f /tmp/node.tar.gz /tmp/dashboard.tar.gz
+        rm -f /tmp/node.tar.gz /tmp/dashboard.tar.gz /tmp/jupyter.tar.gz
 
         echo "✅ Rolling deployment complete"
     fi
@@ -438,11 +487,16 @@ echo ""
 echo "📊 Access your blockchain:"
 
 if [ "$DNS_ENABLED" == "true" ] && [ -n "$LOAD_BALANCER_URL" ] && [ -n "$DASHBOARD_URL" ]; then
+    NOTEBOOK_URL=$(cd "$TERRAFORM_DIR" && terraform output -raw notebook_url 2>/dev/null || echo "")
     echo "  API Endpoint:  $LOAD_BALANCER_URL"
     echo "  Dashboard:     $DASHBOARD_URL"
+    if [ -n "$NOTEBOOK_URL" ]; then
+        echo "  Jupyter Lab:   $NOTEBOOK_URL"
+    fi
     echo ""
     echo "  (Direct IP):   http://$INSTANCE_IP:8080 (API)"
     echo "  (Direct IP):   http://$INSTANCE_IP:3000 (Dashboard)"
+    echo "  (Direct IP):   http://$INSTANCE_IP:8888 (Jupyter)"
     echo ""
     echo "⚠️  DNS Configuration Required:"
     echo "  1. Go to Cloudflare Dashboard → goudchain.com → SSL/TLS → Overview"
@@ -452,6 +506,7 @@ if [ "$DNS_ENABLED" == "true" ] && [ -n "$LOAD_BALANCER_URL" ] && [ -n "$DASHBOA
 else
     echo "  API Endpoint: http://$INSTANCE_IP:8080"
     echo "  Dashboard:    http://$INSTANCE_IP:3000"
+    echo "  Jupyter Lab:  http://$INSTANCE_IP:8888"
 fi
 
 echo ""

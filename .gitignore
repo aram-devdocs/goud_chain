@@ -71,3 +71,32 @@ terraform.tfplan
 # Backups
 *.backup
 *.bak
+
+# Python/Jupyter
+python/scratch/*
+!python/scratch/.gitkeep
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Jupyter notebook outputs (generated from notebook execution)
+python/scratch/*.csv
+python/scratch/*.json
+python/scratch/*.png
+python/scratch/*.jpg
+python/scratch/*.html
+python/scratch/*.pdf
+python/notebooks/*.csv
+python/notebooks/*.json
+python/notebooks/*.png
+python/notebooks/*.jpg
+python/notebooks/*.html
+python/notebooks/*.pdf
+
+# Jupyter metadata and temp files
+.jupyter/
+*.nbconvert.ipynb
+# ds store
+.DS_Store
+*.DS_Store
