@@ -1,16 +1,69 @@
 # Docker Compose for Goud Chain on Google Cloud Platform e2-micro (1GB RAM)
-# Writer/Reader architecture: node1 (writer 320M), node2 (reader 160M)
+# Generated from template - DO NOT EDIT MANUALLY
+# Writer/Reader architecture: node1 (writer), node2 (reader)
 # Conservative allocation with 150M safety margin for OS + Docker
+# Generated: 2025-10-10 15:37:08 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.gcp.yml up -d
+
+# YAML anchors for reusable configuration
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+x-node-base: &node-base
+  image: goud-chain:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+  networks:
+    - goud_network
+  restart: unless-stopped
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 30s
+
+x-nginx-base: &nginx-base
+  image: nginx:alpine
+  networks:
+    - goud_network
+  restart: unless-stopped
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/lb/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 10s
+
+x-dashboard-base: &dashboard-base
+  image: goud-chain-dashboard:latest
+  build: ./dashboard
+  networks:
+    - goud_network
+  restart: unless-stopped
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 20s
+
 
 version: '3.8'
 
 services:
   # NGINX Load Balancer - Primary API endpoint
   nginx:
-    image: nginx:alpine
+    <<: *nginx-base
     container_name: goud_nginx_lb
     ports:
       - "80:80"       # For Cloudflare proxy
@@ -18,9 +71,6 @@ services:
     volumes:
       - ./nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/cors.conf:/etc/nginx/cors.conf:ro
-    networks:
-      - goud_network
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -29,28 +79,13 @@ services:
         reservations:
           cpus: '0.05'
           memory: 24M
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/lb/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   # Dashboard - Web UI
   dashboard:
-    image: goud-chain-dashboard:latest
-    build: ./dashboard
+    <<: *dashboard-base
     container_name: goud_dashboard
     ports:
       - "3000:8080"
-    networks:
-      - goud_network
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -59,24 +94,10 @@ services:
         reservations:
           cpus: '0.05'
           memory: 48M
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   # Blockchain Node 1 - PRIMARY WRITER (handles all write operations)
   node1:
-    image: goud-chain:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *node-base
     container_name: goud_node1
     environment:
       - NODE_ID=node1
@@ -88,9 +109,6 @@ services:
       - "9001:9000"
     volumes:
       - node1_data:/data
-    networks:
-      - goud_network
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -99,24 +117,10 @@ services:
         reservations:
           cpus: '0.25'
           memory: 288M
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   # Blockchain Node 2 - PASSIVE READER (read-only, syncs via P2P)
   node2:
-    image: goud-chain:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *node-base
     container_name: goud_node2
     environment:
       - NODE_ID=node2
@@ -128,9 +132,6 @@ services:
       - "9002:9000"
     volumes:
       - node2_data:/data
-    networks:
-      - goud_network
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -139,17 +140,6 @@ services:
         reservations:
           cpus: '0.15'
           memory: 128M
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
 
 networks:
   goud_network:

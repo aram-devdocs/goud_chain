@@ -1,0 +1,99 @@
+# Docker Compose for Goud Chain on Google Cloud Platform e2-micro (1GB RAM)
+# Generated from template - DO NOT EDIT MANUALLY
+# Writer/Reader architecture: node1 (writer), node2 (reader)
+# Conservative allocation with 150M safety margin for OS + Docker
+# Generated: {{GENERATION_TIMESTAMP}}
+#
+# Usage:
+#   docker-compose -f docker-compose.gcp.yml up -d
+
+version: '3.8'
+
+services:
+  # NGINX Load Balancer - Primary API endpoint
+  nginx:
+    <<: *nginx-base
+    container_name: {{NGINX_HOSTNAME}}
+    ports:
+      - "{{NGINX_HTTP_PORT}}:{{NGINX_HTTP_PORT}}"       # For Cloudflare proxy
+      - "{{NGINX_API_PORT}}:{{NGINX_API_PORT}}"   # For direct IP access
+    volumes:
+      - ./nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/cors.conf:/etc/nginx/cors.conf:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NGINX_CPU_LIMIT}}'
+          memory: {{NGINX_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NGINX_CPU_RESERVATION}}'
+          memory: {{NGINX_MEM_RESERVATION}}
+
+  # Dashboard - Web UI
+  dashboard:
+    <<: *dashboard-base
+    container_name: {{DASHBOARD_HOSTNAME}}
+    ports:
+      - "{{DASHBOARD_PORT}}:{{HTTP_PORT}}"
+    deploy:
+      resources:
+        limits:
+          cpus: '{{DASHBOARD_CPU_LIMIT}}'
+          memory: {{DASHBOARD_MEM_LIMIT}}
+        reservations:
+          cpus: '{{DASHBOARD_CPU_RESERVATION}}'
+          memory: {{DASHBOARD_MEM_RESERVATION}}
+
+  # Blockchain Node 1 - PRIMARY WRITER (handles all write operations)
+  node1:
+    <<: *node-base
+    container_name: {{NODE1_HOSTNAME}}
+    environment:
+      - NODE_ID=node1
+      - HTTP_PORT={{HTTP_PORT}}
+      - P2P_PORT={{P2P_PORT}}
+      - PEERS={{NODE2_HOSTNAME}}:{{P2P_PORT}}
+    ports:
+      - "{{NODE1_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
+      - "{{NODE1_P2P_EXTERNAL}}:{{P2P_PORT}}"
+    volumes:
+      - node1_data:{{DATA_DIR}}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NODE1_CPU_LIMIT}}'
+          memory: {{NODE1_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NODE1_CPU_RESERVATION}}'
+          memory: {{NODE1_MEM_RESERVATION}}
+
+  # Blockchain Node 2 - PASSIVE READER (read-only, syncs via P2P)
+  node2:
+    <<: *node-base
+    container_name: {{NODE2_HOSTNAME}}
+    environment:
+      - NODE_ID=node2
+      - HTTP_PORT={{HTTP_PORT}}
+      - P2P_PORT={{P2P_PORT}}
+      - PEERS={{NODE1_HOSTNAME}}:{{P2P_PORT}}
+    ports:
+      - "{{NODE2_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
+      - "{{NODE2_P2P_EXTERNAL}}:{{P2P_PORT}}"
+    volumes:
+      - node2_data:{{DATA_DIR}}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NODE2_CPU_LIMIT}}'
+          memory: {{NODE2_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NODE2_CPU_RESERVATION}}'
+          memory: {{NODE2_MEM_RESERVATION}}
+
+networks:
+  goud_network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:

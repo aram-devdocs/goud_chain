@@ -14,6 +14,19 @@ pub fn forward_request_to_node(
     body: &str,
     content_type: &str,
 ) -> Result<(u16, String)> {
+    forward_request_with_headers(target_node, method, path, body, content_type, None)
+}
+
+/// Forward an HTTP request with optional Authorization header
+/// Used when current node is not the PoA validator
+pub fn forward_request_with_headers(
+    target_node: &str,
+    method: &str,
+    path: &str,
+    body: &str,
+    content_type: &str,
+    auth_header: Option<&str>,
+) -> Result<(u16, String)> {
     info!(
         target_node = %target_node,
         path = %path,
@@ -85,6 +98,7 @@ pub fn forward_request_to_node(
                     body,
                     content_type,
                     &target_addr,
+                    auth_header,
                 );
             }
             Err(e) => {
@@ -122,14 +136,19 @@ fn perform_http_request(
     body: &str,
     content_type: &str,
     target_addr: &str,
+    auth_header: Option<&str>,
 ) -> Result<(u16, String)> {
-    // Build HTTP request
+    // Build HTTP request with optional Authorization header
+    let auth_line = auth_header
+        .map(|h| format!("Authorization: {}\r\n", h))
+        .unwrap_or_default();
+
     let request = format!(
         "{} {} HTTP/1.1\r\n\
          Host: {}\r\n\
          Content-Type: {}\r\n\
          Content-Length: {}\r\n\
-         Connection: close\r\n\
+         {}Connection: close\r\n\
          \r\n\
          {}",
         method,
@@ -137,6 +156,7 @@ fn perform_http_request(
         target_addr.split(':').next().unwrap_or("localhost"),
         content_type,
         body.len(),
+        auth_line,
         body
     );
 

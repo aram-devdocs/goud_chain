@@ -1,0 +1,150 @@
+# Docker Compose for Goud Chain - Local Development (3-node setup)
+# Generated from template - DO NOT EDIT MANUALLY
+# Generated: {{GENERATION_TIMESTAMP}}
+#
+# Usage:
+#   docker-compose -f docker-compose.local.yml up -d
+
+version: '3.8'
+
+services:
+  # NGINX Load Balancer - Primary API endpoint
+  nginx:
+    <<: *nginx-base
+    container_name: {{NGINX_HOSTNAME}}
+    ports:
+      - "{{NGINX_API_PORT}}:{{NGINX_API_PORT}}"
+    volumes:
+      - ./nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/cors.conf:/etc/nginx/cors.conf:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NGINX_CPU_LIMIT}}'
+          memory: {{NGINX_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NGINX_CPU_RESERVATION}}'
+          memory: {{NGINX_MEM_RESERVATION}}
+
+  # Dashboard - Web UI
+  dashboard:
+    <<: *dashboard-base
+    container_name: {{DASHBOARD_HOSTNAME}}
+    ports:
+      - "{{DASHBOARD_PORT}}:{{HTTP_PORT}}"
+    deploy:
+      resources:
+        limits:
+          cpus: '{{DASHBOARD_CPU_LIMIT}}'
+          memory: {{DASHBOARD_MEM_LIMIT}}
+        reservations:
+          cpus: '{{DASHBOARD_CPU_RESERVATION}}'
+          memory: {{DASHBOARD_MEM_RESERVATION}}
+
+  # Blockchain Node 1 - Validator 1
+  node1:
+    <<: *node-base
+    container_name: {{NODE1_HOSTNAME}}
+    environment:
+      - NODE_ID=node1
+      - HTTP_PORT={{HTTP_PORT}}
+      - P2P_PORT={{P2P_PORT}}
+      - PEERS={{NODE2_HOSTNAME}}:{{P2P_PORT}},{{NODE3_HOSTNAME}}:{{P2P_PORT}}
+    ports:
+      - "{{NODE1_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
+      - "{{NODE1_P2P_EXTERNAL}}:{{P2P_PORT}}"
+    volumes:
+      - node1_data:{{DATA_DIR}}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NODE_CPU_LIMIT}}'
+          memory: {{NODE_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NODE_CPU_RESERVATION}}'
+          memory: {{NODE_MEM_RESERVATION}}
+
+  # Blockchain Node 2 - Validator 2
+  node2:
+    <<: *node-base
+    container_name: {{NODE2_HOSTNAME}}
+    environment:
+      - NODE_ID=node2
+      - HTTP_PORT={{HTTP_PORT}}
+      - P2P_PORT={{P2P_PORT}}
+      - PEERS={{NODE1_HOSTNAME}}:{{P2P_PORT}},{{NODE3_HOSTNAME}}:{{P2P_PORT}}
+    ports:
+      - "{{NODE2_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
+      - "{{NODE2_P2P_EXTERNAL}}:{{P2P_PORT}}"
+    volumes:
+      - node2_data:{{DATA_DIR}}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NODE_CPU_LIMIT}}'
+          memory: {{NODE_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NODE_CPU_RESERVATION}}'
+          memory: {{NODE_MEM_RESERVATION}}
+
+  # Blockchain Node 3 - Validator 3
+  node3:
+    <<: *node-base
+    container_name: {{NODE3_HOSTNAME}}
+    environment:
+      - NODE_ID=node3
+      - HTTP_PORT={{HTTP_PORT}}
+      - P2P_PORT={{P2P_PORT}}
+      - PEERS={{NODE1_HOSTNAME}}:{{P2P_PORT}},{{NODE2_HOSTNAME}}:{{P2P_PORT}}
+    ports:
+      - "{{NODE3_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
+      - "{{NODE3_P2P_EXTERNAL}}:{{P2P_PORT}}"
+    volumes:
+      - node3_data:{{DATA_DIR}}
+    deploy:
+      resources:
+        limits:
+          cpus: '{{NODE_CPU_LIMIT}}'
+          memory: {{NODE_MEM_LIMIT}}
+        reservations:
+          cpus: '{{NODE_CPU_RESERVATION}}'
+          memory: {{NODE_MEM_RESERVATION}}
+
+  # Jupyter Lab - API testing notebooks and experiments
+  jupyter:
+    build: ./python
+    container_name: goud_jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      # Read-only mount for git-tracked notebooks
+      - ./python/notebooks:/home/jovyan/work/notebooks:ro
+      # Read-write mount for scratch/experimental notebooks
+      - jupyter_scratch:/home/jovyan/work/scratch
+    networks:
+      - goud_network
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=
+    restart: {{RESTART_POLICY}}
+    depends_on:
+      - nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging: *default-logging
+
+networks:
+  goud_network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:
+  jupyter_scratch:

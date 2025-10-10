@@ -1,0 +1,64 @@
+# Docker Compose Base Configuration
+# This file contains shared configuration using YAML anchors
+# Environment-specific files extend this base
+
+version: '3.8'
+
+# YAML anchors for reusable configuration
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "{{LOG_MAX_SIZE}}"
+    max-file: "{{LOG_MAX_FILE}}"
+
+x-node-base: &node-base
+  image: {{BLOCKCHAIN_IMAGE_NAME}}:{{IMAGE_TAG_LATEST}}
+  build:
+    context: .
+    dockerfile: Dockerfile
+  networks:
+    - goud_network
+  restart: {{RESTART_POLICY}}
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:{{HTTP_PORT}}/health"]
+    interval: {{NODE_HEALTHCHECK_INTERVAL}}
+    timeout: {{NODE_HEALTHCHECK_TIMEOUT}}
+    retries: {{NODE_HEALTHCHECK_RETRIES}}
+    start_period: {{NODE_HEALTHCHECK_START_PERIOD}}
+
+x-nginx-base: &nginx-base
+  image: {{NGINX_IMAGE}}
+  networks:
+    - goud_network
+  restart: {{RESTART_POLICY}}
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:{{NGINX_API_PORT}}/lb/health"]
+    interval: {{NGINX_HEALTHCHECK_INTERVAL}}
+    timeout: {{NGINX_HEALTHCHECK_TIMEOUT}}
+    retries: {{NGINX_HEALTHCHECK_RETRIES}}
+    start_period: {{NGINX_HEALTHCHECK_START_PERIOD}}
+
+x-dashboard-base: &dashboard-base
+  image: {{DASHBOARD_IMAGE_NAME}}:{{IMAGE_TAG_LATEST}}
+  build: ./dashboard
+  networks:
+    - goud_network
+  restart: {{RESTART_POLICY}}
+  logging: *default-logging
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:{{HTTP_PORT}}"]
+    interval: {{DASHBOARD_HEALTHCHECK_INTERVAL}}
+    timeout: {{DASHBOARD_HEALTHCHECK_TIMEOUT}}
+    retries: {{DASHBOARD_HEALTHCHECK_RETRIES}}
+    start_period: {{DASHBOARD_HEALTHCHECK_START_PERIOD}}
+
+networks:
+  goud_network:
+    driver: bridge
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:

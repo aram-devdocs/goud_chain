@@ -578,6 +578,37 @@ ssh ubuntu@<VM_IP> 'cd /opt/goud-chain && docker-compose -f docker-compose.gcp.y
 - e2-medium: ~$27/month
 - Still cheaper than most cloud providers!
 
+## Configuration Management
+
+**Template-Based System:**
+All nginx and docker-compose configs are **generated from templates** to prevent configuration drift between local and GCP environments.
+
+**Generate configs:**
+```bash
+./config/scripts/generate-configs.sh local   # Local development (3 nodes)
+./config/scripts/generate-configs.sh gcp     # GCP deployment (2 nodes)
+./config/scripts/generate-configs.sh all     # Both environments
+```
+
+**Files you should edit:**
+- `config/base/constants.env` - Change ports, timeouts, memory limits, all magic numbers
+- `config/environments/local/overrides.env` - Local-specific overrides (3 nodes)
+- `config/environments/gcp/overrides.env` - GCP-specific overrides (2 nodes, e2-micro)
+- `config/base/nginx.conf.template` - Nginx structure changes
+- `config/environments/*/docker-compose.template.yml` - Service definitions
+
+**Files you should NOT edit directly (auto-generated):**
+- `nginx/nginx.local.conf` ⚠️ DO NOT EDIT MANUALLY
+- `nginx/nginx.gcp.conf` ⚠️ DO NOT EDIT MANUALLY
+- `docker-compose.local.yml` ⚠️ DO NOT EDIT MANUALLY
+- `docker-compose.gcp.yml` ⚠️ DO NOT EDIT MANUALLY
+
+**Automatic regeneration:**
+- Pre-commit hook: Detects template changes and regenerates configs automatically
+- `./run` script: Regenerates before starting local network
+- `scripts/deploy.sh`: Regenerates on VM before deployment
+- GitHub Actions: Regenerates during CI/CD pipeline
+
 ## Local Development
 
 ### Running Tests
@@ -639,9 +670,24 @@ goud_chain/
 │   ├── destroy.sh                      # Destroy GCP resources
 │   ├── setup-terraform-backend.sh      # Create GCS bucket for Terraform state
 │   └── generate_module_graph.sh        # Dependency visualization
+├── config/
+│   ├── base/
+│   │   ├── constants.env               # All magic numbers centralized
+│   │   ├── nginx.conf.template         # Nginx template ({{VARIABLE}} syntax)
+│   │   └── docker-compose.base.yml     # YAML anchors for reusability
+│   ├── environments/
+│   │   ├── local/
+│   │   │   ├── overrides.env           # Local-specific values (3 nodes)
+│   │   │   └── docker-compose.template.yml
+│   │   └── gcp/
+│   │       ├── overrides.env           # GCP-specific values (2 nodes, e2-micro)
+│   │       └── docker-compose.template.yml
+│   └── scripts/
+│       └── generate-configs.sh         # Config generation script
 ├── nginx/
-│   ├── nginx.conf              # Load balancer (local, 3 nodes)
-│   └── nginx.gcp.conf          # Load balancer (GCP, 2 nodes)
+│   ├── nginx.local.conf        # Generated from config/ templates
+│   ├── nginx.gcp.conf          # Generated from config/ templates
+│   └── cors.conf               # Shared CORS config
 ├── dashboard/
 │   ├── index.html              # Main dashboard (authenticated)
 │   ├── auth.html               # Login & signup page
@@ -660,10 +706,9 @@ goud_chain/
 │           ├── variables.tf    # Environment variables
 │           └── terraform.tfvars.example  # Example configuration
 ├── .env.example                # Environment variable template
-├── docker-compose.yml          # Local 3-node network
-├── docker-compose.dev.yml      # Local dev with hot reload
-├── docker-compose.gcp.yml      # GCP 2-node network (optimized for 1GB RAM)
-├── docker-compose.local.yml    # Local development with custom config
+├── docker-compose.local.yml    # Generated - Local 3-node network
+├── docker-compose.gcp.yml      # Generated - GCP 2-node network (e2-micro optimized)
+├── docker-compose.local.dev.yml # Dev mode overlay (hot reload, jupyter)
 ├── Dockerfile                  # Rust production build
 ├── Dockerfile.dev              # Rust dev build with cargo-watch
 ├── run                         # CLI script

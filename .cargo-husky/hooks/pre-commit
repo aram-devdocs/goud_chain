@@ -35,6 +35,21 @@ if [ -f "docs/module-structure.png" ]; then
     git add docs/module-structure.png docs/module-structure.dot
 fi
 
+# Config generation checks
+if git diff --cached --name-only | grep -qE "^config/(base|environments)/"; then
+    echo "Config templates changed, regenerating configs..."
+    ./config/scripts/generate-configs.sh all || {
+        echo "Error: Config generation failed."
+        exit 1
+    }
+
+    # Stage generated configs
+    git add nginx/nginx.local.conf nginx/nginx.gcp.conf
+    git add docker-compose.local.yml docker-compose.gcp.yml
+
+    echo "✅ Generated configs staged for commit"
+fi
+
 # Dashboard checks
 echo "Running dashboard tests..."
 ./dashboard/test.sh || {

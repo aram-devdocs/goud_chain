@@ -1,15 +1,15 @@
 # Goud Chain Load Balancer Configuration
 # Generated from template - DO NOT EDIT MANUALLY
-# Environment: gcp
-# Generated: 2025-10-10 15:37:08 UTC
+# Environment: {{ENV}}
+# Generated: {{GENERATION_TIMESTAMP}}
 
 # Worker configuration
-worker_processes 1;
-error_log /var/log/nginx/error.log warn;
+worker_processes {{NGINX_WORKER_PROCESSES}};
+error_log /var/log/nginx/error.log {{NGINX_ERROR_LOG_LEVEL}};
 pid /var/run/nginx.pid;
 
 events {
-    worker_connections 512;
+    worker_connections {{NGINX_WORKER_CONNECTIONS}};
     use epoll;
 }
 
@@ -29,74 +29,52 @@ http {
     access_log /var/log/nginx/access.log blockchain;
 
     # Performance settings
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
+    sendfile {{NGINX_SENDFILE}};
+    tcp_nopush {{NGINX_TCP_NOPUSH}};
+    tcp_nodelay {{NGINX_TCP_NODELAY}};
+    keepalive_timeout {{NGINX_KEEPALIVE_TIMEOUT}};
+    types_hash_max_size {{NGINX_TYPES_HASH_MAX_SIZE}};
 
     # Buffer settings for blockchain data
-    client_body_buffer_size 16K;
-    client_max_body_size 1M;
+    client_body_buffer_size {{NGINX_CLIENT_BODY_BUFFER_SIZE}};
+    client_max_body_size {{NGINX_CLIENT_MAX_BODY_SIZE}};
 
     # Upstream pool - all blockchain nodes (hash-based routing for PoA)
     # Hash distribution approximates PoA validator rotation
     # When a request hits the wrong validator, node forwards internally via P2P
     upstream blockchain_nodes {
         # Hash-based routing on client IP for write request distribution
-        hash $remote_addr consistent;
+        {{NGINX_HASH_METHOD}};
 
-        server goud_node1:8080 max_fails=3 fail_timeout=30s;
-        server goud_node2:8080 max_fails=3 fail_timeout=30s;
+{{UPSTREAM_NODES}}
 
         # Connection pooling
-        keepalive 8;
-        keepalive_requests 100;
-        keepalive_timeout 60s;
+        keepalive {{NGINX_KEEPALIVE_CONNECTIONS}};
+        keepalive_requests {{NGINX_KEEPALIVE_REQUESTS}};
+        keepalive_timeout {{NGINX_KEEPALIVE_TIMEOUT_UPSTREAM}};
     }
 
     # Upstream pool for read-only operations
     upstream blockchain_readers {
         # Round-robin for even distribution
-        server goud_node1:8080 max_fails=3 fail_timeout=30s;
-        server goud_node2:8080 max_fails=3 fail_timeout=30s;
+{{UPSTREAM_READERS}}
 
         # Connection pooling
-        keepalive 8;
+        keepalive {{NGINX_KEEPALIVE_CONNECTIONS}};
     }
 
-    # Dashboard server block
-    server {
-        listen 80;
-        listen 8080;
-        server_name dev-dashboard.goudchain.com localhost;
-
-        location / {
-            proxy_pass http://goud_dashboard:8080;
-
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-
-            # CORS
-            include /etc/nginx/cors.conf;
-        }
-    }
+{{DASHBOARD_SERVER_BLOCK}}
 
     # API server block (default for all other requests)
     server {
-        listen 8080 default_server;
-        listen 80;
-        server_name dev-api.goudchain.com _;
+        listen {{NGINX_API_PORT}} default_server;
+{{ADDITIONAL_LISTEN}}
+        server_name {{API_SERVER_NAME}};
 
         # Health check endpoint for the load balancer itself
         location /lb/health {
             access_log off;
-            return 200 '{"status":"healthy","service":"goud_chain_lb","nodes":2,"platform":"gcp","routing":"writer_reader"}\\n';
+            return 200 '{"status":"healthy","service":"goud_chain_lb","nodes":{{NODE_COUNT}},"platform":"{{PLATFORM}}","routing":"{{ROUTING_STRATEGY}}"}\\n';
             add_header Content-Type application/json;
         }
 
@@ -108,11 +86,11 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Connection "";
 
-            proxy_connect_timeout 5s;
-            proxy_read_timeout 10s;
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_HEALTH}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_HEALTH}};
 
             # Cache briefly (changes when blocks are added)
-            add_header Cache-Control "public, max-age=1";
+            add_header Cache-Control "public, max-age={{NGINX_CACHE_MAX_AGE_VALIDATOR}}";
             include /etc/nginx/cors.conf;
         }
 
@@ -122,35 +100,10 @@ http {
             access_log off;
         }
 
-        # ACCOUNT operations - Route to node1 only for consistency
-        # This prevents "API key no longer valid" errors caused by chain inconsistency
-        location ~ ^/(data/list|data/generate)$ {
-            proxy_pass http://goud_node1:8080;
-
-            # Proxy headers
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Connection reuse
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-
-            # Timeouts (blockchain reads can take time)
-            proxy_connect_timeout 10s;
-            proxy_send_timeout 30s;
-            proxy_read_timeout 30s;
-
-            # CORS headers for browser access
-            include /etc/nginx/cors.conf;
-
-            # No caching for account operations (need fresh data)
-            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-        }
+{{ACCOUNT_OPERATIONS_ROUTING}}
 
         # READ operations - Round-robin across all nodes
-        location ~ ^/(chain|peers)$ {
+        location ~ ^/({{READ_ENDPOINTS}})$ {
             proxy_pass http://blockchain_readers;
 
             # Proxy headers
@@ -164,21 +117,21 @@ http {
             proxy_set_header Connection "";
 
             # Timeouts (blockchain reads can take time)
-            proxy_connect_timeout 10s;
-            proxy_send_timeout 30s;
-            proxy_read_timeout 30s;
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_READ}};
+            proxy_send_timeout {{NGINX_PROXY_SEND_TIMEOUT_READ}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_READ}};
 
             # CORS headers for browser access
             include /etc/nginx/cors.conf;
 
             # Cache control (blockchain data is eventually consistent)
-            add_header Cache-Control "public, max-age=2, stale-while-revalidate=5";
+            add_header Cache-Control "public, max-age={{NGINX_CACHE_MAX_AGE_READ}}, stale-while-revalidate={{NGINX_CACHE_STALE_WHILE_REVALIDATE}}";
         }
 
         # WRITE operations - Hash-based routing distributes writes across validators
         # PoA validator rotation handled via internal forwarding when needed
         # Hash approximates round-robin while maintaining session affinity
-        location ~ ^/(account/create|data/submit|data/decrypt|sync)$ {
+        location ~ ^/({{WRITE_ENDPOINTS}})$ {
             proxy_pass http://blockchain_nodes;
 
             # Proxy headers
@@ -192,14 +145,14 @@ http {
             proxy_set_header Connection "";
 
             # Longer timeouts for write operations (encryption + block creation)
-            proxy_connect_timeout 10s;
-            proxy_send_timeout 60s;
-            proxy_read_timeout 60s;
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_WRITE}};
+            proxy_send_timeout {{NGINX_PROXY_SEND_TIMEOUT_WRITE}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_WRITE}};
 
             # Buffering settings
             proxy_buffering on;
-            proxy_buffer_size 4k;
-            proxy_buffers 8 4k;
+            proxy_buffer_size {{NGINX_PROXY_BUFFER_SIZE}};
+            proxy_buffers {{NGINX_PROXY_BUFFERS}};
 
             # CORS headers
             include /etc/nginx/cors.conf;
@@ -215,8 +168,8 @@ http {
             proxy_http_version 1.1;
             proxy_set_header Connection "";
 
-            proxy_connect_timeout 5s;
-            proxy_read_timeout 10s;
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_HEALTH}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_HEALTH}};
 
             access_log off;
         }

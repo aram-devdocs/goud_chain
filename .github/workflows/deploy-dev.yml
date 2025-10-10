@@ -208,6 +208,12 @@ jobs:
             sudo mkdir -p /data
             sudo chown ubuntu:ubuntu /data
 
+            # Generate GCP configs from templates
+            echo "📋 Generating GCP configs from templates..."
+            cd /opt/goud-chain
+            chmod +x config/scripts/generate-configs.sh
+            ./config/scripts/generate-configs.sh gcp
+
             # Run deployment script with pre-built images
             # The script will detect USE_PREBUILT_IMAGES and pull from ghcr.io
             bash -c 'cd /opt/goud-chain && source scripts/deploy.sh' || {

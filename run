@@ -9,6 +9,9 @@ case "$COMMAND" in
   start)
     echo "🚀 Starting Goud Chain network (production mode)..."
     echo ""
+    echo "📋 Generating latest configs from templates..."
+    ./config/scripts/generate-configs.sh local
+    echo ""
     echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
@@ -24,6 +27,9 @@ case "$COMMAND" in
 
   dev)
     echo "🔥 Starting Goud Chain network (development mode with hot reload)..."
+    echo ""
+    echo "📋 Generating latest configs from templates..."
+    ./config/scripts/generate-configs.sh local
     echo ""
     echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"

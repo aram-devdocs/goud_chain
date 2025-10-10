@@ -144,6 +144,10 @@ Entry Point             → Application startup and orchestration
 - Use traits for shared behavior across types
 - Create helper functions for repeated operations
 - If you copy-paste code more than once, extract it
+- **Configuration as Code:** Extract ALL magic values to `config/base/constants.env`
+- Use templates with variable substitution for infrastructure configs
+- Environment-specific overrides, not full config duplicates
+- Pre-commit hook ensures generated configs stay in sync with templates
 
 **Atomic Operations:**
 - Ensure blockchain state changes are atomic (add block + clear pending data together)
@@ -368,3 +372,141 @@ The system is designed to be **cloud-native** and **Terraform-ready**:
 - TLS mutual authentication for P2P connections
 - Hardware security modules (HSM) for key storage
 - Audit logging for compliance requirements
+
+## Configuration Management
+
+### DRY Principle for Infrastructure
+
+This project uses a **template-based configuration system** to eliminate duplication and prevent drift between local and GCP environments (the root cause of the EAGAIN socket error bug).
+
+**Core Philosophy:**
+- ALL configuration values live in `config/base/constants.env` (magic numbers, ports, timeouts, memory limits)
+- Environment-specific overrides in `config/environments/{local,gcp}/overrides.env` (ONLY differences)
+- Templates use `{{VARIABLE}}` placeholders for substitution
+- Generation script (`config/scripts/generate-configs.sh`) produces final configs
+- Pre-commit hook automatically regenerates when templates change
+
+### Template System Architecture
+
+**Base Layer (Shared Across All Environments):**
+- `config/base/constants.env` - Single source of truth for all magic values
+  - Network ports (HTTP_PORT=8080, P2P_PORT=9000)
+  - Nginx settings (worker processes, timeouts, buffer sizes)
+  - Docker resource limits (separate for local vs GCP)
+  - Health check intervals
+  - Logging configuration
+  - All kernel tuning parameters
+
+- `config/base/nginx.conf.template` - Nginx structure with variable placeholders
+  - Uses `{{VARIABLE_NAME}}` syntax for substitution
+  - Contains the full nginx configuration structure
+  - Variables filled in by generation script from constants + overrides
+
+- `config/base/docker-compose.base.yml` - YAML anchors for reusability
+  - Shared service configurations (logging, health checks, networks)
+  - Referenced by environment-specific templates using `<<: *anchor-name`
+
+**Environment-Specific Layer (Overrides Only):**
+- `config/environments/local/overrides.env`
+  - NODE_COUNT=3 (local has 3 validators)
+  - Local hostname patterns (node1, node2, node3)
+  - Development-friendly resource limits
+  - READ_ENDPOINTS includes data/list
+
+- `config/environments/gcp/overrides.env`
+  - NODE_COUNT=2 (GCP e2-micro limited to 2 nodes)
+  - GCP hostname patterns (goud_node1, goud_node2)
+  - Conservative memory limits (320M node1, 160M node2)
+  - ACCOUNT_OPERATIONS_ROUTING_STRATEGY=node1_only (prevents chain inconsistency)
+  - Reduced worker processes and connections
+
+- `config/environments/{env}/docker-compose.template.yml`
+  - Service definitions specific to environment
+  - Uses YAML anchors from base for shared config
+  - Variables substituted during generation
+
+### Config Generation Workflow
+
+**Manual Generation:**
+```bash
+./config/scripts/generate-configs.sh local   # Local development (3 nodes)
+./config/scripts/generate-configs.sh gcp     # GCP deployment (2 nodes)
+./config/scripts/generate-configs.sh all     # Both environments
+```
+
+**Automatic Generation:**
+1. **Pre-commit Hook:** Detects changes to `config/` directory, regenerates all configs, stages them for commit
+2. **./run Script:** Regenerates local config before starting containers
+3. **scripts/deploy.sh:** Regenerates GCP config on VM before deployment
+4. **GitHub Actions:** Regenerates configs during CI/CD pipeline before deployment
+
+**Generation Process:**
+1. Load `config/base/constants.env` (all default values)
+2. Load `config/environments/{env}/overrides.env` (environment-specific overrides)
+3. Generate dynamic sections (upstream nodes list, routing blocks)
+4. Substitute all `{{VARIABLE}}` placeholders in templates
+5. Output final configs:
+   - `nginx/nginx.{env}.conf`
+   - `docker-compose.{env}.yml`
+
+### Generated Files (DO NOT EDIT MANUALLY)
+
+**Warning:** These files are auto-generated from templates:
+- `nginx/nginx.local.conf` ⚠️ Changes will be overwritten
+- `nginx/nginx.gcp.conf` ⚠️ Changes will be overwritten
+- `docker-compose.local.yml` ⚠️ Changes will be overwritten
+- `docker-compose.gcp.yml` ⚠️ Changes will be overwritten
+
+**Pre-commit hook enforcement:**
+- If you edit a template file, the hook regenerates configs automatically
+- Generated files are committed to git (visible diffs in PRs, easier debugging)
+- Comment headers clearly mark files as "DO NOT EDIT MANUALLY"
+
+### Adding New Configuration Values
+
+**Example: Adding a new timeout value**
+
+1. Add constant to `config/base/constants.env`:
+```bash
+NGINX_PROXY_TIMEOUT_NEW=120s
+```
+
+2. Use in template `config/base/nginx.conf.template`:
+```nginx
+proxy_timeout {{NGINX_PROXY_TIMEOUT_NEW}};
+```
+
+3. (Optional) Override for specific environment in `config/environments/gcp/overrides.env`:
+```bash
+NGINX_PROXY_TIMEOUT_NEW=60s  # Shorter timeout for GCP
+```
+
+4. Commit changes - pre-commit hook regenerates configs automatically
+
+### Why This Matters
+
+**Problem Solved:**
+- **EAGAIN Bug Root Cause:** GCP nginx config had hardcoded `proxy_pass http://goud_node1:8080` while local used hash-based routing. Manual edits caused drift.
+- **Magic Number Sprawl:** Timeouts, ports, memory limits scattered across multiple files
+- **Copy-Paste Errors:** 85% duplication between nginx.local.conf and nginx.gcp.conf
+- **Merge Conflicts:** Hard to track what actually differs between environments
+
+**Benefits:**
+- **Single Source of Truth:** Change a port in one place, affects all generated configs
+- **Environment Comparison:** Easy to see differences (just diff the override files)
+- **No Configuration Drift:** Templates enforce consistency
+- **Pre-commit Validation:** Can't commit template changes without regenerating configs
+- **Audit Trail:** Git history shows what values changed and when
+
+**Development Workflow:**
+1. Edit templates or constants (source of truth)
+2. Commit → Pre-commit hook regenerates and stages configs
+3. Deploy → Scripts regenerate on target environment
+4. Zero manual config editing required
+
+**Best Practices:**
+- Never edit generated files directly (changes will be lost)
+- Always add new values to `constants.env` first
+- Use descriptive constant names (NGINX_PROXY_READ_TIMEOUT not TIMEOUT_1)
+- Document non-obvious values with inline comments in constants.env
+- When in doubt, regenerate: `./config/scripts/generate-configs.sh all`

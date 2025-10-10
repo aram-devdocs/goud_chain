@@ -456,6 +456,10 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
     if [ -z "$NGINX_EXISTS" ] || [ -z "$NODE1_EXISTS" ] || [ -z "$NODE2_EXISTS" ]; then
         echo "Initial deployment or missing containers detected, starting all services..."
 
+        # Generate GCP configs from templates
+        echo "📋 Generating GCP configs from templates..."
+        sudo bash /opt/goud-chain/config/scripts/generate-configs.sh gcp
+
         # Clean start - remove any corrupted metadata
         sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
         sudo docker system prune -f 2>/dev/null || true
@@ -468,6 +472,10 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
         echo "✅ Initial deployment complete"
     else
         echo "Existing deployment detected, performing rolling update..."
+
+        # Generate GCP configs from templates (updates may have changed templates)
+        echo "📋 Generating GCP configs from templates..."
+        sudo bash /opt/goud-chain/config/scripts/generate-configs.sh gcp
 
         # Update NGINX config manually to avoid docker-compose ContainerConfig bug
         echo "Checking NGINX configuration..."

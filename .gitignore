@@ -30,6 +30,15 @@ logs/
 # Docker
 docker-compose.override.yml
 
+# Generated configuration files
+# These are auto-generated from config/ templates
+# DO NOT EDIT - managed by config/scripts/generate-configs.sh
+# We commit them to see diffs in PRs and for easier debugging
+# nginx/nginx.local.conf
+# nginx/nginx.gcp.conf
+# docker-compose.local.yml
+# docker-compose.gcp.yml
+
 # Node (for dashboard)
 dashboard/node_modules/
 dashboard/package-lock.json
