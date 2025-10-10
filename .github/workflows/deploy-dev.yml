@@ -201,6 +201,8 @@ jobs:
             # Clone or update repository
             if [ -d .git ]; then
               echo "Updating existing repository..."
+              # Reset generated configs (they'll be regenerated after pull)
+              git reset --hard HEAD
               git pull origin main
             else
               echo "Cloning repository..."
