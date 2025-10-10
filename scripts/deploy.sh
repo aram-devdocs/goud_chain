@@ -464,11 +464,98 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
         sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
         sudo docker system prune -f 2>/dev/null || true
 
-        # Build images
-        sudo docker-compose -f docker-compose.gcp.yml build
+        # Ensure goud_network exists (avoiding docker-compose project name prefix)
+        sudo docker network create goud_network 2>/dev/null || true
 
-        # Start all services
-        sudo docker-compose -f docker-compose.gcp.yml up -d
+        # Load or build images
+        if [ -f /tmp/node.tar.gz ]; then
+            echo "Loading node image..."
+            sudo docker load < /tmp/node.tar.gz
+        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
+            echo "Pulling pre-built node image from ghcr.io..."
+            sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest 2>/dev/null || sudo docker-compose -f docker-compose.gcp.yml build node1
+            sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest 2>/dev/null || true
+        else
+            echo "Building images..."
+            sudo docker-compose -f docker-compose.gcp.yml build
+        fi
+
+        if [ -f /tmp/dashboard.tar.gz ]; then
+            echo "Loading dashboard image..."
+            sudo docker load < /tmp/dashboard.tar.gz
+        elif [ -n "$USE_PREBUILT_IMAGES" ] && [ "$USE_PREBUILT_IMAGES" = "true" ]; then
+            echo "Pulling pre-built dashboard image from ghcr.io..."
+            sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest 2>/dev/null || sudo docker-compose -f docker-compose.gcp.yml build dashboard
+            sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest 2>/dev/null || true
+        fi
+
+        # Start nodes manually to ensure correct network
+        echo "Starting node1..."
+        sudo docker run -d \
+            --name goud_node1 \
+            --network goud_network \
+            -p 8081:8080 \
+            -p 9001:9000 \
+            -v node1_data:/data \
+            -e NODE_ID=node1 \
+            -e HTTP_PORT=8080 \
+            -e P2P_PORT=9000 \
+            -e PEERS=goud_node2:9000 \
+            -e NODE1_ADDR=goud_node1:8080 \
+            -e NODE2_ADDR=goud_node2:8080 \
+            --restart unless-stopped \
+            --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=30s \
+            goud-chain:latest
+
+        echo "Starting node2..."
+        sudo docker run -d \
+            --name goud_node2 \
+            --network goud_network \
+            -p 8082:8080 \
+            -p 9002:9000 \
+            -v node2_data:/data \
+            -e NODE_ID=node2 \
+            -e HTTP_PORT=8080 \
+            -e P2P_PORT=9000 \
+            -e PEERS=goud_node1:9000 \
+            -e NODE1_ADDR=goud_node1:8080 \
+            -e NODE2_ADDR=goud_node2:8080 \
+            --restart unless-stopped \
+            --health-cmd='curl -f http://localhost:8080/health || exit 1' \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=30s \
+            goud-chain:latest
+
+        echo "Starting nginx load balancer..."
+        sudo docker run -d \
+            --name goud_nginx_lb \
+            --network goud_network \
+            -p 80:80 \
+            -p 8080:8080 \
+            -v /opt/goud-chain/nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro \
+            -v /opt/goud-chain/nginx/cors.conf:/etc/nginx/cors.conf:ro \
+            --restart unless-stopped \
+            --health-cmd='wget --quiet --tries=1 --spider http://localhost:8080/lb/health || exit 1' \
+            --health-interval=30s \
+            --health-timeout=10s \
+            --health-retries=3 \
+            --health-start-period=10s \
+            nginx:alpine
+
+        echo "Starting dashboard..."
+        sudo docker run -d \
+            --name goud_dashboard \
+            --network goud_network \
+            -p 3000:8080 \
+            --restart unless-stopped \
+            goud-chain-dashboard:latest
+
         echo "✅ Initial deployment complete"
     else
         echo "Existing deployment detected, performing rolling update..."
@@ -477,16 +564,47 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
         echo "📋 Generating GCP configs from templates..."
         sudo bash /opt/goud-chain/config/scripts/generate-configs.sh gcp
 
-        # Update NGINX config manually to avoid docker-compose ContainerConfig bug
-        echo "Checking NGINX configuration..."
-        if sudo docker exec goud_nginx_lb nginx -t 2>/dev/null; then
-            echo "✅ NGINX config is valid"
+        # Update NGINX: Recreate container to ensure correct network attachment
+        # (docker restart doesn't migrate to new networks, causing DNS failures)
+        echo "Updating NGINX load balancer..."
+
+        # Check if nginx is healthy and on correct network
+        NGINX_NETWORK=$(sudo docker inspect goud_nginx_lb --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null || echo "none")
+        NGINX_HEALTHY=$(sudo docker inspect --format='{{.State.Health.Status}}' goud_nginx_lb 2>/dev/null || echo "none")
+
+        if [ "$NGINX_NETWORK" = "goud_network" ] && [ "$NGINX_HEALTHY" = "healthy" ]; then
+            echo "✅ NGINX is healthy and on correct network"
+            # Just reload config without recreating
+            sudo docker exec goud_nginx_lb nginx -s reload 2>/dev/null || echo "⚠️  Config reload failed, but container is healthy"
         else
-            echo "⚠️  NGINX config needs update, reloading..."
-            sudo docker exec goud_nginx_lb nginx -s reload 2>/dev/null || {
-                echo "NGINX reload failed, restarting container..."
-                sudo docker restart goud_nginx_lb
-            }
+            echo "⚠️  NGINX needs recreation (network: $NGINX_NETWORK, health: $NGINX_HEALTHY)"
+
+            # Stop and remove old container
+            sudo docker stop goud_nginx_lb 2>/dev/null || true
+            sudo docker rm goud_nginx_lb 2>/dev/null || true
+
+            # Recreate on correct network with updated config
+            sudo docker run -d \
+                --name goud_nginx_lb \
+                --network goud_network \
+                -p 80:80 \
+                -p 8080:8080 \
+                -v /opt/goud-chain/nginx/nginx.gcp.conf:/etc/nginx/nginx.conf:ro \
+                -v /opt/goud-chain/nginx/cors.conf:/etc/nginx/cors.conf:ro \
+                --restart unless-stopped \
+                --health-cmd='wget --quiet --tries=1 --spider http://localhost:8080/lb/health || exit 1' \
+                --health-interval=30s \
+                --health-timeout=10s \
+                --health-retries=3 \
+                --health-start-period=10s \
+                nginx:alpine
+
+            # Wait for nginx to become healthy
+            if wait_for_health goud_nginx_lb; then
+                echo "✅ NGINX updated successfully"
+            else
+                echo "⚠️  NGINX health check failed, but continuing (may recover)"
+            fi
         fi
 
         # Rolling update: node2 first (node1 continues serving traffic)
