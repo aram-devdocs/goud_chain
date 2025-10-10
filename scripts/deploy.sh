@@ -363,6 +363,10 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
             sudo docker build -t goud-chain:latest .
         fi
 
+        # Convert service names to container names for Docker network DNS
+        # (docker run uses container names for DNS, not service names like docker-compose)
+        local peers_gcp=$(echo "${peers}" | sed 's/\bnode1\b/goud_node1/g; s/\bnode2\b/goud_node2/g; s/\bnode3\b/goud_node3/g')
+
         # Start new container alongside old one (temporary port)
         echo "Starting new ${node_name} container..."
         sudo docker run -d \
@@ -372,7 +376,7 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
             -e NODE_ID=${node_name} \
             -e HTTP_PORT=8080 \
             -e P2P_PORT=9000 \
-            -e PEERS=${peers} \
+            -e PEERS=${peers_gcp} \
             --health-cmd='curl -f http://localhost:8080/health || exit 1' \
             --health-interval=30s \
             --health-timeout=10s \
@@ -405,7 +409,7 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
                 -e NODE_ID=${node_name} \
                 -e HTTP_PORT=8080 \
                 -e P2P_PORT=9000 \
-                -e PEERS=${peers} \
+                -e PEERS=${peers_gcp} \
                 -e NODE1_ADDR=goud_node1:8080 \
                 -e NODE2_ADDR=goud_node2:8080 \
                 --health-cmd='curl -f http://localhost:8080/health || exit 1' \
