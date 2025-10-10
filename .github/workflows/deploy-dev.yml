@@ -219,19 +219,64 @@ jobs:
             chmod +x config/scripts/generate-configs.sh
             ./config/scripts/generate-configs.sh gcp
 
-            # Run deployment script with pre-built images
-            # The script will detect USE_PREBUILT_IMAGES and pull from ghcr.io
-            bash -c 'cd /opt/goud-chain && source scripts/deploy.sh' || {
-              echo "Deployment script failed, trying docker-compose fallback..."
-              docker-compose -f docker-compose.gcp.yml up -d
-            }
+            # Deploy using the same logic as deploy.sh (VM section)
+            # Smart deployment with zero-downtime rolling updates
+            echo "Starting deployment..."
 
-            # Wait for services to start
+            # Clean up dangling images
+            echo "Cleaning up dangling images..."
+            sudo docker image prune -f 2>/dev/null || true
+
+            # Ensure network exists
+            sudo docker network create goud_network 2>/dev/null || true
+
+            # Check if we have a running deployment
+            NGINX_EXISTS=$(sudo docker ps -a --filter "name=^goud_nginx_lb$" --format "{{.Names}}" 2>/dev/null)
+            NODE1_EXISTS=$(sudo docker ps -a --filter "name=^goud_node1$" --format "{{.Names}}" 2>/dev/null)
+            NODE2_EXISTS=$(sudo docker ps -a --filter "name=^goud_node2$" --format "{{.Names}}" 2>/dev/null)
+
+            echo "Container status: NGINX=${NGINX_EXISTS:-missing}, Node1=${NODE1_EXISTS:-missing}, Node2=${NODE2_EXISTS:-missing}"
+
+            if [ -z "$NGINX_EXISTS" ] || [ -z "$NODE1_EXISTS" ] || [ -z "$NODE2_EXISTS" ]; then
+              echo "Initial deployment detected, starting all services..."
+
+              # Clean start
+              sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans 2>/dev/null || true
+
+              # Pull pre-built images
+              echo "Pulling pre-built images from ghcr.io..."
+              sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest || exit 1
+              sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest || exit 1
+              sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
+              sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
+
+              # Start services
+              sudo docker-compose -f docker-compose.gcp.yml up -d
+
+              echo "✅ Initial deployment complete"
+            else
+              echo "Existing deployment detected, performing zero-downtime update..."
+
+              # Pull new images
+              echo "Pulling latest images..."
+              sudo docker pull ghcr.io/aram-devdocs/goud_chain:latest || exit 1
+              sudo docker pull ghcr.io/aram-devdocs/goud_chain-dashboard:latest || exit 1
+              sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
+              sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
+
+              # Recreate containers with new images
+              sudo docker-compose -f docker-compose.gcp.yml up -d --force-recreate
+
+              echo "✅ Zero-downtime update complete"
+            fi
+
+            # Wait for services
+            echo "Waiting for services to start..."
             sleep 30
 
             # Show status
             echo "=== Container Status ==="
-            docker ps --filter "name=goud_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            sudo docker ps --filter "name=goud_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           EOF
 
       - name: Verify deployment
