@@ -1,5 +1,6 @@
 # Docker Compose for Goud Chain on Google Cloud Platform e2-micro (1GB RAM)
-# Optimized for single-VM deployment with 2 blockchain nodes
+# Writer/Reader architecture: node1 (writer 320M), node2 (reader 160M)
+# Conservative allocation with 150M safety margin for OS + Docker
 #
 # Usage:
 #   docker-compose -f docker-compose.gcp.yml up -d
@@ -23,11 +24,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.15'
-          memory: 64M
+          cpus: '0.10'
+          memory: 32M
         reservations:
           cpus: '0.05'
-          memory: 32M
+          memory: 24M
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/lb/health"]
       interval: 30s
@@ -53,11 +54,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.15'
-          memory: 128M
+          cpus: '0.10'
+          memory: 64M
         reservations:
           cpus: '0.05'
-          memory: 64M
+          memory: 48M
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
       interval: 30s
@@ -70,7 +71,7 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # Blockchain Node 1
+  # Blockchain Node 1 - PRIMARY WRITER (handles all write operations)
   node1:
     image: goud-chain:latest
     build:
@@ -81,7 +82,7 @@ services:
       - NODE_ID=node1
       - HTTP_PORT=8080
       - P2P_PORT=9000
-      - PEERS=node2:9000
+      - PEERS=goud_node2:9000
     ports:
       - "8081:8080"
       - "9001:9000"
@@ -93,11 +94,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.35'
-          memory: 384M
+          cpus: '0.50'
+          memory: 320M
         reservations:
-          cpus: '0.2'
-          memory: 256M
+          cpus: '0.25'
+          memory: 288M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -110,7 +111,7 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # Blockchain Node 2
+  # Blockchain Node 2 - PASSIVE READER (read-only, syncs via P2P)
   node2:
     image: goud-chain:latest
     build:
@@ -121,7 +122,7 @@ services:
       - NODE_ID=node2
       - HTTP_PORT=8080
       - P2P_PORT=9000
-      - PEERS=node1:9000
+      - PEERS=goud_node1:9000
     ports:
       - "8082:8080"
       - "9002:9000"
@@ -133,11 +134,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.35'
-          memory: 384M
+          cpus: '0.30'
+          memory: 160M
         reservations:
-          cpus: '0.2'
-          memory: 256M
+          cpus: '0.15'
+          memory: 128M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
