@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::net::TcpStream;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::types::{GoudChainError, Result};
 
@@ -27,19 +27,102 @@ pub fn forward_request_to_node(
         target_node.to_string()
     };
 
-    // Connect to target node
-    let mut stream = TcpStream::connect(&target_addr).map_err(|e| {
-        GoudChainError::PeerConnectionFailed(format!("Failed to connect to {}: {}", target_addr, e))
-    })?;
+    // Retry logic for connection with exponential backoff
+    const MAX_RETRIES: u32 = 3;
+    const INITIAL_BACKOFF_MS: u64 = 50;
 
-    // Set timeouts
-    stream
-        .set_read_timeout(Some(Duration::from_secs(30)))
-        .map_err(GoudChainError::IoError)?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(10)))
-        .map_err(GoudChainError::IoError)?;
+    let mut last_error = None;
 
+    for attempt in 0..MAX_RETRIES {
+        if attempt > 0 {
+            let backoff = INITIAL_BACKOFF_MS * 2_u64.pow(attempt - 1);
+            warn!(
+                attempt = attempt + 1,
+                backoff_ms = backoff,
+                "Retrying connection after EAGAIN error"
+            );
+            std::thread::sleep(Duration::from_millis(backoff));
+        }
+
+        match TcpStream::connect(&target_addr) {
+            Ok(stream) => {
+                // Explicitly ensure blocking mode (default, but be explicit)
+                if let Err(e) = stream.set_nonblocking(false) {
+                    warn!(error = %e, "Failed to set blocking mode, continuing anyway");
+                }
+
+                // Set timeouts
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(30)))
+                    .map_err(GoudChainError::IoError)?;
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(10)))
+                    .map_err(GoudChainError::IoError)?;
+
+                // Set TCP options for better reliability
+                #[cfg(unix)]
+                {
+                    use std::os::unix::io::AsRawFd;
+                    let fd = stream.as_raw_fd();
+
+                    // Enable TCP_NODELAY to disable Nagle's algorithm (reduce latency)
+                    unsafe {
+                        let flag: libc::c_int = 1;
+                        libc::setsockopt(
+                            fd,
+                            libc::IPPROTO_TCP,
+                            libc::TCP_NODELAY,
+                            &flag as *const _ as *const libc::c_void,
+                            std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+                        );
+                    }
+                }
+
+                return perform_http_request(
+                    stream,
+                    method,
+                    path,
+                    body,
+                    content_type,
+                    &target_addr,
+                );
+            }
+            Err(e) => {
+                // Check if error is EAGAIN (Resource temporarily unavailable)
+                if e.kind() == std::io::ErrorKind::WouldBlock || e.raw_os_error() == Some(11)
+                // EAGAIN on Unix
+                {
+                    last_error = Some(e);
+                    continue;
+                }
+
+                // For other errors, fail immediately
+                return Err(GoudChainError::PeerConnectionFailed(format!(
+                    "Failed to connect to {}: {}",
+                    target_addr, e
+                )));
+            }
+        }
+    }
+
+    // All retries exhausted
+    Err(GoudChainError::PeerConnectionFailed(format!(
+        "Failed to connect to {} after {} retries: {}",
+        target_addr,
+        MAX_RETRIES,
+        last_error.unwrap()
+    )))
+}
+
+/// Perform the actual HTTP request over an established TCP stream
+fn perform_http_request(
+    mut stream: TcpStream,
+    method: &str,
+    path: &str,
+    body: &str,
+    content_type: &str,
+    target_addr: &str,
+) -> Result<(u16, String)> {
     // Build HTTP request
     let request = format!(
         "{} {} HTTP/1.1\r\n\

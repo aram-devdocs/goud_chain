@@ -22,6 +22,7 @@ thiserror = "2.0"  # For custom error types
 tracing = "0.1"  # For structured logging
 tracing-subscriber = "0.3"  # For logging initialization
 jsonwebtoken = "9.3.1"
+libc = "0.2"  # For low-level TCP socket options
 
 # Pin to avoid edition2024 requirement
 [dependencies.base64ct]

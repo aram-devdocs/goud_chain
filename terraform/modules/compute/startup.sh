@@ -47,6 +47,23 @@ apt-get remove -y docker-compose || true
 echo "Adding ubuntu user to docker group..."
 usermod -aG docker ubuntu
 
+# Optimize kernel TCP settings for inter-container communication
+echo "Tuning kernel TCP parameters..."
+sysctl -w net.core.somaxconn=8192
+sysctl -w net.ipv4.tcp_max_syn_backlog=512
+sysctl -w net.ipv4.tcp_fin_timeout=30
+sysctl -w net.core.netdev_max_backlog=2000
+
+# Make TCP tuning persistent across reboots
+cat >> /etc/sysctl.conf << EOF
+
+# Goud Chain TCP optimizations for blockchain P2P
+net.core.somaxconn=8192
+net.ipv4.tcp_max_syn_backlog=512
+net.ipv4.tcp_fin_timeout=30
+net.core.netdev_max_backlog=2000
+EOF
+
 # Create data directory for blockchain storage
 echo "Creating data directory..."
 mkdir -p /data
