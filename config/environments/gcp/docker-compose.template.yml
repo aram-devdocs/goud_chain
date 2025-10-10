@@ -53,6 +53,8 @@ services:
       - HTTP_PORT={{HTTP_PORT}}
       - P2P_PORT={{P2P_PORT}}
       - PEERS={{NODE2_HOSTNAME}}:{{P2P_PORT}}
+      - NODE1_ADDR={{NODE1_HOSTNAME}}:{{HTTP_PORT}}
+      - NODE2_ADDR={{NODE2_HOSTNAME}}:{{HTTP_PORT}}
     ports:
       - "{{NODE1_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
       - "{{NODE1_P2P_EXTERNAL}}:{{P2P_PORT}}"
@@ -76,6 +78,8 @@ services:
       - HTTP_PORT={{HTTP_PORT}}
       - P2P_PORT={{P2P_PORT}}
       - PEERS={{NODE1_HOSTNAME}}:{{P2P_PORT}}
+      - NODE1_ADDR={{NODE1_HOSTNAME}}:{{HTTP_PORT}}
+      - NODE2_ADDR={{NODE2_HOSTNAME}}:{{HTTP_PORT}}
     ports:
       - "{{NODE2_HTTP_EXTERNAL}}:{{HTTP_PORT}}"
       - "{{NODE2_P2P_EXTERNAL}}:{{P2P_PORT}}"

@@ -1,6 +1,6 @@
 # Docker Compose for Goud Chain - Local Development (3-node setup)
 # Generated from template - DO NOT EDIT MANUALLY
-# Generated: 2025-10-10 15:37:49 UTC
+# Generated: 2025-10-10 16:19:05 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.local.yml up -d
@@ -101,6 +101,9 @@ services:
       - HTTP_PORT=8080
       - P2P_PORT=9000
       - PEERS=node2:9000,node3:9000
+      - NODE1_ADDR=node1:8080
+      - NODE2_ADDR=node2:8080
+      - NODE3_ADDR=node3:8080
     ports:
       - "8081:8080"
       - "9001:9000"
@@ -124,6 +127,9 @@ services:
       - HTTP_PORT=8080
       - P2P_PORT=9000
       - PEERS=node1:9000,node3:9000
+      - NODE1_ADDR=node1:8080
+      - NODE2_ADDR=node2:8080
+      - NODE3_ADDR=node3:8080
     ports:
       - "8082:8080"
       - "9002:9000"
@@ -147,6 +153,9 @@ services:
       - HTTP_PORT=8080
       - P2P_PORT=9000
       - PEERS=node1:9000,node2:9000
+      - NODE1_ADDR=node1:8080
+      - NODE2_ADDR=node2:8080
+      - NODE3_ADDR=node3:8080
     ports:
       - "8083:8080"
       - "9003:9000"

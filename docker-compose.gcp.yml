@@ -2,7 +2,7 @@
 # Generated from template - DO NOT EDIT MANUALLY
 # Writer/Reader architecture: node1 (writer), node2 (reader)
 # Conservative allocation with 150M safety margin for OS + Docker
-# Generated: 2025-10-10 15:37:08 UTC
+# Generated: 2025-10-10 16:19:05 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.gcp.yml up -d
@@ -104,6 +104,8 @@ services:
       - HTTP_PORT=8080
       - P2P_PORT=9000
       - PEERS=goud_node2:9000
+      - NODE1_ADDR=goud_node1:8080
+      - NODE2_ADDR=goud_node2:8080
     ports:
       - "8081:8080"
       - "9001:9000"
@@ -127,6 +129,8 @@ services:
       - HTTP_PORT=8080
       - P2P_PORT=9000
       - PEERS=goud_node1:9000
+      - NODE1_ADDR=goud_node1:8080
+      - NODE2_ADDR=goud_node2:8080
     ports:
       - "8082:8080"
       - "9002:9000"
