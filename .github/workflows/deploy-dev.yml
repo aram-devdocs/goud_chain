@@ -255,7 +255,7 @@ jobs:
 
               echo "✅ Initial deployment complete"
             else
-              echo "Existing deployment detected, performing zero-downtime update..."
+              echo "Existing deployment detected, performing update..."
 
               # Pull new images
               echo "Pulling latest images..."
@@ -264,10 +264,15 @@ jobs:
               sudo docker tag ghcr.io/aram-devdocs/goud_chain:latest goud-chain:latest
               sudo docker tag ghcr.io/aram-devdocs/goud_chain-dashboard:latest goud-chain-dashboard:latest
 
-              # Recreate containers with new images
-              sudo docker-compose -f docker-compose.gcp.yml up -d --force-recreate
+              # Stop and remove old containers
+              echo "Stopping old containers..."
+              sudo docker-compose -f docker-compose.gcp.yml down --remove-orphans
 
-              echo "✅ Zero-downtime update complete"
+              # Start with new images
+              echo "Starting updated containers..."
+              sudo docker-compose -f docker-compose.gcp.yml up -d
+
+              echo "✅ Update complete"
             fi
 
             # Wait for services
