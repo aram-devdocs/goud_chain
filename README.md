@@ -67,12 +67,16 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 
 **🌐 Dashboard:** [http://localhost:3000](http://localhost:3000)
 
+**📓 Jupyter Lab (dev mode only):** [http://localhost:8888](http://localhost:8888)
+
 **📡 Individual Nodes (for debugging):**
 - Node 1: http://localhost:8081
 - Node 2: http://localhost:8082
 - Node 3: http://localhost:8083
 
 > **Note:** Always use the load balancer endpoint (`http://localhost:8080`) for all API calls. It provides automatic failover and intelligent routing.
+>
+> **Note:** Jupyter Lab is **only available in local development** (`./run dev`). It is not deployed to GCP.
 
 ## Architecture
 

@@ -53,6 +53,12 @@ jobs:
 
       - name: Create Terraform variables file
         run: |
+          # Pre-process values for Terraform (functions not allowed in .tfvars)
+          REPOSITORY_SAFE="${{ github.repository }}"
+          REPOSITORY_SAFE="${REPOSITORY_SAFE//\//_}"
+          COMMIT_SHORT="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_SHORT:0:8}"
+
           cat > terraform.tfvars <<EOF
           # GCP Configuration
           project_id    = "${{ secrets.GCP_PROJECT_ID }}"
@@ -83,16 +89,15 @@ jobs:
           enable_cloudflare_proxy = true
           dashboard_subdomain     = "dashboard"
           api_subdomain           = "api"
-          notebook_subdomain      = "notebook"
 
           # Tags (GCP labels: lowercase, numbers, underscores, dashes only)
           tags = {
             project     = "goud-chain"
             environment = "dev"
             managed_by  = "github-actions"
-            repository  = replace("${{ github.repository }}", "/", "_")
+            repository  = "${REPOSITORY_SAFE}"
             deployed_by = "${{ github.actor }}"
-            commit_sha  = substr("${{ github.sha }}", 0, 8)
+            commit_sha  = "${COMMIT_SHORT}"
           }
           EOF
 
@@ -116,7 +121,6 @@ jobs:
           echo "instance_ip=$(terraform output -raw instance_public_ip)" >> $GITHUB_OUTPUT
           echo "load_balancer_url=$(terraform output -raw load_balancer_url)" >> $GITHUB_OUTPUT
           echo "dashboard_url=$(terraform output -raw dashboard_url)" >> $GITHUB_OUTPUT
-          echo "notebook_url=$(terraform output -raw notebook_url)" >> $GITHUB_OUTPUT
 
       - name: Save outputs as artifact
         uses: actions/upload-artifact@v4
@@ -130,7 +134,6 @@ jobs:
       instance_ip: ${{ steps.outputs.outputs.instance_ip }}
       load_balancer_url: ${{ steps.outputs.outputs.load_balancer_url }}
       dashboard_url: ${{ steps.outputs.outputs.dashboard_url }}
-      notebook_url: ${{ steps.outputs.outputs.notebook_url }}
 
   # Deploy Docker containers to GCP VM
   deploy-containers:
@@ -250,10 +253,6 @@ jobs:
           echo "Testing dashboard..."
           curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:3000 || exit 1
 
-          # Check Jupyter Notebook
-          echo "Testing Jupyter..."
-          curl -f http://${{ needs.terraform-deploy.outputs.instance_ip }}:8888 || echo "⚠️  Jupyter not responding (may require token)"
-
           echo "✅ All health checks passed!"
 
   # Post-deployment notifications and status check
@@ -288,5 +287,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🚀 API Endpoint: ${{ needs.terraform-deploy.outputs.load_balancer_url }}" >> $GITHUB_STEP_SUMMARY
           echo "🌐 Dashboard: ${{ needs.terraform-deploy.outputs.dashboard_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "📓 Jupyter Lab: ${{ needs.terraform-deploy.outputs.notebook_url }}" >> $GITHUB_STEP_SUMMARY
           echo "📡 Direct IP: http://${{ needs.terraform-deploy.outputs.instance_ip }}:8080" >> $GITHUB_STEP_SUMMARY
