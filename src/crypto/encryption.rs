@@ -1,4 +1,3 @@
-use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -25,8 +24,7 @@ pub fn encrypt_data_with_nonce(
     encryption_key: &[u8; AES_KEY_SIZE_BYTES],
     nonce_bytes: &[u8; NONCE_SIZE_BYTES],
 ) -> Result<(String, String)> {
-    let key = GenericArray::from_slice(encryption_key);
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new(encryption_key.into());
     let nonce = Nonce::from_slice(nonce_bytes);
 
     // Encrypt
@@ -49,8 +47,7 @@ pub fn decrypt_data_with_key(
     encrypted_payload: &str,
     encryption_key: &[u8; AES_KEY_SIZE_BYTES],
 ) -> Result<String> {
-    let key = GenericArray::from_slice(encryption_key);
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new(encryption_key.into());
 
     // Decode base64
     let combined = general_purpose::STANDARD

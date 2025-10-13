@@ -48,7 +48,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
-    librocksdb6.11 \
+    librocksdb6.11t64 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder
