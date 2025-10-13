@@ -125,10 +125,10 @@ pub fn handle_create_account(
                                     #[allow(unknown_lints)]
                                     #[allow(clippy::manual_is_multiple_of)]
                                     if block.index % CHECKPOINT_INTERVAL == 0 {
-                                        if let Err(e) = p2p.blockchain_store.save_checkpoint(
-                                            block.index,
-                                            &block.hash,
-                                        ) {
+                                        if let Err(e) = p2p
+                                            .blockchain_store
+                                            .save_checkpoint(block.index, &block.hash)
+                                        {
                                             error!(error = %e, "Failed to save checkpoint");
                                         }
                                     }

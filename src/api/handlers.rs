@@ -161,11 +161,7 @@ pub fn handle_get_current_validator(
 }
 
 /// Route and handle HTTP requests
-pub fn route_request(
-    request: Request,
-    blockchain: Arc<Mutex<Blockchain>>,
-    p2p: Arc<P2PNode>,
-) {
+pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: Arc<P2PNode>) {
     let method = request.method().clone();
     let url = request.url().to_string();
 

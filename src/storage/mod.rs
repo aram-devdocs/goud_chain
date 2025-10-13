@@ -118,7 +118,8 @@ fn check_json_migration(
                         warn!(error = %e, "Failed to delete corrupted JSON file");
                     }
 
-                    let blockchain = Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+                    let blockchain =
+                        Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
                     store.save_metadata(node_id, SCHEMA_VERSION)?;
                     Ok(blockchain)
                 }

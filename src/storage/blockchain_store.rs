@@ -108,7 +108,10 @@ impl BlockchainStore {
             }
         };
 
-        info!(chain_length = chain_length, "Loading blockchain from RocksDB");
+        info!(
+            chain_length = chain_length,
+            "Loading blockchain from RocksDB"
+        );
 
         // Load all blocks
         let mut chain = Vec::with_capacity(chain_length as usize);
@@ -330,9 +333,7 @@ mod tests {
         let store = create_test_store();
         store.clear_all().unwrap();
 
-        store
-            .save_metadata("node1", "v6_rocksdb")
-            .unwrap();
+        store.save_metadata("node1", "v6_rocksdb").unwrap();
 
         let (node_id, schema_version) = store.load_metadata().unwrap();
         assert_eq!(node_id, "node1");
