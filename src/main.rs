@@ -14,7 +14,7 @@ use tracing::{error, info};
 use api::{create_preflight_response, route_request};
 use config::Config;
 use network::P2PNode;
-use storage::{init_data_directory, load_blockchain, RocksDbStore};
+use storage::{init_data_directory, load_blockchain, BlockchainStore};
 
 fn main() {
     // Initialize tracing
@@ -35,9 +35,21 @@ fn main() {
         std::process::exit(1);
     }
 
-    // Load or create blockchain
-    let blockchain = match load_blockchain(config.node_id.clone(), config.master_chain_key.clone())
-    {
+    // Initialize BlockchainStore for persistent blockchain storage
+    let blockchain_store = match BlockchainStore::new() {
+        Ok(store) => Arc::new(store),
+        Err(e) => {
+            error!(error = %e, "Failed to initialize BlockchainStore");
+            std::process::exit(1);
+        }
+    };
+
+    // Load or create blockchain from RocksDB
+    let blockchain = match load_blockchain(
+        config.node_id.clone(),
+        config.master_chain_key.clone(),
+        &blockchain_store,
+    ) {
         Ok(bc) => Arc::new(Mutex::new(bc)),
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");
@@ -45,20 +57,12 @@ fn main() {
         }
     };
 
-    // Initialize RocksDB (optional - graceful degradation if it fails)
-    let rocksdb = match RocksDbStore::new() {
-        Ok(db) => {
-            info!("RocksDB initialized successfully");
-            Some(Arc::new(db))
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to initialize RocksDB - KV endpoints will be unavailable");
-            None
-        }
-    };
-
     // Start P2P node
-    let p2p_node = P2PNode::new(Arc::clone(&blockchain), config.peers.clone());
+    let p2p_node = P2PNode::new(
+        Arc::clone(&blockchain),
+        Arc::clone(&blockchain_store),
+        config.peers.clone(),
+    );
     p2p_node.start_p2p_server(config.p2p_port);
 
     // Start continuous sync task (initial sync happens in background)
@@ -80,25 +84,19 @@ fn main() {
     info!("   Node ID: {}", config.node_id);
     info!("   HTTP API: http://{}", config.http_bind_addr());
     info!("   P2P Port: {}", config.p2p_port);
+    info!("   Storage: RocksDB (high-performance embedded database)");
     info!("\n📊 Endpoints:");
     info!("   POST /data/submit      - Submit encrypted JSON data");
     info!("   GET  /data/list        - List all encrypted data");
     info!("   POST /data/decrypt     - Decrypt specific data with API key");
     info!("   GET  /chain            - View full blockchain");
     info!("   GET  /peers            - View peers");
-    info!("   GET  /sync             - Sync with peers");
-    info!("\n🔑 RocksDB Key-Value Store:");
-    info!("   POST   /kv/put         - Store key-value pair");
-    info!("   GET    /kv/get/:key    - Retrieve value by key");
-    info!("   DELETE /kv/delete/:key - Delete key");
-    info!("   GET    /kv/list        - List all keys");
-    info!("   GET    /kv/all         - List all key-value pairs\n");
+    info!("   GET  /sync             - Sync with peers\n");
 
     // Handle requests
     for request in server.incoming_requests() {
         let blockchain = Arc::clone(&blockchain);
         let p2p = Arc::clone(&p2p_clone);
-        let db = rocksdb.clone();
 
         // Handle OPTIONS preflight requests
         if request.method() == &Method::Options {
@@ -109,6 +107,6 @@ fn main() {
         }
 
         // Route and handle request
-        route_request(request, blockchain, p2p, db);
+        route_request(request, blockchain, p2p);
     }
 }

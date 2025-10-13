@@ -3,13 +3,9 @@ use tiny_http::{Method, Request, Response};
 
 use super::account_handlers::{handle_create_account, handle_login};
 use super::data_handlers::{handle_decrypt_data, handle_list_data, handle_submit_data};
-use super::kv_handlers::{
-    handle_kv_delete, handle_kv_get, handle_kv_list, handle_kv_list_all, handle_kv_put,
-};
 use super::middleware::{error_response, json_response};
 use crate::domain::Blockchain;
 use crate::network::P2PNode;
-use crate::storage::RocksDbStore;
 use crate::types::*;
 
 /// Handle GET /chain - View full blockchain
@@ -166,10 +162,9 @@ pub fn handle_get_current_validator(
 
 /// Route and handle HTTP requests
 pub fn route_request(
-    mut request: Request,
+    request: Request,
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
-    db: Option<Arc<RocksDbStore>>,
 ) {
     let method = request.method().clone();
     let url = request.url().to_string();
@@ -224,61 +219,6 @@ pub fn route_request(
         // ========== Validator Info (for load balancer routing) ==========
         (Method::Get, "/validator/current") => {
             let _ = request.respond(handle_get_current_validator(blockchain));
-        }
-
-        // ========== RocksDB Key-Value Store ==========
-        (Method::Post, "/kv/put") => {
-            if let Some(db) = db {
-                let response = handle_kv_put(&mut request, db);
-                let _ = request.respond(response);
-            } else {
-                let _ = request.respond(error_response(
-                    ErrorResponse::new("RocksDB not initialized").to_json(),
-                    503,
-                ));
-            }
-        }
-        (Method::Get, url) if url.starts_with("/kv/get/") => {
-            if let Some(db) = db {
-                let key = url.trim_start_matches("/kv/get/");
-                let _ = request.respond(handle_kv_get(key, db));
-            } else {
-                let _ = request.respond(error_response(
-                    ErrorResponse::new("RocksDB not initialized").to_json(),
-                    503,
-                ));
-            }
-        }
-        (Method::Delete, url) if url.starts_with("/kv/delete/") => {
-            if let Some(db) = db {
-                let key = url.trim_start_matches("/kv/delete/");
-                let _ = request.respond(handle_kv_delete(key, db));
-            } else {
-                let _ = request.respond(error_response(
-                    ErrorResponse::new("RocksDB not initialized").to_json(),
-                    503,
-                ));
-            }
-        }
-        (Method::Get, "/kv/list") => {
-            if let Some(db) = db {
-                let _ = request.respond(handle_kv_list(db));
-            } else {
-                let _ = request.respond(error_response(
-                    ErrorResponse::new("RocksDB not initialized").to_json(),
-                    503,
-                ));
-            }
-        }
-        (Method::Get, "/kv/all") => {
-            if let Some(db) = db {
-                let _ = request.respond(handle_kv_list_all(db));
-            } else {
-                let _ = request.respond(error_response(
-                    ErrorResponse::new("RocksDB not initialized").to_json(),
-                    503,
-                ));
-            }
         }
 
         _ => {

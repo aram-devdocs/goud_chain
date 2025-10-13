@@ -5,12 +5,11 @@ use tracing::{error, info, warn};
 use super::auth::{generate_session_token, verify_api_key_hash};
 use super::internal_client::{forward_request_to_node, get_validator_node_address};
 use super::middleware::{error_response, json_response};
-use crate::constants::SESSION_EXPIRY_SECONDS;
+use crate::constants::{CHECKPOINT_INTERVAL, SESSION_EXPIRY_SECONDS};
 use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key};
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, UserAccount};
 use crate::network::P2PNode;
-use crate::storage;
 use crate::types::*;
 
 /// Handle POST /account/create - Create a new user account
@@ -117,9 +116,23 @@ pub fn handle_create_account(
                             // Create block
                             match blockchain_guard.add_block() {
                                 Ok(block) => {
-                                    if let Err(e) = storage::save_blockchain(&blockchain_guard) {
-                                        error!(error = %e, "Failed to save blockchain");
+                                    // Save block to RocksDB (incremental write)
+                                    if let Err(e) = p2p.blockchain_store.save_block(&block) {
+                                        error!(error = %e, "Failed to save block to RocksDB");
                                     }
+
+                                    // Save checkpoint if needed
+                                    #[allow(unknown_lints)]
+                                    #[allow(clippy::manual_is_multiple_of)]
+                                    if block.index % CHECKPOINT_INTERVAL == 0 {
+                                        if let Err(e) = p2p.blockchain_store.save_checkpoint(
+                                            block.index,
+                                            &block.hash,
+                                        ) {
+                                            error!(error = %e, "Failed to save checkpoint");
+                                        }
+                                    }
+
                                     drop(blockchain_guard);
 
                                     // Broadcast to peers

@@ -2,10 +2,9 @@
 //! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
-pub const SCHEMA_VERSION: &str = "v5_deterministic_genesis";
+pub const SCHEMA_VERSION: &str = "v6_rocksdb_storage";
 
 // Storage paths
-pub const BLOCKCHAIN_FILE_PATH: &str = "/data/blockchain.json";
 pub const DATA_DIRECTORY: &str = "/data";
 pub const ROCKSDB_PATH: &str = "/data/rocksdb";
 

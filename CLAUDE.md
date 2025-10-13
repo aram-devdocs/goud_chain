@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Goud Chain is an encrypted blockchain with API key-based authentication using Proof of Authority (PoA) consensus. This is a proof-of-concept project demonstrating encrypted JSON storage on an immutable distributed ledger.
+Goud Chain is an encrypted blockchain with API key-based authentication using Proof of Authority (PoA) consensus. This is a proof-of-concept project demonstrating encrypted data storage on an immutable distributed ledger with high-performance RocksDB persistence.
 
 **Core Technologies:**
 - Rust for blockchain implementation
+- RocksDB for high-performance block storage (embedded key-value database)
 - AES-256-GCM for symmetric encryption
 - Ed25519 for digital signatures
 - SHA-256 for hashing (blocks, Merkle trees, API key derivation)
@@ -96,8 +97,9 @@ Entry Point             → Application startup and orchestration
      - Uses utilities for crypto/hashing but knows nothing about storage or networking
 
    - **Persistence (Layer 3):** Storage and retrieval
-     - File I/O, database operations
-     - Serialization/deserialization
+     - RocksDB for blockchain block storage (incremental writes, O(1) reads)
+     - Bincode serialization (faster than JSON)
+     - Schema: `block:{index}` → Block, `metadata:*` → Chain metadata
      - Uses business models to know what to store
 
    - **Infrastructure (Layer 4):** External communication
@@ -181,6 +183,22 @@ Entry Point             → Application startup and orchestration
 - Separate pending data from committed blocks
 - Maintain clear boundaries between in-memory and persistent state
 - Handle chain reorganization gracefully
+
+**Storage Architecture (RocksDB):**
+- **Incremental Writes:** New blocks written individually (O(1) vs O(n) for full JSON serialization)
+- **Fast Reads:** Block retrieval by index is O(1) with RocksDB key-value lookup
+- **Compression:** Snappy compression enabled (~50% disk space reduction)
+- **Schema Design:**
+  - `block:{index}` → Bincode-serialized Block
+  - `metadata:chain_length` → u64
+  - `metadata:schema_version` → String
+  - `checkpoint:{index}` → Block hash
+- **Migration:** Automatic JSON-to-RocksDB migration on first startup (legacy blockchain.json → RocksDB)
+- **Persistence Strategy:**
+  - Blocks saved immediately after creation (no batching)
+  - Checkpoints saved every 100 blocks
+  - In-memory blockchain loaded from RocksDB on startup
+  - Chain validation still requires full scan (security-critical)
 
 ### Security Best Practices
 

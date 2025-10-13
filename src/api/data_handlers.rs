@@ -6,10 +6,10 @@ use super::auth::{extract_auth, AuthMethod};
 use super::internal_client::{forward_request_with_headers, get_validator_node_address};
 use super::middleware::{error_response, json_response};
 use crate::crypto::hash_api_key;
+use crate::constants::CHECKPOINT_INTERVAL;
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, EncryptedCollection};
 use crate::network::P2PNode;
-use crate::storage;
 use crate::types::*;
 
 /// Handle POST /data/submit - Submit encrypted data (requires API key auth)
@@ -181,9 +181,23 @@ pub fn handle_submit_data(
                                     // Create block
                                     match blockchain.add_block() {
                                         Ok(block) => {
-                                            if let Err(e) = storage::save_blockchain(&blockchain) {
-                                                error!(error = %e, "Failed to save blockchain");
+                                            // Save block to RocksDB (incremental write)
+                                            if let Err(e) = p2p.blockchain_store.save_block(&block) {
+                                                error!(error = %e, "Failed to save block to RocksDB");
                                             }
+
+                                            // Save checkpoint if needed
+                                            #[allow(unknown_lints)]
+                                            #[allow(clippy::manual_is_multiple_of)]
+                                            if block.index % CHECKPOINT_INTERVAL == 0 {
+                                                if let Err(e) = p2p.blockchain_store.save_checkpoint(
+                                                    block.index,
+                                                    &block.hash,
+                                                ) {
+                                                    error!(error = %e, "Failed to save checkpoint");
+                                                }
+                                            }
+
                                             drop(blockchain);
 
                                             // Broadcast to peers

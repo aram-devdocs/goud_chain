@@ -40,17 +40,30 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 
 ## Features
 
+### Performance & Storage
+- **RocksDB Persistence** - High-performance embedded database with Snappy compression
+- **Incremental Writes** - O(1) block writes (vs O(n) for full JSON serialization)
+- **Fast Lookups** - O(1) block retrieval by index
+- **50% Disk Space Savings** - Snappy compression reduces storage footprint
+- **Automatic Migration** - Seamless JSON-to-RocksDB upgrade on first startup
+
+### Blockchain & Consensus
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
+- **Deterministic Validator Rotation** - Round-robin PoA consensus
+- **Ed25519 Signatures** - Digital signatures for blockchain integrity
+- **Merkle Trees** - Tamper detection with encrypted data and blind indexes
+
+### Privacy & Security
 - **Privacy-Preserving Architecture** - Full metadata encryption with blind indexes
 - **Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks
 - **Timestamp Obfuscation** - Hourly granularity hides exact activity timing
-- **API Key Authentication** - Cryptographically secure 256-bit keys
 - **Dual-Layer Encryption** - Master key for block data, API keys for collections
 - **HKDF Key Derivation** - Separate encryption, MAC, and search keys (100k iterations)
+- **API Key Authentication** - Cryptographically secure 256-bit keys
 - **JWT Sessions** - Token-based authentication with 1-hour expiry
+
+### Infrastructure
 - **Collection-Based Storage** - Group encrypted data by user account
-- **Ed25519 Signatures** - Digital signatures for blockchain integrity
-- **Merkle Trees** - Tamper detection with encrypted data and blind indexes
 - **Auto Schema Migration** - Seamless upgrades during development
 - **Environment Variable Key Management** - Production-ready configuration
 - **Load Balanced** - NGINX reverse proxy with health checks

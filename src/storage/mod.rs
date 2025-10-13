@@ -1,114 +1,135 @@
-pub mod rocksdb;
+pub mod blockchain_store;
 
 use std::fs;
-use std::io::Write;
 use tracing::{info, warn};
 
-use crate::constants::{BLOCKCHAIN_FILE_PATH, DATA_DIRECTORY, SCHEMA_VERSION};
+use crate::constants::{DATA_DIRECTORY, SCHEMA_VERSION};
 use crate::crypto::generate_signing_key;
 use crate::domain::Blockchain;
 use crate::types::{GoudChainError, Result};
 
-// Re-export RocksDB store
-pub use self::rocksdb::RocksDbStore;
+// Re-export storage modules
+pub use self::blockchain_store::BlockchainStore;
 
-/// Save the blockchain to disk
-pub fn save_blockchain(blockchain: &Blockchain) -> Result<()> {
-    let json = serde_json::to_string_pretty(blockchain)
-        .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
+/// Load the blockchain from RocksDB or create a new one
+/// Handles schema migration and JSON-to-RocksDB conversion automatically
+pub fn load_blockchain(
+    node_id: String,
+    master_chain_key: Vec<u8>,
+    store: &BlockchainStore,
+) -> Result<Blockchain> {
+    // Check if RocksDB has data
+    if !store.is_empty() {
+        info!("Loading blockchain from RocksDB");
 
-    let mut file = fs::File::create(BLOCKCHAIN_FILE_PATH)
-        .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
+        // Load metadata and check schema version
+        let (_stored_node_id, stored_schema) = store.load_metadata()?;
 
-    file.write_all(json.as_bytes())
-        .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
+        if stored_schema != SCHEMA_VERSION {
+            warn!(
+                old_schema = %stored_schema,
+                new_schema = %SCHEMA_VERSION,
+                "Schema version mismatch - clearing RocksDB and creating new blockchain"
+            );
+            store.clear_all()?;
+            info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
+            let blockchain = Blockchain::new(node_id.clone(), master_chain_key.clone())?;
+            store.save_metadata(&node_id, SCHEMA_VERSION)?;
+            return Ok(blockchain);
+        }
 
-    info!("Blockchain saved to disk");
-    Ok(())
+        // Load chain from RocksDB
+        let chain = store.load_chain()?;
+        let checkpoints = store.load_checkpoints()?;
+
+        info!(
+            chain_length = chain.len(),
+            checkpoints = checkpoints.len(),
+            schema_version = %stored_schema,
+            "Blockchain loaded from RocksDB"
+        );
+
+        // Reconstruct blockchain
+        Ok(Blockchain {
+            schema_version: SCHEMA_VERSION.to_string(),
+            chain,
+            node_id,
+            checkpoints,
+            pending_accounts: Vec::new(),
+            pending_collections: Vec::new(),
+            node_signing_key: Some(generate_signing_key()),
+            master_chain_key,
+        })
+    } else {
+        // RocksDB is empty - check for legacy JSON file
+        check_json_migration(&node_id, &master_chain_key, store)
+    }
 }
 
-/// Load the blockchain from disk or create a new one
-/// Validates schema version and auto-migrates by deleting old data
-pub fn load_blockchain(node_id: String, master_chain_key: Vec<u8>) -> Result<Blockchain> {
-    match fs::read_to_string(BLOCKCHAIN_FILE_PATH) {
+/// Check if JSON file exists and migrate to RocksDB
+fn check_json_migration(
+    node_id: &str,
+    master_chain_key: &[u8],
+    store: &BlockchainStore,
+) -> Result<Blockchain> {
+    // Legacy JSON path (keeping for migration)
+    const LEGACY_JSON_PATH: &str = "/data/blockchain.json";
+
+    match fs::read_to_string(LEGACY_JSON_PATH) {
         Ok(content) => {
-            // Try to extract just the schema_version field to check compatibility
-            let schema_check: serde_json::Result<serde_json::Value> =
-                serde_json::from_str(&content);
+            warn!("Found legacy JSON blockchain file - migrating to RocksDB");
 
-            match schema_check {
-                Ok(value) => {
-                    let file_schema = value
-                        .get("schema_version")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown");
+            // Try to parse JSON
+            match serde_json::from_str::<Blockchain>(&content) {
+                Ok(mut blockchain) => {
+                    // Update runtime fields
+                    blockchain.node_id = node_id.to_string();
+                    blockchain.pending_accounts = Vec::new();
+                    blockchain.pending_collections = Vec::new();
+                    blockchain.node_signing_key = Some(generate_signing_key());
+                    blockchain.master_chain_key = master_chain_key.to_vec();
 
-                    // Check if schema versions match
-                    if file_schema != SCHEMA_VERSION {
-                        warn!(
-                            old_schema = %file_schema,
-                            new_schema = %SCHEMA_VERSION,
-                            "Schema version mismatch detected - deleting old blockchain and starting fresh"
-                        );
+                    info!(
+                        chain_length = blockchain.chain.len(),
+                        "Migrating {} blocks from JSON to RocksDB",
+                        blockchain.chain.len()
+                    );
 
-                        // Delete the old file
-                        fs::remove_file(BLOCKCHAIN_FILE_PATH)
-                            .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+                    // Migrate to RocksDB
+                    store.migrate_from_json(&blockchain)?;
 
-                        info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-                        return Blockchain::new(node_id, master_chain_key);
+                    // Rename JSON file to .backup
+                    if let Err(e) = fs::rename(LEGACY_JSON_PATH, "/data/blockchain.json.backup") {
+                        warn!(error = %e, "Failed to rename JSON file to backup");
+                    } else {
+                        info!("Legacy JSON file backed up to blockchain.json.backup");
                     }
 
-                    // Schema matches, try full deserialization
-                    match serde_json::from_str::<Blockchain>(&content) {
-                        Ok(blockchain) => {
-                            let mut blockchain = blockchain;
-                            blockchain.node_id = node_id;
-                            blockchain.pending_accounts = Vec::new();
-                            blockchain.pending_collections = Vec::new();
-                            blockchain.node_signing_key = Some(generate_signing_key());
-                            blockchain.master_chain_key = master_chain_key;
-
-                            info!(
-                                chain_length = blockchain.chain.len(),
-                                schema_version = %blockchain.schema_version,
-                                "Blockchain loaded from disk"
-                            );
-                            Ok(blockchain)
-                        }
-                        Err(e) => {
-                            warn!(
-                                error = %e,
-                                "Failed to deserialize blockchain (likely schema mismatch) - deleting and starting fresh"
-                            );
-
-                            // Delete incompatible file
-                            fs::remove_file(BLOCKCHAIN_FILE_PATH)
-                                .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
-
-                            info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-                            Blockchain::new(node_id, master_chain_key)
-                        }
-                    }
+                    Ok(blockchain)
                 }
                 Err(e) => {
                     warn!(
                         error = %e,
-                        "Failed to parse blockchain file - deleting and starting fresh"
+                        "Failed to parse legacy JSON file - creating new blockchain"
                     );
 
-                    // Delete corrupted file
-                    fs::remove_file(BLOCKCHAIN_FILE_PATH)
-                        .map_err(|e| GoudChainError::LoadFailed(e.to_string()))?;
+                    // Delete corrupted JSON
+                    if let Err(e) = fs::remove_file(LEGACY_JSON_PATH) {
+                        warn!(error = %e, "Failed to delete corrupted JSON file");
+                    }
 
-                    info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-                    Blockchain::new(node_id, master_chain_key.clone())
+                    let blockchain = Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+                    store.save_metadata(node_id, SCHEMA_VERSION)?;
+                    Ok(blockchain)
                 }
             }
         }
         Err(_) => {
+            // No JSON file found - create new blockchain
             info!("No existing blockchain found, creating new one");
-            Blockchain::new(node_id, master_chain_key)
+            let blockchain = Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+            store.save_metadata(node_id, SCHEMA_VERSION)?;
+            Ok(blockchain)
         }
     }
 }

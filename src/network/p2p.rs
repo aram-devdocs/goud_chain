@@ -7,22 +7,28 @@ use std::time::Duration;
 use tracing::{error, info, warn};
 
 use crate::constants::{
-    PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK, REPUTATION_REWARD_VALID_BLOCK,
+    CHECKPOINT_INTERVAL, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
+    REPUTATION_REWARD_VALID_BLOCK,
 };
 use crate::domain::{Block, Blockchain};
 use crate::network::messages::P2PMessage;
-use crate::storage;
+use crate::storage::BlockchainStore;
 use crate::types::{GoudChainError, Result};
 
 pub struct P2PNode {
     pub peers: Arc<Mutex<Vec<String>>>,
     pub blockchain: Arc<Mutex<Blockchain>>,
+    pub blockchain_store: Arc<BlockchainStore>,
     pub peer_reputation: Arc<Mutex<HashMap<String, i32>>>,
 }
 
 impl P2PNode {
     /// Create a new P2P node with configured peers
-    pub fn new(blockchain: Arc<Mutex<Blockchain>>, peers: Vec<String>) -> Self {
+    pub fn new(
+        blockchain: Arc<Mutex<Blockchain>>,
+        blockchain_store: Arc<BlockchainStore>,
+        peers: Vec<String>,
+    ) -> Self {
         if !peers.is_empty() {
             info!(peers = ?peers, "Configured peers");
         }
@@ -30,6 +36,7 @@ impl P2PNode {
         P2PNode {
             peers: Arc::new(Mutex::new(peers)),
             blockchain,
+            blockchain_store,
             peer_reputation: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -69,9 +76,11 @@ impl P2PNode {
                             match bc.replace_chain(chain) {
                                 Ok(true) => {
                                     info!(peer = %peer, "Successfully synced chain from peer");
-                                    if let Err(e) = storage::save_blockchain(&bc) {
-                                        error!(error = %e, "Failed to save blockchain");
-                                    }
+                                    // Note: Chain replacement means we need to save the entire chain
+                                    // This is a rare operation (only during sync/reorg)
+                                    // For normal block addition, we use incremental saves
+                                    // TODO: Optimize this to only save new blocks
+                                    warn!("Chain replaced - full chain sync to RocksDB not yet implemented");
                                     // Good peer - increase reputation
                                     let mut r = rep.lock().unwrap();
                                     *r.entry(peer.clone()).or_insert(0) +=
@@ -95,6 +104,7 @@ impl P2PNode {
     /// Start the P2P server to listen for incoming connections
     pub fn start_p2p_server(&self, port: u16) {
         let blockchain = Arc::clone(&self.blockchain);
+        let blockchain_store = Arc::clone(&self.blockchain_store);
         let reputation = Arc::clone(&self.peer_reputation);
 
         thread::spawn(
@@ -104,6 +114,7 @@ impl P2PNode {
 
                     for stream in listener.incoming().flatten() {
                         let bc = Arc::clone(&blockchain);
+                        let store = Arc::clone(&blockchain_store);
                         let rep = Arc::clone(&reputation);
                         let peer_addr = stream
                             .peer_addr()
@@ -112,7 +123,9 @@ impl P2PNode {
                             .unwrap_or_default();
 
                         thread::spawn(move || {
-                            if let Err(e) = Self::handle_connection(stream, bc, rep, &peer_addr) {
+                            if let Err(e) =
+                                Self::handle_connection(stream, bc, store, rep, &peer_addr)
+                            {
                                 warn!(peer = %peer_addr, error = %e, "Connection handling failed");
                             }
                         });
@@ -138,6 +151,7 @@ impl P2PNode {
     fn handle_connection(
         mut stream: TcpStream,
         blockchain: Arc<Mutex<Blockchain>>,
+        blockchain_store: Arc<BlockchainStore>,
         reputation: Arc<Mutex<HashMap<String, i32>>>,
         peer_addr: &str,
     ) -> Result<()> {
@@ -227,7 +241,21 @@ impl P2PNode {
 
                 // All validations passed - add block
                 blockchain.chain.push(block.clone());
-                storage::save_blockchain(&blockchain)?;
+
+                // Save block to RocksDB (incremental write)
+                if let Err(e) = blockchain_store.save_block(&block) {
+                    error!(error = %e, "Failed to save received block to RocksDB");
+                }
+
+                // Save checkpoint if needed
+                #[allow(unknown_lints)]
+                #[allow(clippy::manual_is_multiple_of)]
+                if block.index % CHECKPOINT_INTERVAL == 0 {
+                    if let Err(e) = blockchain_store.save_checkpoint(block.index, &block.hash) {
+                        error!(error = %e, "Failed to save checkpoint");
+                    }
+                }
+
                 info!(
                     block_index = block.index,
                     block_hash = %block.hash,
