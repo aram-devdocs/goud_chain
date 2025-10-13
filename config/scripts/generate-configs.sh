@@ -91,11 +91,34 @@ substitute_template() {
     local content
     content=$(cat "$template")
 
+    # Generate to temporary file first
+    local temp_output="/tmp/$(basename "$output").$$"
+
     # Replace all {{VARIABLE}} patterns with environment variable values
     # Use perl for better regex support and multi-line handling
-    echo "$content" | perl -pe 's/\{\{(\w+)\}\}/$ENV{$1} \/\/ ""/ge' > "$output"
+    echo "$content" | perl -pe 's/\{\{(\w+)\}\}/$ENV{$1} \/\/ ""/ge' > "$temp_output"
 
-    log_success "Generated: $output"
+    # Compare content (excluding timestamp line) to detect real changes
+    local needs_update=true
+    if [[ -f "$output" ]]; then
+        # Strip out the "Generated: " timestamp line before comparing
+        local existing_content_normalized
+        local new_content_normalized
+        existing_content_normalized=$(grep -v "^# Generated: " "$output" 2>/dev/null || true)
+        new_content_normalized=$(grep -v "^# Generated: " "$temp_output" 2>/dev/null || true)
+
+        if [[ "$existing_content_normalized" == "$new_content_normalized" ]]; then
+            needs_update=false
+        fi
+    fi
+
+    if [[ "$needs_update" == true ]]; then
+        mv "$temp_output" "$output"
+        log_success "Generated: $output"
+    else
+        rm -f "$temp_output"
+        log_info "Skipped: $output (no changes)"
+    fi
 }
 
 # Generate upstream nodes list for nginx
