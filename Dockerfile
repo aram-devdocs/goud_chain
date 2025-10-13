@@ -45,10 +45,11 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 # Install runtime dependencies (curl for health checks, librocksdb for RocksDB)
+# Use librocksdb-dev which includes the runtime library
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
-    librocksdb6.11t64 \
+    librocksdb-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder
