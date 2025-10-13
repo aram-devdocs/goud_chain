@@ -34,6 +34,13 @@ pub fn load_blockchain(
             store.clear_all()?;
             info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
             let blockchain = Blockchain::new(node_id.clone(), master_chain_key.clone())?;
+
+            // Save genesis block to RocksDB
+            if let Some(genesis) = blockchain.chain.first() {
+                store.save_block(genesis)?;
+                info!("Genesis block saved to RocksDB");
+            }
+
             store.save_metadata(&node_id, SCHEMA_VERSION)?;
             return Ok(blockchain);
         }
@@ -129,6 +136,13 @@ fn check_json_migration(
             // No JSON file found - create new blockchain
             info!("No existing blockchain found, creating new one");
             let blockchain = Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+
+            // Save genesis block to RocksDB
+            if let Some(genesis) = blockchain.chain.first() {
+                store.save_block(genesis)?;
+                info!("Genesis block saved to RocksDB");
+            }
+
             store.save_metadata(node_id, SCHEMA_VERSION)?;
             Ok(blockchain)
         }
