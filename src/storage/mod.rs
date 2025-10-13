@@ -1,3 +1,5 @@
+pub mod rocksdb;
+
 use std::fs;
 use std::io::Write;
 use tracing::{info, warn};
@@ -6,6 +8,9 @@ use crate::constants::{BLOCKCHAIN_FILE_PATH, DATA_DIRECTORY, SCHEMA_VERSION};
 use crate::crypto::generate_signing_key;
 use crate::domain::Blockchain;
 use crate::types::{GoudChainError, Result};
+
+// Re-export RocksDB store
+pub use self::rocksdb::RocksDbStore;
 
 /// Save the blockchain to disk
 pub fn save_blockchain(blockchain: &Blockchain) -> Result<()> {

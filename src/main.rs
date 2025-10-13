@@ -14,7 +14,7 @@ use tracing::{error, info};
 use api::{create_preflight_response, route_request};
 use config::Config;
 use network::P2PNode;
-use storage::{init_data_directory, load_blockchain};
+use storage::{init_data_directory, load_blockchain, RocksDbStore};
 
 fn main() {
     // Initialize tracing
@@ -42,6 +42,18 @@ fn main() {
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");
             std::process::exit(1);
+        }
+    };
+
+    // Initialize RocksDB (optional - graceful degradation if it fails)
+    let rocksdb = match RocksDbStore::new() {
+        Ok(db) => {
+            info!("RocksDB initialized successfully");
+            Some(Arc::new(db))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to initialize RocksDB - KV endpoints will be unavailable");
+            None
         }
     };
 
@@ -74,12 +86,19 @@ fn main() {
     info!("   POST /data/decrypt     - Decrypt specific data with API key");
     info!("   GET  /chain            - View full blockchain");
     info!("   GET  /peers            - View peers");
-    info!("   GET  /sync             - Sync with peers\n");
+    info!("   GET  /sync             - Sync with peers");
+    info!("\n🔑 RocksDB Key-Value Store:");
+    info!("   POST   /kv/put         - Store key-value pair");
+    info!("   GET    /kv/get/:key    - Retrieve value by key");
+    info!("   DELETE /kv/delete/:key - Delete key");
+    info!("   GET    /kv/list        - List all keys");
+    info!("   GET    /kv/all         - List all key-value pairs\n");
 
     // Handle requests
     for request in server.incoming_requests() {
         let blockchain = Arc::clone(&blockchain);
         let p2p = Arc::clone(&p2p_clone);
+        let db = rocksdb.clone();
 
         // Handle OPTIONS preflight requests
         if request.method() == &Method::Options {
@@ -90,6 +109,6 @@ fn main() {
         }
 
         // Route and handle request
-        route_request(request, blockchain, p2p);
+        route_request(request, blockchain, p2p, db);
     }
 }

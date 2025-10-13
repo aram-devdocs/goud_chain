@@ -3,6 +3,19 @@ FROM rust:1.83-slim as builder
 
 WORKDIR /app
 
+# Install build dependencies (RocksDB system library + build tools)
+RUN apt-get update && apt-get install -y \
+    librocksdb-dev \
+    libclang-dev \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variable to use system RocksDB instead of compiling from source
+# This prevents the rocksdb crate from building from source (much faster!)
+ENV ROCKSDB_LIB_DIR=/usr/lib
+ENV SNAPPY_LIB_DIR=/usr/lib
+
 # Install cargo-chef for dependency caching
 RUN cargo install cargo-chef
 
@@ -31,10 +44,11 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies (curl for health checks)
+# Install runtime dependencies (curl for health checks, librocksdb for RocksDB)
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
+    librocksdb6.11 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary from builder

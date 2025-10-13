@@ -613,6 +613,64 @@ All nginx and docker-compose configs are **generated from templates** to prevent
 - `scripts/deploy.sh`: Regenerates on VM before deployment
 - GitHub Actions: Regenerates during CI/CD pipeline
 
+## Module Dependency Architecture
+
+This project enforces a **layered architecture** with automatic circular dependency prevention to maintain code quality and prevent technical debt.
+
+### Visual Dependency Graph
+
+![Module Dependencies](docs/module-structure.png)
+
+The graph shows how modules depend on each other, with dependencies flowing top-to-bottom through architectural layers. Colors represent different layers (Foundation → Utilities → Business Logic → Persistence → Network → Presentation).
+
+### How It Works
+
+**Automated Testing:**
+- Runs on every commit via [pre-commit hook](.cargo-husky/hooks/pre-commit)
+- Dynamically discovers all modules in `src/` directory (no hardcoded lists!)
+- Detects circular dependencies using depth-first search (DFS) algorithm
+- Blocks commits if violations are found
+- Enforces layered architecture rules
+
+**Layer Hierarchy:**
+- **Layer 0 (Foundation):** `constants`, `types` - Pure data types, no internal dependencies
+- **Layer 1 (Utilities):** `crypto`, `config` - Reusable helpers that depend only on Layer 0
+- **Layer 2 (Business Logic):** `domain` - Core blockchain models (blocks, accounts, collections)
+- **Layer 3 (Persistence):** `storage` - Data storage and retrieval
+- **Layer 4 (Network):** `network` - P2P networking and synchronization
+- **Layer 5 (Presentation):** `api` - HTTP API and external interfaces
+
+**Why This Matters:**
+- Prevents circular dependencies that cause build issues and tight coupling
+- Makes the codebase easier to understand and navigate
+- Enables independent testing of each layer
+- Facilitates future refactoring and feature additions
+- Enforces separation of concerns
+
+**Adding New Modules:**
+1. Create a new directory or `.rs` file in `src/`
+2. No manual registration needed - auto-discovered!
+3. Assign it to a layer by adding to `LAYER_MAP` in [scripts/generate_module_graph.sh](scripts/generate_module_graph.sh)
+4. Run `cargo test` to verify no circular dependencies or layer violations
+5. Commit triggers automatic regeneration of dependency graph
+
+**Manual Commands:**
+```bash
+# Run all dependency tests
+cargo test test_no_circular_dependencies
+cargo test test_foundation_modules_have_no_dependencies
+cargo test test_layered_architecture
+
+# Regenerate visual graph (requires GraphViz: brew install graphviz)
+./scripts/generate_module_graph.sh
+```
+
+**Key Files:**
+- Tests: [tests/module_dependencies.rs](tests/module_dependencies.rs) - Rust test suite
+- Script: [scripts/generate_module_graph.sh](scripts/generate_module_graph.sh) - Graph generation
+- DOT file: [docs/module-structure.dot](docs/module-structure.dot) - GraphViz source
+- Graph: [docs/module-structure.png](docs/module-structure.png) - Visual diagram
+
 ## Local Development
 
 ### Running Tests

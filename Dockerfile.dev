@@ -3,6 +3,19 @@ FROM rust:1.83-slim
 
 WORKDIR /app
 
+# Install build dependencies (RocksDB system library + build tools)
+RUN apt-get update && apt-get install -y \
+    librocksdb-dev \
+    libclang-dev \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variable to use system RocksDB instead of compiling from source
+# This prevents the rocksdb crate from building from source (much faster!)
+ENV ROCKSDB_LIB_DIR=/usr/lib
+ENV SNAPPY_LIB_DIR=/usr/lib
+
 # Install cargo-watch for hot reload
 RUN cargo install cargo-watch
 

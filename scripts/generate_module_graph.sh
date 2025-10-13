@@ -21,6 +21,34 @@ mkdir -p "$DOCS_DIR"
 
 echo "📊 Generating module dependency graph..."
 
+# Function to get layer info for a module
+get_layer_info() {
+    local module=$1
+    case "$module" in
+        constants|types)
+            echo "0:Foundation:#66bb6a"
+            ;;
+        crypto|config)
+            echo "1:Utilities:#42a5f5"
+            ;;
+        domain)
+            echo "2:Business:#ffa726"
+            ;;
+        storage)
+            echo "3:Persistence:#ab47bc"
+            ;;
+        network)
+            echo "4:Network:#ec407a"
+            ;;
+        api)
+            echo "5:Presentation:#ffca28"
+            ;;
+        *)
+            echo "99:Unknown:#9e9e9e"
+            ;;
+    esac
+}
+
 # Start DOT file
 cat > "$DOT_FILE" <<'EOF'
 digraph ModuleDependencies {
@@ -36,39 +64,88 @@ digraph ModuleDependencies {
     // Entry point (Dark Gray) - at the top
     main [label="main\n(entry)", fillcolor="#37474f", fontcolor="white", shape="ellipse", width=2.0, height=2.0];
 
-    // Layer 5: Presentation (Yellow)
-    api [label="api\n(Layer 5)", fillcolor="#ffca28", fontcolor="white"];
-
-    // Layer 4: Network (Pink)
-    network [label="network\n(Layer 4)", fillcolor="#ec407a", fontcolor="white"];
-
-    // Layer 3: Persistence (Purple)
-    storage [label="storage\n(Layer 3)", fillcolor="#ab47bc", fontcolor="white"];
-
-    // Layer 2: Business (Orange)
-    domain [label="domain\n(Layer 2)", fillcolor="#ffa726", fontcolor="white"];
-
-    // Layer 1: Utilities (Blue)
-    crypto [label="crypto\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
-    config [label="config\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
-
-    // Layer 0: Foundation (Green) - at the bottom
-    constants [label="constants\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
-    types [label="types\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
-
-    // Enforce strict top-to-bottom layering
-    {rank=same; constants; types;}
-    {rank=same; crypto; config;}
-    {rank=same; domain;}
-    {rank=same; storage;}
-    {rank=same; network;}
-    {rank=same; api;}
-
-    // Invisible edges to force horizontal alignment within layers
-    constants -> types [style=invis];
-    crypto -> config [style=invis];
-
 EOF
+
+# Dynamically discover modules from src/ directory
+echo "  Discovering modules..."
+MODULES=()
+for item in "$SRC_DIR"/*; do
+    name=$(basename "$item")
+    # Include directories (modules) and .rs files (exclude main, lib, config)
+    if [[ -d "$item" && ! "$name" =~ ^\. && "$name" != "bin" && "$name" != "migrations" ]]; then
+        MODULES+=("$name")
+    elif [[ -f "$item" && "$item" == *.rs && "$name" != "main.rs" && "$name" != "lib.rs" && "$name" != "config.rs" ]]; then
+        # Remove .rs extension
+        MODULES+=("${name%.rs}")
+    fi
+done
+
+# Sort modules for consistent output
+IFS=$'\n' MODULES=($(sort <<<"${MODULES[*]}"))
+unset IFS
+
+echo "  Found ${#MODULES[@]} modules: ${MODULES[*]}"
+
+# Generate node definitions dynamically
+echo "" >> "$DOT_FILE"
+echo "    // Module nodes (auto-generated)" >> "$DOT_FILE"
+
+# Arrays to track modules per layer (layer_0, layer_1, etc.)
+layer_0=""
+layer_1=""
+layer_2=""
+layer_3=""
+layer_4=""
+layer_5=""
+layer_99=""
+
+for module in "${MODULES[@]}"; do
+    layer_info=$(get_layer_info "$module")
+    IFS=':' read -r layer_num layer_name color <<< "$layer_info"
+    echo "    $module [label=\"$module\\n(Layer $layer_num)\", fillcolor=\"$color\", fontcolor=\"white\"];" >> "$DOT_FILE"
+
+    # Track modules per layer for ranking
+    case "$layer_num" in
+        0) layer_0="$layer_0 $module" ;;
+        1) layer_1="$layer_1 $module" ;;
+        2) layer_2="$layer_2 $module" ;;
+        3) layer_3="$layer_3 $module" ;;
+        4) layer_4="$layer_4 $module" ;;
+        5) layer_5="$layer_5 $module" ;;
+        99) layer_99="$layer_99 $module" ;;
+    esac
+done
+
+# Generate layer rankings
+echo "" >> "$DOT_FILE"
+echo "    // Enforce strict top-to-bottom layering" >> "$DOT_FILE"
+for layer_num in 0 1 2 3 4 5 99; do
+    layer_var="layer_$layer_num"
+    eval "modules=\${$layer_var}"
+    if [[ -n "$modules" ]]; then
+        echo "    {rank=same;$modules;}" >> "$DOT_FILE"
+    fi
+done
+
+# Generate invisible edges for horizontal alignment within layers
+echo "" >> "$DOT_FILE"
+echo "    // Invisible edges to force horizontal alignment within layers" >> "$DOT_FILE"
+for layer_num in 0 1 2 3 4 5 99; do
+    layer_var="layer_$layer_num"
+    eval "modules=\${$layer_var}"
+    if [[ -n "$modules" ]]; then
+        # Trim leading space
+        modules="${modules# }"
+        read -ra mods <<< "$modules"
+        if [[ ${#mods[@]} -gt 1 ]]; then
+            for ((i=0; i<${#mods[@]}-1; i++)); do
+                echo "    ${mods[$i]} -> ${mods[$i+1]} [style=invis];" >> "$DOT_FILE"
+            done
+        fi
+    fi
+done
+
+echo "" >> "$DOT_FILE"
 
 # Function to extract dependencies from a module
 extract_dependencies() {
@@ -84,9 +161,6 @@ extract_dependencies() {
         echo "$module_file"
     fi
 }
-
-# Parse dependencies and add edges
-MODULES=("api" "config" "constants" "crypto" "domain" "network" "storage" "types")
 
 echo "  Analyzing module dependencies..."
 

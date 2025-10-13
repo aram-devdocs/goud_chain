@@ -3,6 +3,7 @@ pub mod auth;
 pub mod data_handlers;
 pub mod handlers;
 pub mod internal_client;
+pub mod kv_handlers;
 pub mod middleware;
 
 // Re-export commonly used functions

@@ -76,6 +76,13 @@ pub enum GoudChainError {
     #[error("Failed to create data directory: {0}")]
     DirectoryCreationFailed(String),
 
+    // RocksDB errors
+    #[error("RocksDB operation failed: {0}")]
+    RocksDbError(String),
+
+    #[error("Key not found: {0}")]
+    KeyNotFound(String),
+
     // API errors
     #[error("Invalid request body: {0}")]
     InvalidRequestBody(String),
@@ -110,7 +117,7 @@ impl GoudChainError {
         match self {
             Self::InvalidRequestBody(_) => 400,
             Self::Unauthorized(_) | Self::DecryptionFailed => 403,
-            Self::DataNotFound(_) => 404,
+            Self::DataNotFound(_) | Self::KeyNotFound(_) => 404,
             Self::InvalidSignature
             | Self::InvalidBlockHash(_)
             | Self::BrokenChain(_)

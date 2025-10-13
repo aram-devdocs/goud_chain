@@ -116,22 +116,42 @@ fn parse_dependencies(file_path: &Path, module_name: &str) -> HashSet<String> {
     dependencies
 }
 
+/// Dynamically discover all modules in src/ directory
+fn discover_modules() -> Vec<String> {
+    let src_dir = Path::new("src");
+    let mut modules = Vec::new();
+
+    // Scan src directory for modules
+    if let Ok(entries) = fs::read_dir(src_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name().unwrap().to_str().unwrap();
+
+            // Include directories (with mod.rs) and .rs files (excluding main/lib/config)
+            let is_module_dir =
+                path.is_dir() && !name.starts_with('.') && name != "bin" && name != "migrations";
+
+            let is_module_file = path.extension() == Some(std::ffi::OsStr::new("rs"))
+                && !["main.rs", "lib.rs", "config.rs"].contains(&name);
+
+            if is_module_dir || is_module_file {
+                let module_name = name.trim_end_matches(".rs").to_string();
+                modules.push(module_name);
+            }
+        }
+    }
+
+    modules.sort();
+    modules
+}
+
 /// Walk the src directory and build dependency graph
 fn build_dependency_graph() -> DependencyGraph {
     let mut graph = DependencyGraph::new();
     let src_dir = Path::new("src");
 
-    // List of top-level modules
-    let modules = [
-        "api",
-        "config",
-        "constants",
-        "crypto",
-        "domain",
-        "network",
-        "storage",
-        "types",
-    ];
+    // Dynamically discover modules
+    let modules = discover_modules();
 
     for module in &modules {
         let module_path = src_dir.join(module);

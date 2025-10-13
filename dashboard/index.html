@@ -692,6 +692,49 @@
                     </div>
                 </div>
             </div>
+
+            <!-- RocksDB Key-Value Store Tester -->
+            <div class="mt-6">
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="text-lg font-bold mb-4">🔑 RocksDB Key-Value Store</h3>
+                    <div class="space-y-4">
+                        <!-- Key Input -->
+                        <div>
+                            <label class="block text-xs font-medium mb-2 text-gray-400">Key</label>
+                            <input x-model="kvKey" type="text" placeholder="my-test-key"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <!-- Value Input -->
+                        <div>
+                            <label class="block text-xs font-medium mb-2 text-gray-400">Value</label>
+                            <textarea x-model="kvValue" placeholder="my-test-value" rows="3"
+                                      class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <button @click="kvPut()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded transition text-sm">
+                                PUT
+                            </button>
+                            <button @click="kvGet()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded transition text-sm">
+                                GET
+                            </button>
+                            <button @click="kvDelete()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded transition text-sm">
+                                DELETE
+                            </button>
+                            <button @click="kvListAll()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded transition text-sm">
+                                LIST ALL
+                            </button>
+                        </div>
+
+                        <!-- Response Display -->
+                        <div x-show="kvResponse" class="bg-gray-900 rounded p-3 max-h-64 overflow-auto">
+                            <pre class="text-xs text-green-400" x-text="kvResponse"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -738,6 +781,11 @@
                 // Debug
                 debugEndpoint: '/chain',
                 debugResponse: '',
+
+                // RocksDB KV Store
+                kvKey: '',
+                kvValue: '',
+                kvResponse: '',
 
                 // Initialize
                 async init() {
@@ -1223,6 +1271,74 @@
                         this.debugResponse = JSON.stringify(data, null, 2);
                     } catch (e) {
                         this.debugResponse = `Error: ${e.message}`;
+                    }
+                },
+
+                // RocksDB KV Store operations
+                async kvPut() {
+                    if (!this.kvKey || !this.kvValue) {
+                        this.kvResponse = 'Error: Both key and value are required';
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/kv/put`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: this.kvKey, value: this.kvValue })
+                        });
+                        const data = await res.json();
+                        this.kvResponse = JSON.stringify(data, null, 2);
+                    } catch (e) {
+                        this.kvResponse = `Error: ${e.message}`;
+                    }
+                },
+
+                async kvGet() {
+                    if (!this.kvKey) {
+                        this.kvResponse = 'Error: Key is required';
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/kv/get/${encodeURIComponent(this.kvKey)}`);
+                        const data = await res.json();
+                        if (res.ok) {
+                            this.kvValue = data.value;
+                            this.kvResponse = JSON.stringify(data, null, 2);
+                        } else {
+                            this.kvResponse = JSON.stringify(data, null, 2);
+                        }
+                    } catch (e) {
+                        this.kvResponse = `Error: ${e.message}`;
+                    }
+                },
+
+                async kvDelete() {
+                    if (!this.kvKey) {
+                        this.kvResponse = 'Error: Key is required';
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/kv/delete/${encodeURIComponent(this.kvKey)}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        this.kvResponse = JSON.stringify(data, null, 2);
+                        if (res.ok) {
+                            this.kvKey = '';
+                            this.kvValue = '';
+                        }
+                    } catch (e) {
+                        this.kvResponse = `Error: ${e.message}`;
+                    }
+                },
+
+                async kvListAll() {
+                    try {
+                        const res = await fetch(`${API_BASE}/kv/all`);
+                        const data = await res.json();
+                        this.kvResponse = JSON.stringify(data, null, 2);
+                    } catch (e) {
+                        this.kvResponse = `Error: ${e.message}`;
                     }
                 },
 

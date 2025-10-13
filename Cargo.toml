@@ -23,6 +23,7 @@ tracing = "0.1"  # For structured logging
 tracing-subscriber = "0.3"  # For logging initialization
 jsonwebtoken = "9.3.1"
 libc = "0.2"  # For low-level TCP socket options
+rocksdb = { version = "0.21", default-features = false, features = ["snappy"] }  # Embedded key-value store (compatible with system RocksDB 6.11)
 
 # Pin to avoid edition2024 requirement
 [dependencies.base64ct]

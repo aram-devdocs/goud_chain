@@ -11,29 +11,19 @@ digraph ModuleDependencies {
     // Entry point (Dark Gray) - at the top
     main [label="main\n(entry)", fillcolor="#37474f", fontcolor="white", shape="ellipse", width=2.0, height=2.0];
 
-    // Layer 5: Presentation (Yellow)
+
+    // Module nodes (auto-generated)
     api [label="api\n(Layer 5)", fillcolor="#ffca28", fontcolor="white"];
-
-    // Layer 4: Network (Pink)
-    network [label="network\n(Layer 4)", fillcolor="#ec407a", fontcolor="white"];
-
-    // Layer 3: Persistence (Purple)
-    storage [label="storage\n(Layer 3)", fillcolor="#ab47bc", fontcolor="white"];
-
-    // Layer 2: Business (Orange)
-    domain [label="domain\n(Layer 2)", fillcolor="#ffa726", fontcolor="white"];
-
-    // Layer 1: Utilities (Blue)
-    crypto [label="crypto\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
-    config [label="config\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
-
-    // Layer 0: Foundation (Green) - at the bottom
     constants [label="constants\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
+    crypto [label="crypto\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
+    domain [label="domain\n(Layer 2)", fillcolor="#ffa726", fontcolor="white"];
+    network [label="network\n(Layer 4)", fillcolor="#ec407a", fontcolor="white"];
+    storage [label="storage\n(Layer 3)", fillcolor="#ab47bc", fontcolor="white"];
     types [label="types\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
 
     // Enforce strict top-to-bottom layering
-    {rank=same; constants; types;}
-    {rank=same; crypto; config;}
+    {rank=same; constants types;}
+    {rank=same; crypto;}
     {rank=same; domain;}
     {rank=same; storage;}
     {rank=same; network;}
@@ -41,9 +31,9 @@ digraph ModuleDependencies {
 
     // Invisible edges to force horizontal alignment within layers
     constants -> types [style=invis];
-    crypto -> config [style=invis];
 
     api -> constants;
+    api -> crypto;
     api -> domain;
     api -> network;
     api -> storage;
@@ -62,7 +52,6 @@ digraph ModuleDependencies {
     storage -> domain;
     storage -> types;
     main -> api;
-    main -> config;
     main -> network;
     main -> storage;
 }
