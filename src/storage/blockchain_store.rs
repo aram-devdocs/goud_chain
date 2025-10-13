@@ -28,34 +28,40 @@ pub struct BlockchainStore {
 }
 
 impl BlockchainStore {
-    /// Initialize RocksDB at the configured path
+    /// Initialize RocksDB at the configured path with optimized settings
     pub fn new() -> Result<Self> {
         info!(path = %ROCKSDB_PATH, "Opening RocksDB for blockchain storage");
 
-        let db = DB::open_default(ROCKSDB_PATH)
+        let mut opts = rocksdb::Options::default();
+        opts.create_if_missing(true);
+        opts.set_write_buffer_size(64 * 1024 * 1024);
+        opts.set_max_write_buffer_number(3);
+        opts.set_min_write_buffer_number_to_merge(1);
+        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+        opts.set_manual_wal_flush(true);
+        opts.set_level_compaction_dynamic_level_bytes(true);
+
+        let db = DB::open(&opts, ROCKSDB_PATH)
             .map_err(|e| GoudChainError::RocksDbError(e.to_string()))?;
 
-        info!("BlockchainStore initialized successfully");
+        info!("BlockchainStore initialized with optimized settings");
 
         Ok(Self { db: Arc::new(db) })
     }
 
-    /// Save a single block to RocksDB (incremental write)
     pub fn save_block(&self, block: &Block) -> Result<()> {
-        // Serialize block using bincode (faster than JSON)
         let block_bytes = bincode::serialize(block)
             .map_err(|e| GoudChainError::SaveFailed(format!("Bincode serialization: {}", e)))?;
 
-        // Store block at key "block:{index}"
-        let block_key = format!("block:{}", block.index);
-        self.db
-            .put(block_key.as_bytes(), &block_bytes)
-            .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
+        let mut batch = rocksdb::WriteBatch::default();
 
-        // Update chain length metadata
+        let block_key = format!("block:{}", block.index);
+        batch.put(block_key.as_bytes(), &block_bytes);
+
         let chain_length = block.index + 1;
+        batch.put(b"metadata:chain_length", chain_length.to_le_bytes());
         self.db
-            .put(b"metadata:chain_length", chain_length.to_le_bytes())
+            .write(batch)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
         info!(block_index = block.index, "Block saved to RocksDB");

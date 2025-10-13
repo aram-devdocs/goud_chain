@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::constants::ENCRYPTION_SALT;
 use crate::crypto::{
-    compute_mac, decrypt_data_with_key, derive_encryption_key, derive_mac_key,
-    encrypt_data_with_key, get_public_key_hex, sign_message, verify_mac, verify_signature,
+    compute_mac, decrypt_data_with_key, encrypt_data_with_key, get_public_key_hex,
+    global_key_cache, sign_message, verify_mac, verify_signature,
 };
 use crate::types::Result;
 
@@ -34,19 +34,16 @@ impl EncryptedCollection {
         let collection_id = Uuid::new_v4().to_string();
         let public_key = get_public_key_hex(signing_key);
 
-        // Derive keys from API key
-        let encryption_key = derive_encryption_key(api_key, ENCRYPTION_SALT);
-        let mac_key = derive_mac_key(api_key, ENCRYPTION_SALT);
+        let key_cache = global_key_cache();
+        let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
+        let mac_key = key_cache.get_mac_key(api_key, ENCRYPTION_SALT);
 
-        // Create metadata JSON
         let metadata = serde_json::json!({
             "label": label,
             "created_at": Utc::now().timestamp(),
         });
         let metadata_str = serde_json::to_string(&metadata)
             .map_err(|e| crate::types::GoudChainError::Internal(e.to_string()))?;
-
-        // Encrypt metadata and payload
         let (encrypted_metadata, _meta_nonce) =
             encrypt_data_with_key(&metadata_str, &encryption_key)?;
         let (encrypted_payload, nonce) = encrypt_data_with_key(&data, &encryption_key)?;
@@ -96,7 +93,8 @@ impl EncryptedCollection {
 
         // If API key provided, verify MAC
         if let Some(key) = api_key {
-            let mac_key = derive_mac_key(key, ENCRYPTION_SALT);
+            let key_cache = global_key_cache();
+            let mac_key = key_cache.get_mac_key(key, ENCRYPTION_SALT);
             let mac_message = format!(
                 "{}{}{}",
                 self.collection_id, self.encrypted_metadata, self.encrypted_payload
@@ -109,7 +107,8 @@ impl EncryptedCollection {
 
     /// Decrypt the metadata with the API key
     pub fn decrypt_metadata(&self, api_key: &[u8]) -> Result<serde_json::Value> {
-        let encryption_key = derive_encryption_key(api_key, ENCRYPTION_SALT);
+        let key_cache = global_key_cache();
+        let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
         let decrypted = decrypt_data_with_key(&self.encrypted_metadata, &encryption_key)?;
 
         serde_json::from_str(&decrypted)
@@ -118,7 +117,8 @@ impl EncryptedCollection {
 
     /// Decrypt the payload with the API key
     pub fn decrypt_payload(&self, api_key: &[u8]) -> Result<String> {
-        let encryption_key = derive_encryption_key(api_key, ENCRYPTION_SALT);
+        let key_cache = global_key_cache();
+        let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
         decrypt_data_with_key(&self.encrypted_payload, &encryption_key)
     }
 }

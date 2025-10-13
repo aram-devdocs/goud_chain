@@ -879,6 +879,7 @@
                     }
 
                     this.isSubmitting = true;
+                    const startTime = performance.now();
 
                     try {
                         const res = await fetch(`${API_BASE}/data/submit`, {
@@ -890,30 +891,44 @@
                             body: JSON.stringify(this.form)
                         });
 
+                        const endTime = performance.now();
+                        const duration = (endTime - startTime).toFixed(0);
+
                         const data = await res.json();
                         if (data.error) {
-                            this.submitResult = { success: false, message: `ERROR: ${data.error}` };
+                            this.submitResult = { success: false, message: `ERROR: ${data.error}<br>⏱️ Request time: ${duration}ms` };
                         } else {
+                            let perfClass = 'text-green-400';
+                            let perfLabel = 'Excellent';
+                            if (duration > 2000) {
+                                perfClass = 'text-red-400';
+                                perfLabel = 'Slow';
+                            } else if (duration > 1000) {
+                                perfClass = 'text-yellow-400';
+                                perfLabel = 'Good';
+                            }
+
                             this.submitResult = {
                                 success: true,
-                                message: `Data encrypted and stored on blockchain!<br>
-                                    Collection ID: <code>${data.collection_id.substring(0, 16)}...</code><br>
-                                    Block: #${data.block_number}`
+                                message: `✅ Data encrypted and stored on blockchain!<br>
+                                    📦 Collection ID: <code class="text-blue-400">${data.collection_id.substring(0, 16)}...</code><br>
+                                    🔗 Block: <code class="text-purple-400">#${data.block_number}</code><br>
+                                    ⏱️ <span class="${perfClass} font-bold">Block creation time: ${duration}ms</span> <span class="text-zinc-500">(${perfLabel})</span>`
                             };
 
-                            // Reset form
                             this.form = { label: '', data: '' };
                             this.formFields = [];
                             this.jsonValid = false;
 
-                            // Reload data
                             setTimeout(() => {
                                 this.loadCollections();
                                 this.loadChain();
                             }, 1000);
                         }
                     } catch (e) {
-                        this.submitResult = { success: false, message: `ERROR: ${e.message}` };
+                        const endTime = performance.now();
+                        const duration = (endTime - startTime).toFixed(0);
+                        this.submitResult = { success: false, message: `ERROR: ${e.message}<br>⏱️ Request time: ${duration}ms` };
                     } finally {
                         this.isSubmitting = false;
                     }
@@ -939,16 +954,14 @@
                 filterCollections() {
                     let filtered = [...this.collections];
 
-                    // Search filter
                     if (this.searchQuery) {
                         const query = this.searchQuery.toLowerCase();
-                        filtered = filtered.filter(c => 
+                        filtered = filtered.filter(c =>
                             c.label.toLowerCase().includes(query) ||
                             c.collection_id.toLowerCase().includes(query)
                         );
                     }
 
-                    // Sort
                     switch (this.sortBy) {
                         case 'newest':
                             filtered.sort((a, b) => b.created_at - a.created_at);

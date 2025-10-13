@@ -201,9 +201,6 @@ pub fn handle_submit_data(
 
                                             drop(blockchain);
 
-                                            // Broadcast to peers
-                                            p2p.broadcast_block(&block);
-
                                             let response = SubmitDataResponse {
                                                 message: "Data encrypted and stored successfully"
                                                     .to_string(),
@@ -213,6 +210,8 @@ pub fn handle_submit_data(
                                             let _ = request.respond(json_response(
                                                 serde_json::to_string(&response).unwrap(),
                                             ));
+
+                                            p2p.broadcast_block(&block);
                                         }
                                         Err(e) => {
                                             error!(error = %e, "Failed to add block");

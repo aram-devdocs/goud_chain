@@ -9,7 +9,7 @@ use crate::constants::{
     TIMESTAMP_GRANULARITY_SECONDS,
 };
 use crate::crypto::{
-    decrypt_data_with_key, derive_encryption_key, encrypt_data_with_key, encrypt_data_with_nonce,
+    decrypt_data_with_key, encrypt_data_with_key, encrypt_data_with_nonce, global_key_cache,
 };
 use crate::types::{GoudChainError, Result};
 
@@ -98,8 +98,8 @@ impl Block {
             GoudChainError::Internal(format!("Failed to serialize block data: {}", e))
         })?;
 
-        // Encrypt block data with master key
-        let encryption_key = derive_encryption_key(config.master_key, ENCRYPTION_SALT);
+        let key_cache = global_key_cache();
+        let encryption_key = key_cache.get_encryption_key(config.master_key, ENCRYPTION_SALT);
         let (encrypted_block_data, nonce) = if config.index == 0 {
             // Genesis block: deterministic nonce for identical genesis across all nodes
             let genesis_nonce = derive_genesis_nonce(config.master_key);
@@ -132,7 +132,6 @@ impl Block {
         Ok(block)
     }
 
-    /// Calculate the merkle root from encrypted block data and blind indexes
     pub fn calculate_merkle_root(encrypted_data: &str, blind_indexes: &[String]) -> String {
         if encrypted_data.is_empty() && blind_indexes.is_empty() {
             return EMPTY_MERKLE_ROOT.to_string();
@@ -140,16 +139,12 @@ impl Block {
 
         let mut hashes: Vec<String> = Vec::new();
 
-        // Hash encrypted block data
-        let mut hasher = Sha256::new();
-        hasher.update(encrypted_data.as_bytes());
-        hashes.push(format!("{:x}", hasher.finalize()));
+        let hash = blake3::hash(encrypted_data.as_bytes());
+        hashes.push(hash.to_hex().to_string());
 
-        // Hash all blind indexes
         for index in blind_indexes {
-            let mut hasher = Sha256::new();
-            hasher.update(index.as_bytes());
-            hashes.push(format!("{:x}", hasher.finalize()));
+            let hash = blake3::hash(index.as_bytes());
+            hashes.push(hash.to_hex().to_string());
         }
 
         // Build Merkle tree
@@ -161,9 +156,8 @@ impl Block {
                 } else {
                     chunk[0].clone()
                 };
-                let mut hasher = Sha256::new();
-                hasher.update(combined.as_bytes());
-                next_level.push(format!("{:x}", hasher.finalize()));
+                let hash = blake3::hash(combined.as_bytes());
+                next_level.push(hash.to_hex().to_string());
             }
             hashes = next_level;
         }
@@ -184,20 +178,19 @@ impl Block {
         u64::from_le_bytes(bytes)
     }
 
-    /// Calculate the hash of this block
     pub fn calculate_hash(&self) -> String {
         let content = format!(
             "{}{}{}{}{}",
             self.index, self.timestamp, self.merkle_root, self.previous_hash, self.validator_index
         );
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        format!("{:x}", hasher.finalize())
+        let hash = blake3::hash(content.as_bytes());
+        hash.to_hex().to_string()
     }
 
     /// Decrypt block data with master key
     pub fn decrypt_data(&self, master_key: &[u8]) -> Result<BlockData> {
-        let encryption_key = derive_encryption_key(master_key, ENCRYPTION_SALT);
+        let key_cache = global_key_cache();
+        let encryption_key = key_cache.get_encryption_key(master_key, ENCRYPTION_SALT);
         let decrypted_json = decrypt_data_with_key(&self.encrypted_block_data, &encryption_key)?;
 
         serde_json::from_str(&decrypted_json).map_err(|e| {

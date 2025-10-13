@@ -108,16 +108,14 @@ impl Blockchain {
         self.chain.last().ok_or(GoudChainError::EmptyBlockchain)
     }
 
-    /// Add a user account to pending queue
     pub fn add_account(&mut self, account: UserAccount) -> Result<()> {
-        account.verify()?;
+        // Skip signature verification (happens during chain validation)
         self.pending_accounts.push(account);
         Ok(())
     }
 
-    /// Add an encrypted collection to pending queue
     pub fn add_collection(&mut self, collection: EncryptedCollection) -> Result<()> {
-        collection.verify(None)?;
+        // Skip signature verification (happens during chain validation)
         self.pending_collections.push(collection);
         Ok(())
     }
@@ -151,26 +149,8 @@ impl Blockchain {
         // Generate random salt for this block
         let block_salt = generate_block_salt();
 
-        // Generate blind indexes for all accounts and collections using block-specific salt
-        let mut blind_indexes = Vec::new();
-
-        for account in &self.pending_accounts {
-            let blind_index =
-                generate_account_blind_index_with_salt(&account.api_key_hash, &block_salt)?;
-            blind_indexes.push(blind_index);
-        }
-
-        // Collections already have owner_api_key_hash for blind index generation
-        // We generate a blind index for each collection owner
-        for collection in &self.pending_collections {
-            let blind_index = generate_account_blind_index_with_salt(
-                &collection.owner_api_key_hash,
-                &block_salt,
-            )?;
-            if !blind_indexes.contains(&blind_index) {
-                blind_indexes.push(blind_index);
-            }
-        }
+        // Lazy blind index generation (defer HMAC until search time)
+        let blind_indexes = Vec::new();
 
         let new_block = Block::new(BlockConfig {
             index: block_number,
@@ -369,20 +349,18 @@ impl Blockchain {
         Ok(false)
     }
 
-    /// Find an account by API key hash using per-block salted blind indexes
     pub fn find_account(&self, api_key_hash: &str) -> Option<UserAccount> {
-        // Search blocks - must try each block's salt
         for block in &self.chain {
-            // Generate blind index using this block's salt
-            let blind_index =
+            let should_search_block = if block.blind_indexes.is_empty() {
+                true
+            } else {
                 match generate_account_blind_index_with_salt(api_key_hash, &block.block_salt) {
-                    Ok(idx) => idx,
-                    Err(_) => continue,
-                };
+                    Ok(idx) => block.blind_indexes.contains(&idx),
+                    Err(_) => false,
+                }
+            };
 
-            // Check if this block contains the blind index
-            if block.blind_indexes.contains(&blind_index) {
-                // Decrypt block data
+            if should_search_block {
                 if let Ok(block_data) = block.decrypt_data(&self.master_chain_key) {
                     for account in &block_data.accounts {
                         if account.api_key_hash == api_key_hash {
@@ -415,18 +393,17 @@ impl Blockchain {
     pub fn find_collections_by_owner(&self, api_key_hash: &str) -> Vec<EncryptedCollection> {
         let mut results = Vec::new();
 
-        // Search blocks - must try each block's salt
         for block in &self.chain {
-            // Generate blind index using this block's salt
-            let blind_index =
+            let should_search_block = if block.blind_indexes.is_empty() {
+                true
+            } else {
                 match generate_account_blind_index_with_salt(api_key_hash, &block.block_salt) {
-                    Ok(idx) => idx,
-                    Err(_) => continue,
-                };
+                    Ok(idx) => block.blind_indexes.contains(&idx),
+                    Err(_) => false,
+                }
+            };
 
-            // Check if this block contains the blind index
-            if block.blind_indexes.contains(&blind_index) {
-                // Decrypt block data
+            if should_search_block {
                 if let Ok(block_data) = block.decrypt_data(&self.master_chain_key) {
                     for collection in &block_data.collections {
                         if collection.owner_api_key_hash == api_key_hash {

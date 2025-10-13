@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::constants::ENCRYPTION_SALT;
 use crate::crypto::{
-    derive_encryption_key, encrypt_data_with_key, get_public_key_hex, hash_api_key, sign_message,
+    encrypt_data_with_key, get_public_key_hex, global_key_cache, hash_api_key, sign_message,
     verify_signature,
 };
 use crate::types::Result;
@@ -30,7 +30,8 @@ impl UserAccount {
 
         // Encrypt metadata if provided
         let metadata_encrypted = if let Some(meta) = metadata {
-            let encryption_key = derive_encryption_key(api_key, ENCRYPTION_SALT);
+            let key_cache = global_key_cache();
+            let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
             let (encrypted, _nonce) = encrypt_data_with_key(&meta, &encryption_key)?;
             Some(encrypted)
         } else {
