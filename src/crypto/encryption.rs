@@ -1,6 +1,6 @@
 use aes_gcm::{
     aead::{Aead, KeyInit},
-    Aes256Gcm, Nonce,
+    Aes256Gcm,
 };
 use base64::{engine::general_purpose, Engine as _};
 
@@ -25,7 +25,7 @@ pub fn encrypt_data_with_nonce(
     nonce_bytes: &[u8; NONCE_SIZE_BYTES],
 ) -> Result<(String, String)> {
     let cipher = Aes256Gcm::new(encryption_key.into());
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce = nonce_bytes.into();
 
     // Encrypt
     let ciphertext = cipher
@@ -60,7 +60,11 @@ pub fn decrypt_data_with_key(
 
     // Split nonce and ciphertext
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_SIZE_BYTES);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    // Convert slice to array reference for nonce
+    let nonce_array: &[u8; NONCE_SIZE_BYTES] = nonce_bytes
+        .try_into()
+        .map_err(|_| GoudChainError::DecryptionFailed)?;
+    let nonce = nonce_array.into();
 
     // Decrypt
     let plaintext = cipher
