@@ -27,9 +27,6 @@ pub const HKDF_CONTEXT_ENCRYPTION: &[u8] = b"goud_chain_encryption_v2";
 pub const HKDF_CONTEXT_MAC: &[u8] = b"goud_chain_mac_v2";
 
 // JWT/Session
-// Default JWT secret for development (override with JWT_SECRET env var in production)
-pub const JWT_SECRET_DEFAULT: &[u8] =
-    b"goud_chain_jwt_secret_development_only_change_in_production";
 pub const SESSION_EXPIRY_SECONDS: i64 = 3600; // 1 hour
 
 // Genesis block

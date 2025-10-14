@@ -1,53 +1,126 @@
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm,
+};
+use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use tiny_http::Request;
 
-use crate::constants::{JWT_SECRET_DEFAULT, SESSION_EXPIRY_SECONDS};
+use crate::config::Config;
+use crate::constants::{NONCE_SIZE_BYTES, SESSION_EXPIRY_SECONDS};
 use crate::crypto::{constant_time_compare, decode_api_key, hash_api_key, validate_api_key};
 use crate::types::{GoudChainError, Result};
 
-/// Get JWT secret from environment variable or use default for development
-fn get_jwt_secret() -> Vec<u8> {
-    std::env::var("JWT_SECRET")
-        .map(|s| s.into_bytes())
-        .unwrap_or_else(|_| JWT_SECRET_DEFAULT.to_vec())
+/// Encrypt API key with session secret for storage in JWT
+fn encrypt_api_key_for_jwt(api_key: &[u8], config: &Config) -> Result<String> {
+    let session_secret = &config.session_secret;
+
+    // Derive a 32-byte key from session secret (handle variable length secrets)
+    let mut key_bytes = [0u8; 32];
+    let len = session_secret.len().min(32);
+    key_bytes[..len].copy_from_slice(&session_secret[..len]);
+
+    let cipher = Aes256Gcm::new(&key_bytes.into());
+
+    // Generate random nonce
+    let nonce_bytes: [u8; NONCE_SIZE_BYTES] = rand::random();
+    let nonce = nonce_bytes.into();
+
+    // Encrypt API key
+    let ciphertext = cipher
+        .encrypt(&nonce, api_key)
+        .map_err(|e| GoudChainError::Internal(format!("Failed to encrypt API key: {}", e)))?;
+
+    // Combine nonce + ciphertext and encode as base64
+    let mut combined = nonce_bytes.to_vec();
+    combined.extend_from_slice(&ciphertext);
+    Ok(general_purpose::STANDARD.encode(combined))
+}
+
+/// Decrypt API key from JWT encrypted_api_key field
+pub fn decrypt_api_key_from_jwt(encrypted_api_key: &str, config: &Config) -> Result<Vec<u8>> {
+    let session_secret = &config.session_secret;
+
+    // Derive a 32-byte key from session secret (handle variable length secrets)
+    let mut key_bytes = [0u8; 32];
+    let len = session_secret.len().min(32);
+    key_bytes[..len].copy_from_slice(&session_secret[..len]);
+
+    let cipher = Aes256Gcm::new(&key_bytes.into());
+
+    // Decode base64
+    let combined = general_purpose::STANDARD
+        .decode(encrypted_api_key)
+        .map_err(|e| GoudChainError::Internal(format!("Base64 decode failed: {}", e)))?;
+
+    if combined.len() < NONCE_SIZE_BYTES {
+        return Err(GoudChainError::Internal(
+            "Invalid encrypted API key format".to_string(),
+        ));
+    }
+
+    // Split nonce and ciphertext
+    let (nonce_bytes, ciphertext) = combined.split_at(NONCE_SIZE_BYTES);
+    let nonce_array: &[u8; NONCE_SIZE_BYTES] = nonce_bytes
+        .try_into()
+        .map_err(|_| GoudChainError::Internal("Invalid nonce size".to_string()))?;
+    let nonce = (*nonce_array).into();
+
+    // Decrypt
+    let plaintext = cipher
+        .decrypt(&nonce, ciphertext)
+        .map_err(|_| GoudChainError::Unauthorized("Invalid session token".to_string()))?;
+
+    Ok(plaintext)
 }
 
 /// JWT Claims structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,          // Subject (account_id)
-    pub api_key_hash: String, // API key hash for verification
-    pub exp: i64,             // Expiration timestamp
-    pub iat: i64,             // Issued at timestamp
+    pub sub: String,               // Subject (account_id)
+    pub api_key_hash: String,      // API key hash for verification
+    pub encrypted_api_key: String, // AES-GCM(api_key, SESSION_SECRET) - for server-side decryption
+    pub exp: i64,                  // Expiration timestamp
+    pub iat: i64,                  // Issued at timestamp
 }
 
 /// Generate a JWT session token from API key
-pub fn generate_session_token(account_id: String, api_key_hash: String) -> Result<String> {
+pub fn generate_session_token(
+    account_id: String,
+    api_key: &[u8],
+    api_key_hash: String,
+    config: &Config,
+) -> Result<String> {
     let now = Utc::now().timestamp();
+
+    // Encrypt API key with SESSION_SECRET for inclusion in JWT
+    let encrypted_api_key = encrypt_api_key_for_jwt(api_key, config)?;
+
     let claims = Claims {
         sub: account_id,
         api_key_hash,
+        encrypted_api_key,
         exp: now + SESSION_EXPIRY_SECONDS,
         iat: now,
     };
 
-    let jwt_secret = get_jwt_secret();
+    let jwt_secret = &config.jwt_secret;
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(&jwt_secret),
+        &EncodingKey::from_secret(jwt_secret),
     )
     .map_err(|e| GoudChainError::Internal(format!("JWT encoding failed: {}", e)))
 }
 
 /// Verify and decode a JWT session token
-pub fn verify_session_token(token: &str) -> Result<Claims> {
+pub fn verify_session_token(token: &str, config: &Config) -> Result<Claims> {
     let validation = Validation::default();
-    let jwt_secret = get_jwt_secret();
+    let jwt_secret = &config.jwt_secret;
 
-    decode::<Claims>(token, &DecodingKey::from_secret(&jwt_secret), &validation)
+    decode::<Claims>(token, &DecodingKey::from_secret(jwt_secret), &validation)
         .map(|data| data.claims)
         .map_err(|e| GoudChainError::Unauthorized(format!("Invalid token: {}", e)))
 }
@@ -59,7 +132,7 @@ pub enum AuthMethod {
 }
 
 /// Extract authentication from HTTP request
-pub fn extract_auth(request: &Request) -> Result<AuthMethod> {
+pub fn extract_auth(request: &Request, config: &Config) -> Result<AuthMethod> {
     // Get Authorization header
     let auth_header = request
         .headers()
@@ -77,7 +150,7 @@ pub fn extract_auth(request: &Request) -> Result<AuthMethod> {
     // Check if it's a Bearer token
     if let Some(token) = auth_value.strip_prefix("Bearer ") {
         // Try to decode as JWT first
-        if let Ok(claims) = verify_session_token(token) {
+        if let Ok(claims) = verify_session_token(token, config) {
             return Ok(AuthMethod::SessionToken(claims));
         }
 
@@ -116,40 +189,64 @@ pub fn verify_api_key_hash(api_key: &[u8], expected_hash: &str) -> Result<()> {
 mod tests {
     use super::*;
 
+    fn test_config() -> Config {
+        Config {
+            node_id: "test-node".to_string(),
+            http_port: "8080".to_string(),
+            p2p_port: 9000,
+            peers: vec![],
+            jwt_secret: b"test_jwt_secret_min_32_bytes_long_123456".to_vec(),
+            session_secret: b"test_session_secret_min_32_bytes_long".to_vec(),
+        }
+    }
+
     #[test]
     fn test_generate_verify_token() {
+        let config = test_config();
         let account_id = "test-account".to_string();
+        let api_key = b"test_api_key_12345678901234567890";
         let api_key_hash = "test-hash".to_string();
 
-        let token = generate_session_token(account_id.clone(), api_key_hash.clone()).unwrap();
+        let token =
+            generate_session_token(account_id.clone(), api_key, api_key_hash.clone(), &config)
+                .unwrap();
 
-        let claims = verify_session_token(&token).unwrap();
+        let claims = verify_session_token(&token, &config).unwrap();
         assert_eq!(claims.sub, account_id);
         assert_eq!(claims.api_key_hash, api_key_hash);
+
+        // Verify we can decrypt the API key from the token
+        let decrypted_api_key =
+            decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config).unwrap();
+        assert_eq!(decrypted_api_key, api_key);
     }
 
     #[test]
     fn test_expired_token() {
+        let config = test_config();
         let account_id = "test-account".to_string();
+        let api_key = b"test_api_key_12345678901234567890";
         let api_key_hash = "test-hash".to_string();
+        let encrypted_api_key = encrypt_api_key_for_jwt(api_key, &config).unwrap();
 
         // Create token that's already expired
         let claims = Claims {
             sub: account_id,
             api_key_hash,
+            encrypted_api_key,
             exp: Utc::now().timestamp() - 3600, // Expired 1 hour ago
             iat: Utc::now().timestamp() - 7200,
         };
 
-        let jwt_secret = get_jwt_secret();
+        let jwt_secret = &config.jwt_secret;
         let token = encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(&jwt_secret),
+            &EncodingKey::from_secret(jwt_secret),
         )
         .unwrap();
 
-        let result = verify_session_token(&token);
+        let result = verify_session_token(&token, &config);
         assert!(result.is_err());
     }
 

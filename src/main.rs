@@ -22,7 +22,7 @@ fn main() {
 
     // Load configuration
     let config = match Config::from_env() {
-        Ok(cfg) => cfg,
+        Ok(cfg) => Arc::new(cfg),
         Err(e) => {
             error!(error = %e, "Failed to load configuration");
             std::process::exit(1);
@@ -93,6 +93,7 @@ fn main() {
     for request in server.incoming_requests() {
         let blockchain = Arc::clone(&blockchain);
         let p2p = Arc::clone(&p2p_clone);
+        let config_clone = Arc::clone(&config);
 
         // Handle OPTIONS preflight requests
         if request.method() == &Method::Options {
@@ -103,6 +104,6 @@ fn main() {
         }
 
         // Route and handle request
-        route_request(request, blockchain, p2p);
+        route_request(request, blockchain, p2p, config_clone);
     }
 }

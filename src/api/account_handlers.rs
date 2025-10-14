@@ -5,6 +5,7 @@ use tracing::{error, info, warn};
 use super::auth::{generate_session_token, verify_api_key_hash};
 use super::internal_client::{forward_request_to_node, get_validator_node_address};
 use super::middleware::{error_response, json_response};
+use crate::config::Config;
 use crate::constants::{CHECKPOINT_INTERVAL, SESSION_EXPIRY_SECONDS};
 use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key};
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
@@ -178,7 +179,7 @@ pub fn handle_create_account(
 }
 
 /// Handle POST /account/login - Login with API key and get session token
-pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>) {
+pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>, config: Arc<Config>) {
     let mut content = String::new();
     if request.as_reader().read_to_string(&mut content).is_err() {
         let _ = request.respond(error_response(
@@ -200,11 +201,13 @@ pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>) {
                             // Verify API key hash matches (constant-time comparison)
                             match verify_api_key_hash(&api_key, &account.api_key_hash) {
                                 Ok(_) => {
-                                    // Generate session token
+                                    // Generate session token with encrypted API key
                                     let api_key_hash = hash_api_key(&api_key);
                                     match generate_session_token(
                                         account.account_id.clone(),
+                                        &api_key,
                                         api_key_hash,
+                                        &config,
                                     ) {
                                         Ok(token) => {
                                             let response = LoginResponse {

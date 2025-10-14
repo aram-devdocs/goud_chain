@@ -2,9 +2,10 @@ use std::sync::{Arc, Mutex};
 use tiny_http::{Request, Response};
 use tracing::{error, info, warn};
 
-use super::auth::{extract_auth, AuthMethod};
+use super::auth::{decrypt_api_key_from_jwt, extract_auth, AuthMethod};
 use super::internal_client::{forward_request_with_headers, get_validator_node_address};
 use super::middleware::{error_response, json_response};
+use crate::config::Config;
 use crate::constants::CHECKPOINT_INTERVAL;
 use crate::crypto::hash_api_key;
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
@@ -17,6 +18,7 @@ pub fn handle_submit_data(
     mut request: Request,
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
+    config: Arc<Config>,
 ) {
     // Extract Authorization header (needed for forwarding)
     let auth_header_value = request
@@ -31,7 +33,7 @@ pub fn handle_submit_data(
         .map(|h| h.value.as_str().to_string());
 
     // Extract authentication
-    let auth = match extract_auth(&request) {
+    let auth = match extract_auth(&request, &config) {
         Ok(a) => a,
         Err(e) => {
             let _ = request.respond(error_response(e.to_json(), e.status_code()));
@@ -257,25 +259,32 @@ pub fn handle_submit_data(
 pub fn handle_list_data(
     request: &Request,
     blockchain: Arc<Mutex<Blockchain>>,
+    config: Arc<Config>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication
-    let auth = match extract_auth(request) {
+    let auth = match extract_auth(request, &config) {
         Ok(a) => a,
         Err(e) => return error_response(e.to_json(), e.status_code()),
     };
 
-    // Only support API keys for now (Phase 2 will add session token support)
+    // Support both API keys and session tokens
     let api_key = match auth {
         AuthMethod::ApiKey(key) => key,
-        AuthMethod::SessionToken(_claims) => {
-            // TODO: In Phase 2, decrypt API key from JWT claims.encrypted_api_key
-            return error_response(
-                GoudChainError::Unauthorized(
-                    "Session tokens not yet supported for /data/list - use API key".to_string(),
-                )
-                .to_json(),
-                403,
-            );
+        AuthMethod::SessionToken(claims) => {
+            // Decrypt API key from JWT's encrypted_api_key field
+            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(key) => key,
+                Err(e) => {
+                    return error_response(
+                        GoudChainError::Unauthorized(format!(
+                            "Failed to decrypt API key from session token: {}",
+                            e
+                        ))
+                        .to_json(),
+                        403,
+                    );
+                }
+            }
         }
     };
 
@@ -327,21 +336,32 @@ pub fn handle_decrypt_data(
     request: &Request,
     blockchain: Arc<Mutex<Blockchain>>,
     collection_id: &str,
+    config: Arc<Config>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication - must be API key for decryption
-    let auth = match extract_auth(request) {
+    let auth = match extract_auth(request, &config) {
         Ok(a) => a,
         Err(e) => return error_response(e.to_json(), e.status_code()),
     };
 
+    // Support both API keys and session tokens
     let api_key = match auth {
         AuthMethod::ApiKey(key) => key,
-        AuthMethod::SessionToken(_) => {
-            return error_response(
-                GoudChainError::Unauthorized("Direct API key required for decryption".to_string())
-                    .to_json(),
-                403,
-            );
+        AuthMethod::SessionToken(claims) => {
+            // Decrypt API key from JWT's encrypted_api_key field
+            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(key) => key,
+                Err(e) => {
+                    return error_response(
+                        GoudChainError::Unauthorized(format!(
+                            "Failed to decrypt API key from session token: {}",
+                            e
+                        ))
+                        .to_json(),
+                        403,
+                    );
+                }
+            }
         }
     };
 

@@ -161,7 +161,12 @@ pub fn handle_get_current_validator(
 }
 
 /// Route and handle HTTP requests
-pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: Arc<P2PNode>) {
+pub fn route_request(
+    request: Request,
+    blockchain: Arc<Mutex<Blockchain>>,
+    p2p: Arc<P2PNode>,
+    config: Arc<crate::config::Config>,
+) {
     let method = request.method().clone();
     let url = request.url().to_string();
 
@@ -171,22 +176,23 @@ pub fn route_request(request: Request, blockchain: Arc<Mutex<Blockchain>>, p2p: 
             handle_create_account(request, blockchain, p2p);
         }
         (Method::Post, "/account/login") => {
-            handle_login(request, blockchain);
+            handle_login(request, blockchain, Arc::clone(&config));
         }
 
         // ========== Data Operations ==========
         (Method::Post, "/data/submit") => {
-            handle_submit_data(request, blockchain, p2p);
+            handle_submit_data(request, blockchain, p2p, Arc::clone(&config));
         }
         (Method::Get, "/data/list") => {
-            let response = handle_list_data(&request, blockchain);
+            let response = handle_list_data(&request, blockchain, Arc::clone(&config));
             let _ = request.respond(response);
         }
 
         // ========== Decryption (with path param) ==========
         (Method::Post, url) if url.starts_with("/data/decrypt/") => {
             let collection_id = url.trim_start_matches("/data/decrypt/");
-            let response = handle_decrypt_data(&request, blockchain, collection_id);
+            let response =
+                handle_decrypt_data(&request, blockchain, collection_id, Arc::clone(&config));
             let _ = request.respond(response);
         }
 
