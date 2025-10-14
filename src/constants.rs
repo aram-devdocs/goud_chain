@@ -52,3 +52,11 @@ pub const HEADER_VALUE_JSON: &[u8] = b"application/json";
 // Proof of Authority validators
 // Reduced to 2 validators for single-VM GCP deployment (optimized for e2-micro 1GB RAM)
 pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];
+
+// P2P Network Security (Phase 4)
+// Whitelist of allowed peer node IDs (must match NODE_ID env var of allowed peers)
+// In production, this should be configured via environment variable
+pub const ALLOWED_PEERS: [&str; 3] = ["node1", "node2", "node3"];
+pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
+pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
+pub const MAX_CONCURRENT_CONNECTIONS: usize = 10;

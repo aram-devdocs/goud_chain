@@ -3,11 +3,12 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
 use crate::constants::{
-    CHECKPOINT_INTERVAL, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
+    ALLOWED_PEERS, CHECKPOINT_INTERVAL, MAX_CONCURRENT_CONNECTIONS, MAX_MESSAGES_PER_MINUTE,
+    MIN_REPUTATION_THRESHOLD, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
     REPUTATION_REWARD_VALID_BLOCK,
 };
 use crate::domain::{Block, Blockchain};
@@ -15,11 +16,54 @@ use crate::network::messages::P2PMessage;
 use crate::storage::BlockchainStore;
 use crate::types::{GoudChainError, Result};
 
+/// Rate limiting tracker for a single peer
+#[derive(Debug, Clone)]
+pub struct RateLimitTracker {
+    message_count: u32,
+    window_start: u64, // Unix timestamp in seconds
+}
+
+impl RateLimitTracker {
+    fn new() -> Self {
+        Self {
+            message_count: 0,
+            window_start: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        }
+    }
+
+    fn check_and_increment(&mut self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Reset window if 60 seconds have passed
+        if now - self.window_start >= 60 {
+            self.message_count = 0;
+            self.window_start = now;
+        }
+
+        // Check if under limit
+        if self.message_count < MAX_MESSAGES_PER_MINUTE {
+            self.message_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub struct P2PNode {
     pub peers: Arc<Mutex<Vec<String>>>,
     pub blockchain: Arc<Mutex<Blockchain>>,
     pub blockchain_store: Arc<BlockchainStore>,
     pub peer_reputation: Arc<Mutex<HashMap<String, i32>>>,
+    pub rate_limiters: Arc<Mutex<HashMap<String, RateLimitTracker>>>,
+    pub blacklist: Arc<Mutex<Vec<String>>>, // Permanently banned peer addresses
+    pub active_connections: Arc<Mutex<usize>>,
 }
 
 impl P2PNode {
@@ -38,6 +82,9 @@ impl P2PNode {
             blockchain,
             blockchain_store,
             peer_reputation: Arc::new(Mutex::new(HashMap::new())),
+            rate_limiters: Arc::new(Mutex::new(HashMap::new())),
+            blacklist: Arc::new(Mutex::new(Vec::new())),
+            active_connections: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -101,11 +148,78 @@ impl P2PNode {
         }
     }
 
+    /// Check if a peer is whitelisted
+    #[allow(dead_code)] // Phase 4: Will be used in authentication handshake
+    fn is_peer_allowed(&self, node_id: &str) -> bool {
+        ALLOWED_PEERS.contains(&node_id)
+    }
+
+    /// Check if a peer is blacklisted
+    #[allow(dead_code)] // Phase 4: Used in connection handler (inline for now)
+    fn is_peer_blacklisted(&self, peer_addr: &str) -> bool {
+        let blacklist = self.blacklist.lock().unwrap();
+        blacklist.contains(&peer_addr.to_string())
+    }
+
+    /// Blacklist a peer permanently
+    #[allow(dead_code)] // Phase 4: Will be used when implementing malicious peer detection
+    fn blacklist_peer(&self, peer_addr: &str) {
+        let mut blacklist = self.blacklist.lock().unwrap();
+        if !blacklist.contains(&peer_addr.to_string()) {
+            blacklist.push(peer_addr.to_string());
+            warn!(peer = %peer_addr, "Peer blacklisted");
+        }
+    }
+
+    /// Check if a peer has acceptable reputation
+    #[allow(dead_code)] // Phase 4: Used inline in handle_connection
+    fn check_peer_reputation(&self, peer_addr: &str) -> bool {
+        let reputation = self.peer_reputation.lock().unwrap();
+        let rep = reputation.get(peer_addr).unwrap_or(&0);
+        *rep >= MIN_REPUTATION_THRESHOLD
+    }
+
+    /// Check rate limit for a peer
+    #[allow(dead_code)] // Phase 4: Used inline in handle_connection
+    fn check_rate_limit(&self, peer_addr: &str) -> bool {
+        let mut limiters = self.rate_limiters.lock().unwrap();
+        let tracker = limiters
+            .entry(peer_addr.to_string())
+            .or_insert_with(RateLimitTracker::new);
+        tracker.check_and_increment()
+    }
+
+    /// Check if max concurrent connections reached
+    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
+    fn can_accept_connection(&self) -> bool {
+        let active = self.active_connections.lock().unwrap();
+        *active < MAX_CONCURRENT_CONNECTIONS
+    }
+
+    /// Increment active connection count
+    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
+    fn increment_connections(&self) {
+        let mut active = self.active_connections.lock().unwrap();
+        *active += 1;
+    }
+
+    /// Decrement active connection count
+    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
+    fn decrement_connections(&self) {
+        let mut active = self.active_connections.lock().unwrap();
+        if *active > 0 {
+            *active -= 1;
+        }
+    }
+
     /// Start the P2P server to listen for incoming connections
     pub fn start_p2p_server(&self, port: u16) {
         let blockchain = Arc::clone(&self.blockchain);
         let blockchain_store = Arc::clone(&self.blockchain_store);
         let reputation = Arc::clone(&self.peer_reputation);
+        let rate_limiters = Arc::clone(&self.rate_limiters);
+        let blacklist = Arc::clone(&self.blacklist);
+        let active_connections = Arc::clone(&self.active_connections);
 
         thread::spawn(
             move || match TcpListener::bind(format!("0.0.0.0:{}", port)) {
@@ -116,6 +230,10 @@ impl P2PNode {
                         let bc = Arc::clone(&blockchain);
                         let store = Arc::clone(&blockchain_store);
                         let rep = Arc::clone(&reputation);
+                        let limiters = Arc::clone(&rate_limiters);
+                        let bl = Arc::clone(&blacklist);
+                        let active = Arc::clone(&active_connections);
+
                         let peer_addr = stream
                             .peer_addr()
                             .ok()
@@ -123,10 +241,33 @@ impl P2PNode {
                             .unwrap_or_default();
 
                         thread::spawn(move || {
-                            if let Err(e) =
-                                Self::handle_connection(stream, bc, store, rep, &peer_addr)
+                            // Check blacklist
+                            if bl.lock().unwrap().contains(&peer_addr) {
+                                warn!(peer = %peer_addr, "Rejected blacklisted peer");
+                                return;
+                            }
+
+                            // Check concurrent connection limit
                             {
+                                let mut active_count = active.lock().unwrap();
+                                if *active_count >= MAX_CONCURRENT_CONNECTIONS {
+                                    warn!(peer = %peer_addr, "Rejected: max concurrent connections reached");
+                                    return;
+                                }
+                                *active_count += 1;
+                            }
+
+                            // Handle connection (rate limiting checked inside)
+                            if let Err(e) = Self::handle_connection(
+                                stream, bc, store, rep, limiters, &peer_addr,
+                            ) {
                                 warn!(peer = %peer_addr, error = %e, "Connection handling failed");
+                            }
+
+                            // Decrement connection count
+                            let mut active_count = active.lock().unwrap();
+                            if *active_count > 0 {
+                                *active_count -= 1;
                             }
                         });
                     }
@@ -153,8 +294,35 @@ impl P2PNode {
         blockchain: Arc<Mutex<Blockchain>>,
         blockchain_store: Arc<BlockchainStore>,
         reputation: Arc<Mutex<HashMap<String, i32>>>,
+        rate_limiters: Arc<Mutex<HashMap<String, RateLimitTracker>>>,
         peer_addr: &str,
     ) -> Result<()> {
+        // Check reputation threshold
+        {
+            let rep = reputation.lock().unwrap();
+            let peer_rep = rep.get(peer_addr).unwrap_or(&0);
+            if *peer_rep < MIN_REPUTATION_THRESHOLD {
+                warn!(peer = %peer_addr, reputation = *peer_rep, "Rejected peer with low reputation");
+                return Err(GoudChainError::Unauthorized(
+                    "Peer reputation below threshold".to_string(),
+                ));
+            }
+        }
+
+        // Check rate limit
+        {
+            let mut limiters = rate_limiters.lock().unwrap();
+            let tracker = limiters
+                .entry(peer_addr.to_string())
+                .or_insert_with(RateLimitTracker::new);
+            if !tracker.check_and_increment() {
+                warn!(peer = %peer_addr, "Rate limit exceeded");
+                return Err(GoudChainError::Unauthorized(
+                    "Rate limit exceeded".to_string(),
+                ));
+            }
+        }
+
         // Note: We can't trigger sync from here as this is a static method
         // Chain divergence will be caught by periodic sync task
         let mut buffer = Vec::new();
