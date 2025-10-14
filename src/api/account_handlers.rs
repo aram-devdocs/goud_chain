@@ -109,9 +109,9 @@ pub fn handle_create_account(
                 Ok(account) => {
                     let account_id = account.account_id.clone();
 
-                    // Add account to blockchain
+                    // Add account to blockchain WITH API key for envelope creation
                     let mut blockchain_guard = blockchain.lock().unwrap();
-                    match blockchain_guard.add_account(account) {
+                    match blockchain_guard.add_account_with_key(account, api_key.clone()) {
                         Ok(_) => {
                             // Create block
                             match blockchain_guard.add_block() {
@@ -193,16 +193,15 @@ pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>) {
             // Decode API key
             match crate::crypto::decode_api_key(&req.api_key) {
                 Ok(api_key) => {
-                    let api_key_hash = hash_api_key(&api_key);
-
-                    // Find account
+                    // Find account (requires API key to decrypt envelope)
                     let blockchain_guard = blockchain.lock().unwrap();
-                    match blockchain_guard.find_account(&api_key_hash) {
+                    match blockchain_guard.find_account(&api_key) {
                         Some(account) => {
                             // Verify API key hash matches (constant-time comparison)
                             match verify_api_key_hash(&api_key, &account.api_key_hash) {
                                 Ok(_) => {
                                     // Generate session token
+                                    let api_key_hash = hash_api_key(&api_key);
                                     match generate_session_token(
                                         account.account_id.clone(),
                                         api_key_hash,

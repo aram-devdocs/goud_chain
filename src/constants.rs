@@ -2,7 +2,7 @@
 //! This module contains all magic numbers and strings used throughout the application.
 
 // Schema versioning
-pub const SCHEMA_VERSION: &str = "v6_rocksdb_storage";
+pub const SCHEMA_VERSION: &str = "v8_envelope_encryption";
 
 // Storage paths
 pub const DATA_DIRECTORY: &str = "/data";

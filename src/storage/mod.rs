@@ -13,11 +13,7 @@ pub use self::blockchain_store::BlockchainStore;
 
 /// Load the blockchain from RocksDB or create a new one
 /// Handles schema migration and JSON-to-RocksDB conversion automatically
-pub fn load_blockchain(
-    node_id: String,
-    master_chain_key: Vec<u8>,
-    store: &BlockchainStore,
-) -> Result<Blockchain> {
+pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Blockchain> {
     // Check if RocksDB has data
     if !store.is_empty() {
         info!("Loading blockchain from RocksDB");
@@ -33,7 +29,7 @@ pub fn load_blockchain(
             );
             store.clear_all()?;
             info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-            let blockchain = Blockchain::new(node_id.clone(), master_chain_key.clone())?;
+            let blockchain = Blockchain::new(node_id.clone())?;
 
             // Save genesis block to RocksDB
             if let Some(genesis) = blockchain.chain.first() {
@@ -62,23 +58,18 @@ pub fn load_blockchain(
             chain,
             node_id,
             checkpoints,
-            pending_accounts: Vec::new(),
+            pending_accounts_with_keys: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: Some(generate_signing_key()),
-            master_chain_key,
         })
     } else {
         // RocksDB is empty - check for legacy JSON file
-        check_json_migration(&node_id, &master_chain_key, store)
+        check_json_migration(&node_id, store)
     }
 }
 
 /// Check if JSON file exists and migrate to RocksDB
-fn check_json_migration(
-    node_id: &str,
-    master_chain_key: &[u8],
-    store: &BlockchainStore,
-) -> Result<Blockchain> {
+fn check_json_migration(node_id: &str, store: &BlockchainStore) -> Result<Blockchain> {
     // Legacy JSON path (keeping for migration)
     const LEGACY_JSON_PATH: &str = "/data/blockchain.json";
 
@@ -91,10 +82,9 @@ fn check_json_migration(
                 Ok(mut blockchain) => {
                     // Update runtime fields
                     blockchain.node_id = node_id.to_string();
-                    blockchain.pending_accounts = Vec::new();
+                    blockchain.pending_accounts_with_keys = Vec::new();
                     blockchain.pending_collections = Vec::new();
                     blockchain.node_signing_key = Some(generate_signing_key());
-                    blockchain.master_chain_key = master_chain_key.to_vec();
 
                     info!(
                         chain_length = blockchain.chain.len(),
@@ -125,8 +115,7 @@ fn check_json_migration(
                         warn!(error = %e, "Failed to delete corrupted JSON file");
                     }
 
-                    let blockchain =
-                        Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+                    let blockchain = Blockchain::new(node_id.to_string())?;
                     store.save_metadata(node_id, SCHEMA_VERSION)?;
                     Ok(blockchain)
                 }
@@ -135,7 +124,7 @@ fn check_json_migration(
         Err(_) => {
             // No JSON file found - create new blockchain
             info!("No existing blockchain found, creating new one");
-            let blockchain = Blockchain::new(node_id.to_string(), master_chain_key.to_vec())?;
+            let blockchain = Blockchain::new(node_id.to_string())?;
 
             // Save genesis block to RocksDB
             if let Some(genesis) = blockchain.chain.first() {

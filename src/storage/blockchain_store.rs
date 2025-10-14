@@ -311,16 +311,14 @@ mod tests {
         let store = create_test_store();
         store.clear_all().unwrap();
 
-        let master_key = b"test_master_key_32_bytes_long!!";
         let block = Block::new(BlockConfig {
             index: 0,
-            user_accounts: Vec::new(),
-            encrypted_collections: Vec::new(),
+            account_envelopes: Vec::new(),
+            collection_envelopes: Vec::new(),
             previous_hash: "0".to_string(),
             validator: "Validator_1".to_string(),
             blind_indexes: Vec::new(),
             block_salt: "test_salt".to_string(),
-            master_key,
         })
         .unwrap();
 

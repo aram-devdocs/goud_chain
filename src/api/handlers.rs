@@ -72,14 +72,14 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
     let mut validator_distribution: HashMap<String, u64> = HashMap::new();
 
     for block in &chain.chain {
-        // Decrypt block data to get counts
-        if let Ok(block_data) = block.decrypt_data(&chain.master_chain_key) {
-            total_collections += block_data.collections.len() as u64;
-            total_accounts += block_data.accounts.len() as u64;
-            *validator_distribution
-                .entry(block_data.validator.clone())
-                .or_insert(0) += 1;
-        }
+        // Get counts without decrypting envelopes (zero-knowledge)
+        total_collections += block.get_collection_count().unwrap_or(0) as u64;
+        total_accounts += block.get_account_count().unwrap_or(0) as u64;
+
+        // Validator is plaintext field
+        *validator_distribution
+            .entry(block.validator.clone())
+            .or_insert(0) += 1;
     }
 
     // Calculate average block time

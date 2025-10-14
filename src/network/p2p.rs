@@ -267,16 +267,9 @@ impl P2PNode {
                 let mut r = reputation.lock().unwrap();
                 *r.entry(peer_addr.to_string()).or_insert(0) += REPUTATION_REWARD_VALID_BLOCK;
             }
-            P2PMessage::NewAccount(account) => {
-                let mut blockchain = blockchain.lock().unwrap();
-                blockchain.add_account(account)?;
-                info!("Received valid account");
-            }
-            P2PMessage::NewCollection(collection) => {
-                let mut blockchain = blockchain.lock().unwrap();
-                blockchain.add_collection(collection)?;
-                info!("Received valid collection");
-            }
+            // Note: Individual account/collection sync removed in v8_envelope_encryption
+            // All data is synced as complete blocks with encrypted envelopes
+            // Nodes cannot extract individual accounts without API keys
             P2PMessage::RequestChain => {
                 let blockchain = blockchain.lock().unwrap();
                 let response = P2PMessage::ResponseChain(blockchain.chain.clone());

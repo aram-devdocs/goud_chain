@@ -60,7 +60,7 @@ pub fn handle_submit_data(
 
     // Verify account exists
     let blockchain_guard = blockchain.lock().unwrap();
-    if blockchain_guard.find_account(&api_key_hash).is_none() {
+    if blockchain_guard.find_account(&api_key).is_none() {
         drop(blockchain_guard);
         let _ = request.respond(error_response(
             GoudChainError::Unauthorized("Account not found".to_string()).to_json(),
@@ -264,19 +264,25 @@ pub fn handle_list_data(
         Err(e) => return error_response(e.to_json(), e.status_code()),
     };
 
-    // Get API key hash from auth
-    let (api_key, api_key_hash) = match auth {
-        AuthMethod::ApiKey(key) => {
-            let hash = hash_api_key(&key);
-            (Some(key), hash)
+    // Only support API keys for now (Phase 2 will add session token support)
+    let api_key = match auth {
+        AuthMethod::ApiKey(key) => key,
+        AuthMethod::SessionToken(_claims) => {
+            // TODO: In Phase 2, decrypt API key from JWT claims.encrypted_api_key
+            return error_response(
+                GoudChainError::Unauthorized(
+                    "Session tokens not yet supported for /data/list - use API key".to_string(),
+                )
+                .to_json(),
+                403,
+            );
         }
-        AuthMethod::SessionToken(claims) => (None, claims.api_key_hash),
     };
 
     let blockchain = blockchain.lock().unwrap();
 
     // Verify account exists
-    if blockchain.find_account(&api_key_hash).is_none() {
+    if blockchain.find_account(&api_key).is_none() {
         return error_response(
             GoudChainError::Unauthorized("Account not found".to_string()).to_json(),
             403,
@@ -284,34 +290,24 @@ pub fn handle_list_data(
     }
 
     // Find all collections for this user using blind index lookup
-    let collections = blockchain.find_collections_by_owner(&api_key_hash);
+    let collections = blockchain.find_collections_by_owner(&api_key);
     let mut result = Vec::new();
 
     for collection in collections {
-        // Try to decrypt metadata if we have the API key
-        let label = if let Some(ref key) = api_key {
-            match collection.decrypt_metadata(key) {
-                Ok(metadata) => metadata["label"]
-                    .as_str()
-                    .unwrap_or("[decryption failed]")
-                    .to_string(),
-                Err(_) => "[encrypted]".to_string(),
-            }
-        } else {
-            "[encrypted - use API key to decrypt]".to_string()
+        // Try to decrypt metadata (we have the API key)
+        let label = match collection.decrypt_metadata(&api_key) {
+            Ok(metadata) => metadata["label"]
+                .as_str()
+                .unwrap_or("[decryption failed]")
+                .to_string(),
+            Err(_) => "[encrypted]".to_string(),
         };
 
-        let created_at = if let Some(ref key) = api_key {
-            match collection.decrypt_metadata(key) {
-                Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
-                Err(_) => 0,
-            }
-        } else {
-            0
+        let created_at = match collection.decrypt_metadata(&api_key) {
+            Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
+            Err(_) => 0,
         };
 
-        // Note: We don't have block_number readily available in the new structure
-        // This would require additional lookup. For now, set to 0
         result.push(CollectionListItem {
             collection_id: collection.collection_id.clone(),
             label,
@@ -349,20 +345,13 @@ pub fn handle_decrypt_data(
         }
     };
 
-    let api_key_hash = hash_api_key(&api_key);
     let blockchain = blockchain.lock().unwrap();
 
-    // Find collection
-    match blockchain.find_collection(collection_id) {
+    // Find collection (requires API key to decrypt envelope and verify ownership)
+    match blockchain.find_collection(collection_id, &api_key) {
         Some(collection) => {
-            // Verify ownership
-            if collection.owner_api_key_hash != api_key_hash {
-                return error_response(
-                    GoudChainError::Unauthorized("Not the owner of this collection".to_string())
-                        .to_json(),
-                    403,
-                );
-            }
+            // Ownership already verified in find_collection
+            // (it only returns collections owned by the API key)
 
             // Decrypt metadata and payload
             match (
