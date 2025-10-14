@@ -241,22 +241,29 @@ impl P2PNode {
                             .unwrap_or_default();
 
                         thread::spawn(move || {
-                            // Check blacklist
+                            // Check blacklist BEFORE incrementing connection counter
                             if bl.lock().unwrap().contains(&peer_addr) {
                                 warn!(peer = %peer_addr, "Rejected blacklisted peer");
                                 return;
                             }
 
-                            // Check concurrent connection limit
-                            {
+                            // Check and increment connection limit atomically
+                            let should_handle = {
                                 let mut active_count = active.lock().unwrap();
                                 if *active_count >= MAX_CONCURRENT_CONNECTIONS {
                                     warn!(peer = %peer_addr, "Rejected: max concurrent connections reached");
-                                    return;
+                                    false
+                                } else {
+                                    *active_count += 1;
+                                    true
                                 }
-                                *active_count += 1;
+                            };
+
+                            if !should_handle {
+                                return; // Don't handle, and counter wasn't incremented
                             }
 
+                            // Connection counter incremented - MUST decrement on ALL exit paths
                             // Handle connection (rate limiting checked inside)
                             if let Err(e) = Self::handle_connection(
                                 stream, bc, store, rep, limiters, &peer_addr,
@@ -264,7 +271,7 @@ impl P2PNode {
                                 warn!(peer = %peer_addr, error = %e, "Connection handling failed");
                             }
 
-                            // Decrement connection count
+                            // Decrement connection count (guaranteed to run)
                             let mut active_count = active.lock().unwrap();
                             if *active_count > 0 {
                                 *active_count -= 1;
@@ -325,9 +332,17 @@ impl P2PNode {
 
         // Note: We can't trigger sync from here as this is a static method
         // Chain divergence will be caught by periodic sync task
-        let mut buffer = Vec::new();
+
+        // Read length-prefixed message: [4 bytes length][N bytes payload]
+        let mut len_bytes = [0u8; 4];
         stream
-            .read_to_end(&mut buffer)
+            .read_exact(&mut len_bytes)
+            .map_err(GoudChainError::IoError)?;
+        let len = u32::from_be_bytes(len_bytes) as usize;
+
+        let mut buffer = vec![0u8; len];
+        stream
+            .read_exact(&mut buffer)
             .map_err(GoudChainError::IoError)?;
 
         let message: P2PMessage = bincode::deserialize(&buffer)
@@ -457,6 +472,11 @@ impl P2PNode {
         let mut stream = TcpStream::connect(peer)
             .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
 
+        // Write length-prefixed message: [4 bytes length][N bytes payload]
+        let len = encoded.len() as u32;
+        stream
+            .write_all(&len.to_be_bytes())
+            .map_err(GoudChainError::IoError)?;
         stream
             .write_all(&encoded)
             .map_err(GoudChainError::IoError)?;
@@ -472,13 +492,25 @@ impl P2PNode {
         let mut stream = TcpStream::connect(peer)
             .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
 
+        // Write length-prefixed message: [4 bytes length][N bytes payload]
+        let len = encoded.len() as u32;
+        stream
+            .write_all(&len.to_be_bytes())
+            .map_err(GoudChainError::IoError)?;
         stream
             .write_all(&encoded)
             .map_err(GoudChainError::IoError)?;
 
-        let mut buffer = Vec::new();
+        // Read length-prefixed response: [4 bytes length][N bytes payload]
+        let mut len_bytes = [0u8; 4];
         stream
-            .read_to_end(&mut buffer)
+            .read_exact(&mut len_bytes)
+            .map_err(GoudChainError::IoError)?;
+        let len = u32::from_be_bytes(len_bytes) as usize;
+
+        let mut buffer = vec![0u8; len];
+        stream
+            .read_exact(&mut buffer)
             .map_err(GoudChainError::IoError)?;
 
         bincode::deserialize(&buffer)
@@ -490,6 +522,11 @@ impl P2PNode {
         let encoded = bincode::serialize(message)
             .map_err(|e| GoudChainError::SerializationError(e.to_string()))?;
 
+        // Write length-prefixed message: [4 bytes length][N bytes payload]
+        let len = encoded.len() as u32;
+        stream
+            .write_all(&len.to_be_bytes())
+            .map_err(GoudChainError::IoError)?;
         stream
             .write_all(&encoded)
             .map_err(GoudChainError::IoError)?;
