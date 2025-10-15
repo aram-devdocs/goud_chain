@@ -24,6 +24,8 @@ pub struct EncryptedCollection {
 
 impl EncryptedCollection {
     /// Create a new encrypted collection
+    /// Note: Size validation happens at API layer (P3-002) before reaching this function
+    /// Encryption adds ~1.33x overhead (base64 encoding + nonce + MAC)
     pub fn new(
         label: String,
         data: String,

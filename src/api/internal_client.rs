@@ -14,10 +14,10 @@ pub fn forward_request_to_node(
     body: &str,
     content_type: &str,
 ) -> Result<(u16, String)> {
-    forward_request_with_headers(target_node, method, path, body, content_type, None)
+    forward_request_with_headers(target_node, method, path, body, content_type, None, None)
 }
 
-/// Forward an HTTP request with optional Authorization header
+/// Forward an HTTP request with optional Authorization and X-Signature headers
 /// Used when current node is not the PoA validator
 pub fn forward_request_with_headers(
     target_node: &str,
@@ -26,6 +26,7 @@ pub fn forward_request_with_headers(
     body: &str,
     content_type: &str,
     auth_header: Option<&str>,
+    signature_header: Option<&str>,
 ) -> Result<(u16, String)> {
     info!(
         target_node = %target_node,
@@ -99,6 +100,7 @@ pub fn forward_request_with_headers(
                     content_type,
                     &target_addr,
                     auth_header,
+                    signature_header,
                 );
             }
             Err(e) => {
@@ -129,6 +131,7 @@ pub fn forward_request_with_headers(
 }
 
 /// Perform the actual HTTP request over an established TCP stream
+#[allow(clippy::too_many_arguments)]
 fn perform_http_request(
     mut stream: TcpStream,
     method: &str,
@@ -137,10 +140,15 @@ fn perform_http_request(
     content_type: &str,
     target_addr: &str,
     auth_header: Option<&str>,
+    signature_header: Option<&str>,
 ) -> Result<(u16, String)> {
-    // Build HTTP request with optional Authorization header
+    // Build HTTP request with optional Authorization and X-Signature headers
     let auth_line = auth_header
         .map(|h| format!("Authorization: {}\r\n", h))
+        .unwrap_or_default();
+
+    let signature_line = signature_header
+        .map(|h| format!("X-Signature: {}\r\n", h))
         .unwrap_or_default();
 
     let request = format!(
@@ -148,7 +156,7 @@ fn perform_http_request(
          Host: {}\r\n\
          Content-Type: {}\r\n\
          Content-Length: {}\r\n\
-         {}Connection: close\r\n\
+         {}{}Connection: close\r\n\
          \r\n\
          {}",
         method,
@@ -157,6 +165,7 @@ fn perform_http_request(
         content_type,
         body.len(),
         auth_line,
+        signature_line,
         body
     );
 

@@ -80,3 +80,8 @@ pub const BAN_IP_24HR_SECONDS: u64 = 86400; // After complete blacklist: 24-hour
 
 // Performance tuning
 pub const RATE_LIMIT_CACHE_SIZE: usize = 10000; // LRU cache for hot API keys
+
+// Request signing (P3-003 - Replay Attack Prevention)
+pub const SIGNATURE_HEADER_NAME: &str = "X-Signature";
+pub const SIGNATURE_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5 minutes
+pub const NONCE_EXPIRY_SECONDS: u64 = 600; // 10 minutes (nonce deduplication window)

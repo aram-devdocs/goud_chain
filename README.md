@@ -63,6 +63,9 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
   - **Tier 2 (Encryption):** 1,000 iterations for encryption/MAC keys (domain separation)
 - **API Key Authentication** - Cryptographically secure 256-bit keys
 - **JWT Sessions** - Token-based authentication with 1-hour expiry
+- **Request Signing** - HMAC-SHA256 signatures prevent replay attacks with 5-minute timestamp tolerance and 10-minute nonce window
+- **Payload Size Limits** - 10MB per collection, 100MB per block, 100-character labels (prevents storage DoS)
+- **Input Validation** - JSON schema validation with max depth limits and control character filtering (prevents injection attacks)
 - **Constant-Time Comparisons** - `subtle` crate prevents timing attacks
 - **Memory Protection** - Automatic key zeroization with 5-minute TTL and LRU cache
 - **Graduated Rate Limiting** - 5-tier DoS protection (10 writes/sec, 100 reads/sec)

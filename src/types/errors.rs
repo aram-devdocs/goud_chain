@@ -108,6 +108,33 @@ pub enum GoudChainError {
     #[error("IP address banned: expires at {expires_at}")]
     IpAddressBanned { expires_at: i64 },
 
+    // Size limit errors (P3-002 - DoS Protection)
+    #[error("Payload too large: {actual_bytes} bytes (max: {max_bytes} bytes)")]
+    PayloadTooLarge {
+        actual_bytes: usize,
+        max_bytes: usize,
+    },
+
+    // Input validation errors (P3-004 - Injection Prevention)
+    #[error("Invalid label: {0}")]
+    InvalidLabel(String),
+
+    #[error("Invalid JSON: {0}")]
+    InvalidJson(String),
+
+    #[error("JSON too deep: maximum {max_depth} levels allowed")]
+    JsonTooDeep { max_depth: usize },
+
+    // Request signing errors (P3-003 - Replay Attack Prevention)
+    #[error("Signature verification failed: {0}")]
+    InvalidRequestSignature(String),
+
+    #[error("Replay attack detected: nonce already used")]
+    NonceReused,
+
+    #[error("Request timestamp expired (older than 5 minutes)")]
+    RequestExpired,
+
     // Configuration errors
     #[error("Configuration error: {0}")]
     ConfigError(String),
@@ -130,9 +157,17 @@ pub type Result<T> = std::result::Result<T, GoudChainError>;
 impl GoudChainError {
     pub fn status_code(&self) -> u16 {
         match self {
-            Self::InvalidRequestBody(_) => 400,
-            Self::Unauthorized(_) | Self::DecryptionFailed => 403,
+            Self::InvalidRequestBody(_)
+            | Self::InvalidLabel(_)
+            | Self::InvalidJson(_)
+            | Self::JsonTooDeep { .. } => 400,
+            Self::Unauthorized(_)
+            | Self::DecryptionFailed
+            | Self::InvalidRequestSignature(_)
+            | Self::NonceReused
+            | Self::RequestExpired => 401,
             Self::DataNotFound(_) | Self::KeyNotFound(_) => 404,
+            Self::PayloadTooLarge { .. } => 413,
             Self::InvalidSignature
             | Self::InvalidBlockHash(_)
             | Self::BrokenChain(_)

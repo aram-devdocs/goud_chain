@@ -211,6 +211,11 @@ impl RateLimiter {
         })
     }
 
+    /// Get access to underlying rate limit store (for signature verification)
+    pub fn get_store(&self) -> &Arc<RateLimitStore> {
+        &self.store
+    }
+
     /// Create HTTP headers for rate limit response
     pub fn create_headers(&self, result: &RateLimitResult) -> Vec<(String, String)> {
         match result {

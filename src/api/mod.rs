@@ -8,5 +8,5 @@ pub mod rate_limiter;
 
 // Re-export commonly used functions
 pub use handlers::route_request;
-pub use middleware::create_preflight_response;
+pub use middleware::{create_preflight_response, verify_request_signature};
 pub use rate_limiter::{RateLimitResult, RateLimiter};

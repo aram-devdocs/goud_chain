@@ -793,6 +793,88 @@
                     }
                 },
 
+                // Generate request signature (P3-003 - Replay Attack Prevention)
+                // Format: X-Signature: ts={timestamp},nonce={nonce},sig={hex}
+                // Signature = HMAC-SHA256(api_key, timestamp || nonce || SHA256(body))
+                async signRequest(body) {
+                    try {
+                        // Generate timestamp (Unix seconds)
+                        const timestamp = Math.floor(Date.now() / 1000);
+
+                        // Generate cryptographically secure random nonce
+                        const nonce = this.generateNonce();
+
+                        // Decode base64 API key to raw bytes
+                        const apiKeyBytes = this.base64ToBytes(this.apiKey);
+
+                        // Compute SHA-256 hash of request body
+                        const bodyHash = await this.sha256(body);
+
+                        // Compute HMAC-SHA256 signature
+                        const message = `${timestamp}${nonce}${bodyHash}`;
+                        const signature = await this.hmacSha256(apiKeyBytes, message);
+
+                        // Return formatted header value
+                        return `ts=${timestamp},nonce=${nonce},sig=${signature}`;
+                    } catch (e) {
+                        console.error('Failed to sign request:', e);
+                        throw new Error('Signature generation failed');
+                    }
+                },
+
+                // Generate cryptographically secure random nonce (UUID v4)
+                generateNonce() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                },
+
+                // Decode base64 string to Uint8Array
+                base64ToBytes(base64) {
+                    const binaryString = atob(base64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    return bytes;
+                },
+
+                // Compute SHA-256 hash and return hex string
+                async sha256(message) {
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(message);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    return this.bufferToHex(hashBuffer);
+                },
+
+                // Compute HMAC-SHA256 and return hex string
+                async hmacSha256(keyBytes, message) {
+                    const encoder = new TextEncoder();
+                    const messageBytes = encoder.encode(message);
+
+                    // Import key for HMAC
+                    const cryptoKey = await crypto.subtle.importKey(
+                        'raw',
+                        keyBytes,
+                        { name: 'HMAC', hash: 'SHA-256' },
+                        false,
+                        ['sign']
+                    );
+
+                    // Sign message
+                    const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageBytes);
+                    return this.bufferToHex(signatureBuffer);
+                },
+
+                // Convert ArrayBuffer to hex string
+                bufferToHex(buffer) {
+                    return Array.from(new Uint8Array(buffer))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
+                },
+
                 // ==================== Submit Data ====================
 
                 addField() {
@@ -882,13 +964,24 @@
                     const startTime = performance.now();
 
                     try {
+                        // Prepare request body
+                        const body = JSON.stringify(this.form);
+
+                        // Generate request signature (P3-003 - Replay Attack Prevention)
+                        const signature = await this.signRequest(body);
+                        console.log('Generated signature:', signature);
+
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'X-Signature': signature
+                        };
+                        console.log('Request headers:', headers);
+
                         const res = await fetch(`${API_BASE}/data/submit`, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${this.apiKey}`
-                            },
-                            body: JSON.stringify(this.form)
+                            headers: headers,
+                            body: body
                         });
 
                         const endTime = performance.now();

@@ -151,6 +151,40 @@ pub fn handle_submit_data(
 
     match serde_json::from_str::<SubmitDataRequest>(&content) {
         Ok(req) => {
+            // DEBUG: Log all headers
+            info!("=== DEBUG: Request headers ===");
+            for header in request.headers() {
+                info!(
+                    "Header: {} = {}",
+                    header.field.as_str(),
+                    header.value.as_str()
+                );
+            }
+            info!("=== END DEBUG ===");
+
+            // Verify request signature (P3-003 - Replay Protection)
+            // NOTE: To disable signature verification (not recommended), comment out this block
+            if let Err(e) = super::verify_request_signature(
+                &request,
+                &api_key,
+                &content,
+                _rate_limiter.get_store(),
+            ) {
+                warn!(
+                    api_key_hash = %api_key_hash,
+                    error = %e,
+                    "Signature verification failed"
+                );
+                let _ = request.respond(error_response(e.to_json(), e.status_code()));
+                return;
+            }
+
+            // Validate request size BEFORE encryption (P3-002 - DoS Protection)
+            if let Err(e) = req.validate() {
+                let _ = request.respond(error_response(e.to_json(), e.status_code()));
+                return;
+            }
+
             // Check if this node is the authorized validator for the next block
             let blockchain_guard = blockchain.lock().unwrap();
             let next_block_number = blockchain_guard
@@ -174,6 +208,18 @@ pub fn handle_submit_data(
 
                 match get_validator_node_address(&expected_validator) {
                     Ok(validator_addr) => {
+                        // Extract X-Signature header to forward to validator
+                        let signature_header = request
+                            .headers()
+                            .iter()
+                            .find(|h| {
+                                h.field
+                                    .as_str()
+                                    .as_str()
+                                    .eq_ignore_ascii_case("X-Signature")
+                            })
+                            .map(|h| h.value.as_str());
+
                         match forward_request_with_headers(
                             &validator_addr,
                             "POST",
@@ -181,6 +227,7 @@ pub fn handle_submit_data(
                             &content,
                             "application/json",
                             auth_header_value.as_deref(),
+                            signature_header,
                         ) {
                             Ok((status_code, response_body)) => {
                                 info!(
