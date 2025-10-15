@@ -80,6 +80,22 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Cloud-Native** - Runs on GCP free tier ($0/month)
 - **DoS Protection** - 5-tier graduated rate limiting with IP banning
 
+### Operational Security & Observability
+- **Audit Logging** - Comprehensive audit trails stored on blockchain
+  - All account and data operations logged (create, login, submit, decrypt, list)
+  - Batched storage (10s intervals or 50 events) reduces blockchain bloat
+  - Privacy-preserving: IP addresses hashed (truncated SHA-256)
+  - Encrypted with user's API key (only account owner can view their logs)
+  - Query API with time range, event type, and pagination filters
+- **System Metrics** - Real-time performance monitoring via `/api/metrics` endpoint
+  - Cache hit rates, operations per second, chain statistics
+  - Prometheus-compatible metrics for external monitoring tools
+  - Per-node health and status tracking
+- **Dashboard Integration** - Visual audit log viewer with filtering and export
+  - Real-time event streaming
+  - Timeline visualization
+  - CSV/JSON export capabilities
+
 ## Quick Start (Local Development)
 
 ```bash
@@ -456,6 +472,65 @@ curl http://localhost:8080/health
   "peer_count": 1
 }
 ```
+
+### System Metrics
+
+```bash
+curl http://localhost:8080/api/metrics
+
+# Response:
+{
+  "node_id": "node1",
+  "chain_length": 10,
+  "peer_count": 2,
+  "latest_block_index": 9,
+  "latest_block_timestamp": 1704067200,
+  "status": "healthy",
+  "total_operations": 25,
+  "cache_hit_rate": 99.3,
+  "operations_per_second": 0.0
+}
+```
+
+### Query Audit Logs
+
+```bash
+# Get all audit logs for authenticated user
+curl -X GET "http://localhost:8080/api/audit?page=0&page_size=20" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Filter by event type and time range
+curl -X GET "http://localhost:8080/api/audit?event_type=DataSubmitted&start_ts=1704067200000&end_ts=1704153600000" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Response:
+{
+  "logs": [
+    {
+      "event_type": "DataSubmitted",
+      "timestamp": 1704067800000,
+      "collection_id": "650e8400-e29b-41d4-a716-446655440000",
+      "ip_hash": "1a2b3c4d5e6f7890",
+      "metadata": {
+        "block": 5,
+        "label": "my-data"
+      },
+      "invalidated": false
+    }
+  ],
+  "total": 25,
+  "page": 0,
+  "page_size": 20,
+  "total_pages": 2
+}
+```
+
+**Query Parameters:**
+- `page` - Page number (0-indexed, default: 0)
+- `page_size` - Items per page (default: 50, max: 100)
+- `event_type` - Filter by event type (AccountCreated, DataSubmitted, DataDecrypted, DataListed, AccountLogin)
+- `start_ts` - Start timestamp in milliseconds (inclusive)
+- `end_ts` - End timestamp in milliseconds (inclusive)
 
 ### Load Balancer Status
 

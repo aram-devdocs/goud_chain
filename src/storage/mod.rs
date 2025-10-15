@@ -1,3 +1,4 @@
+pub mod audit_log;
 pub mod blockchain_store;
 pub mod rate_limit_store;
 
@@ -10,6 +11,7 @@ use crate::domain::Blockchain;
 use crate::types::{GoudChainError, Result};
 
 // Re-export storage modules
+pub use self::audit_log::AuditLogger;
 pub use self::blockchain_store::BlockchainStore;
 pub use self::rate_limit_store::{BanLevel, RateLimitStore};
 

@@ -528,3 +528,124 @@ NGINX_PROXY_TIMEOUT_NEW=60s  # Shorter timeout for GCP
 - Use descriptive constant names (NGINX_PROXY_READ_TIMEOUT not TIMEOUT_1)
 - Document non-obvious values with inline comments in constants.env
 - When in doubt, regenerate: `./config/scripts/generate-configs.sh all`
+
+## Operational Security & Observability
+
+### Audit Logging Architecture
+
+The audit logging system provides comprehensive operational security by tracking all user activities on the blockchain. This is critical for compliance, security investigations, and user transparency.
+
+**Design Philosophy:**
+- **Blockchain-Native Storage:** Audit logs are stored as `EncryptedCollection` objects directly on the blockchain (no separate database)
+- **Privacy-Preserving:** Only the account owner can decrypt their audit logs (encrypted with their API key)
+- **Batched for Efficiency:** Events are buffered and flushed every 10 seconds or when 50 events accumulate (reduces blockchain bloat)
+- **Immutable by Design:** Blockchain immutability ensures audit logs cannot be tampered with or deleted
+- **Non-Blocking:** Audit logging is asynchronous and never blocks API operations
+
+**Layer Assignment:**
+- **Layer 0 (Foundation):** `src/types/audit.rs` - Pure audit data types (AuditEventType, AuditLogEntry, AuditLogBatch)
+- **Layer 3 (Persistence):** `src/storage/audit_log.rs` - Audit logger implementation, batching, and storage
+- **Layer 5 (Presentation):** `src/api/handlers.rs` - Audit query API endpoint (`GET /api/audit`)
+
+**Event Types Logged:**
+1. **AccountCreated** - New account registration (POST /account/create)
+2. **AccountLogin** - User authentication with API key (POST /account/login)
+3. **DataSubmitted** - Data written to blockchain (POST /data/submit)
+4. **DataDecrypted** - Data read from blockchain (POST /data/decrypt/{id})
+5. **DataListed** - User queried their collections (GET /data/list)
+
+**Storage Format:**
+```rust
+// Audit logs stored as encrypted collections with "AUDIT:" label prefix
+EncryptedCollection {
+    collection_id: "uuid-...",
+    owner_api_key_hash: "sha256(api_key)",
+    encrypted_metadata: "AUDIT:2024-01-01T00:00:00Z", // Label with batch timestamp
+    encrypted_payload: "AES-GCM(JSON(AuditLogBatch))", // Array of AuditLogEntry
+    mac: "HMAC-SHA256(...)",
+    nonce: "random-12-bytes",
+    signature: "Ed25519(...)",
+}
+```
+
+**Batching Strategy:**
+- **Time-based flush:** Every 10 seconds (configurable via `AUDIT_BATCH_INTERVAL_SECONDS`)
+- **Size-based flush:** When 50 events accumulate (configurable via `AUDIT_BATCH_SIZE`)
+- **Graceful shutdown:** Flushes all pending logs on node shutdown
+- **Per-account buffering:** Separate buffers per API key hash prevent cross-user interference
+
+**Privacy Considerations:**
+- **IP Address Hashing:** Client IPs are hashed using SHA-256, then truncated to 8 bytes (prevents reverse lookup)
+- **Encryption:** Logs encrypted with user's API key (not master chain key) so only owner can read
+- **Soft Deletion:** `invalidated` flag supports retention policies without actually deleting (blockchain is immutable)
+- **Metadata Separation:** Event metadata stored as JSON (flexible schema for different event types)
+
+**Query Performance:**
+- **Linear Scan:** Currently O(n) scan of all blocks (acceptable for PoC with <10k blocks)
+- **Future Optimization:** Add RocksDB index for fast time-range queries
+- **Pagination:** API supports page/page_size parameters to limit memory usage
+- **Filtering:** Filter by event type, time range, and invalidation status
+
+**Integration Points:**
+1. **API Handlers:** Call `audit_logger.log()` after successful operations (non-blocking)
+2. **Authentication Middleware:** Log login attempts (both success and failure)
+3. **Data Operations:** Log submit, decrypt, list operations with collection IDs
+4. **Background Task:** Tokio async task flushes pending logs periodically
+5. **Dashboard:** Visual timeline of audit events with export capabilities
+
+**Error Handling:**
+- Audit logging failures NEVER block API operations (fail-open design)
+- Errors logged to tracing but operation succeeds
+- Critical for availability: audit system downtime doesn't affect blockchain operations
+- Trade-off: Some audit events may be lost if flush fails
+
+**Testing Strategy:**
+- Unit tests for batching logic and serialization
+- Integration tests for end-to-end audit trail verification
+- Simulate failure scenarios (flush errors, disk full, encryption failures)
+- Verify audit logs survive node restarts and P2P synchronization
+
+**Configuration:**
+```bash
+# src/constants.rs
+pub const AUDIT_LABEL_PREFIX: &str = "AUDIT:";
+pub const AUDIT_BATCH_SIZE: usize = 50;         // Max events per batch
+pub const AUDIT_BATCH_INTERVAL_SECONDS: u64 = 10; // Flush interval
+pub const AUDIT_IP_HASH_LENGTH: usize = 8;      // Truncated SHA-256 length
+```
+
+**Future Enhancements:**
+- Retention policies (auto-invalidate logs older than N days)
+- RocksDB index for O(log n) queries
+- Real-time audit event streaming (WebSocket)
+- Audit log export to external SIEM systems
+- Anomaly detection (unusual access patterns)
+- Compliance reports (GDPR, HIPAA, SOC2)
+
+### System Metrics
+
+The metrics endpoint (`GET /api/metrics`) provides real-time operational visibility into blockchain performance.
+
+**Metrics Tracked:**
+- **Chain Statistics:** Length, latest block index, timestamp
+- **Network Health:** Peer count, node status
+- **Performance:** Total operations (accounts + collections), cache hit rates
+- **Future:** Operations per second (requires time-series tracking)
+
+**Cache Hit Rate Calculation:**
+```rust
+// Key derivation cache (HKDF results cached for 5 minutes)
+let cache_stats = global_key_cache().stats();
+let hit_rate = cache_stats.hit_rate(); // hits / (hits + misses) * 100.0
+```
+
+**Prometheus Integration:**
+- Endpoint: `GET /metrics` (Prometheus scrape format)
+- Metrics exposed: chain_length, peer_count, operations_total, cache_hit_rate
+- Useful for Grafana dashboards and alerting
+
+**Best Practices:**
+- Use metrics to identify performance bottlenecks (low cache hit rate = too many HKDF computations)
+- Monitor peer_count to detect network partitions
+- Track operations_total to understand blockchain growth rate
+- Compare metrics across nodes to detect inconsistencies

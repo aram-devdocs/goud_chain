@@ -23,6 +23,7 @@ pub fn handle_create_account(
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
     _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) {
     // Extract client IP for rate limiting (no API key yet for new accounts)
     let client_ip = extract_client_ip(&request);
@@ -201,10 +202,22 @@ pub fn handle_create_account(
                                     drop(blockchain_guard);
 
                                     let response = CreateAccountResponse {
-                                        account_id,
+                                        account_id: account_id.clone(),
                                         api_key: encode_api_key(&api_key),
                                         warning: "⚠️ SAVE THIS API KEY SECURELY. It cannot be recovered and provides full access to your data.".to_string(),
                                     };
+
+                                    // Audit log: Account created (Phase 4)
+                                    // Logs are batched and flushed by background task every 10s
+                                    if let Err(e) = audit_logger.log(
+                                        &api_key,
+                                        AuditEventType::AccountCreated,
+                                        None,
+                                        &client_ip,
+                                        serde_json::json!({"account_id": account_id, "block": block.index}),
+                                    ) {
+                                        error!(error = %e, "Failed to log account creation audit event");
+                                    }
 
                                     info!("New account created");
                                     // Add rate limit headers to success response
@@ -246,7 +259,12 @@ pub fn handle_create_account(
 }
 
 /// Handle POST /account/login - Login with API key and get session token
-pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>, config: Arc<Config>) {
+pub fn handle_login(
+    mut request: Request,
+    blockchain: Arc<Mutex<Blockchain>>,
+    config: Arc<Config>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
+) {
     let mut content = String::new();
     if request.as_reader().read_to_string(&mut content).is_err() {
         let _ = request.respond(error_response(
@@ -292,8 +310,24 @@ pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>, co
                                             let response = LoginResponse {
                                                 session_token: token,
                                                 expires_in: SESSION_EXPIRY_SECONDS,
-                                                account_id: account.account_id,
+                                                account_id: account.account_id.clone(),
                                             };
+
+                                            // Drop blockchain lock before audit logging to avoid deadlock
+                                            drop(blockchain_guard);
+
+                                            // Audit log: Account login (Phase 4)
+                                            // Logs are batched and flushed by background task every 10s
+                                            let client_ip = extract_client_ip(&request);
+                                            if let Err(e) = audit_logger.log(
+                                                &api_key,
+                                                AuditEventType::AccountLogin,
+                                                None,
+                                                &client_ip,
+                                                serde_json::json!({"account_id": account.account_id}),
+                                            ) {
+                                                error!(error = %e, "Failed to log login audit event");
+                                            }
 
                                             info!("User logged in");
                                             let _ = request.respond(json_response(

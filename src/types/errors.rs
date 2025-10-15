@@ -139,6 +139,10 @@ pub enum GoudChainError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
+    // Audit logging errors (Phase 4)
+    #[error("Audit log operation failed: {0}")]
+    AuditLogError(String),
+
     // General errors
     #[error("Internal error: {0}")]
     Internal(String),

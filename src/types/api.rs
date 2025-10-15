@@ -166,6 +166,9 @@ pub struct NodeMetricsResponse {
     pub latest_block_index: u64,
     pub latest_block_timestamp: i64,
     pub status: String,
+    pub total_operations: u64,
+    pub cache_hit_rate: f64,
+    pub operations_per_second: f64,
 }
 
 #[cfg(test)]

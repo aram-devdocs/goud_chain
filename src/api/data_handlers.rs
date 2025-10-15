@@ -22,7 +22,8 @@ pub fn handle_submit_data(
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
     config: Arc<Config>,
-    _rate_limiter: Arc<crate::api::RateLimiter>, // TODO: Implement rate limiting
+    _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) {
     // Extract Authorization header (needed for forwarding)
     let auth_header_value = request
@@ -281,7 +282,7 @@ pub fn handle_submit_data(
                 Some(key) => {
                     // Create encrypted collection
                     match EncryptedCollection::new(
-                        req.label,
+                        req.label.clone(),
                         req.data,
                         &api_key,
                         api_key_hash.clone(),
@@ -320,9 +321,21 @@ pub fn handle_submit_data(
                                             let response = SubmitDataResponse {
                                                 message: "Data encrypted and stored successfully"
                                                     .to_string(),
-                                                collection_id,
+                                                collection_id: collection_id.clone(),
                                                 block_number: block.index,
                                             };
+
+                                            // Audit log: Data submitted (Phase 4)
+                                            // Logs are batched and flushed by background task every 10s
+                                            if let Err(e) = audit_logger.log(
+                                                &api_key,
+                                                AuditEventType::DataSubmitted,
+                                                Some(collection_id.clone()),
+                                                &client_ip,
+                                                serde_json::json!({"block": block.index, "label": req.label}),
+                                            ) {
+                                                error!(error = %e, "Failed to log data submission audit event");
+                                            }
 
                                             // Add rate limit headers to success response
                                             let headers =
@@ -380,6 +393,7 @@ pub fn handle_list_data(
     blockchain: Arc<Mutex<Blockchain>>,
     config: Arc<Config>,
     _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication
     let auth = match extract_auth(request, &config) {
@@ -504,8 +518,21 @@ pub fn handle_list_data(
     }
 
     let response = CollectionListResponse {
-        collections: result,
+        collections: result.clone(),
     };
+
+    // Audit log: Data listed (Phase 4)
+    // Logs are batched and flushed by background task every 10s
+    let client_ip = extract_client_ip(request);
+    if let Err(e) = audit_logger.log(
+        &api_key,
+        AuditEventType::DataListed,
+        None,
+        &client_ip,
+        serde_json::json!({"count": result.len()}),
+    ) {
+        error!(error = %e, "Failed to log data list audit event");
+    }
 
     // Add rate limit headers to response
     let headers = _rate_limiter.create_headers(&rate_limit_result);
@@ -519,6 +546,7 @@ pub fn handle_decrypt_data(
     collection_id: &str,
     config: Arc<Config>,
     _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication - must be API key for decryption
     let auth = match extract_auth(request, &config) {
@@ -620,11 +648,25 @@ pub fn handle_decrypt_data(
             ) {
                 (Ok(metadata), Ok(data)) => {
                     let response = DecryptCollectionResponse {
-                        collection_id: collection.collection_id,
+                        collection_id: collection.collection_id.clone(),
                         label: metadata["label"].as_str().unwrap_or("unknown").to_string(),
                         data,
                         created_at: metadata["created_at"].as_i64().unwrap_or(0),
                     };
+
+                    // Audit log: Data decrypted (Phase 4)
+                    // Logs are batched and flushed by background task every 10s
+                    let client_ip = extract_client_ip(request);
+                    if let Err(e) = audit_logger.log(
+                        &api_key,
+                        AuditEventType::DataDecrypted,
+                        Some(collection.collection_id),
+                        &client_ip,
+                        serde_json::json!({"success": true}),
+                    ) {
+                        error!(error = %e, "Failed to log data decryption audit event");
+                    }
+
                     // Add rate limit headers to response
                     let headers = _rate_limiter.create_headers(&rate_limit_result);
                     json_response_with_headers(serde_json::to_string(&response).unwrap(), headers)

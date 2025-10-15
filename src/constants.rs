@@ -85,3 +85,24 @@ pub const RATE_LIMIT_CACHE_SIZE: usize = 10000; // LRU cache for hot API keys
 pub const SIGNATURE_HEADER_NAME: &str = "X-Signature";
 pub const SIGNATURE_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5 minutes
 pub const NONCE_EXPIRY_SECONDS: u64 = 600; // 10 minutes (nonce deduplication window)
+
+// Audit Logging (Phase 4 - Operational Security)
+pub const AUDIT_LABEL_PREFIX: &str = "AUDIT:"; // Special collection label prefix for audit logs
+pub const AUDIT_BATCH_INTERVAL_SECONDS: u64 = 10; // Flush audit logs every 10 seconds
+pub const AUDIT_BATCH_SIZE: usize = 50; // Or when 50 events accumulated
+/// Minimum audit log retention period (1 year for GDPR/HIPAA compliance)
+/// NOTE: Currently unused, reserved for future retention policy implementation
+#[allow(dead_code)]
+pub const AUDIT_LOG_RETENTION_DAYS: u64 = 365;
+pub const AUDIT_IP_HASH_LENGTH: usize = 8; // Store truncated SHA256(IP) for privacy
+
+// Metrics (Phase 4 - Operational Security)
+/// Prometheus-compatible metrics endpoint path
+/// NOTE: Currently unused, reserved for future Prometheus integration
+#[allow(dead_code)]
+pub const METRICS_ENDPOINT: &str = "/metrics";
+
+/// Metrics update interval for time-series tracking
+/// NOTE: Currently unused, reserved for future time-series metrics implementation
+#[allow(dead_code)]
+pub const METRICS_UPDATE_INTERVAL_SECS: u64 = 5;
