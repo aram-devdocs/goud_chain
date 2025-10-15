@@ -66,7 +66,7 @@ impl SubmitDataRequest {
         validate_json_structure(&self.data)?;
 
         // Validate data size (P3-002 - before encryption adds overhead)
-        let data_size = self.data.as_bytes().len();
+        let data_size = self.data.len();
         if data_size > MAX_COLLECTION_SIZE_BYTES {
             return Err(GoudChainError::PayloadTooLarge {
                 actual_bytes: data_size,
