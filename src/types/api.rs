@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 // ============ Account Management ============
 
 /// Request to create a new user account
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAccountRequest {
     pub metadata: Option<String>, // Optional encrypted metadata (e.g., email, username)
 }
@@ -33,7 +33,7 @@ pub struct LoginResponse {
 // ============ Data Operations ============
 
 /// Request to submit data (requires API key auth)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitDataRequest {
     pub label: String,
     pub data: String,
@@ -130,19 +130,6 @@ pub struct MessageResponse {
 #[derive(Debug, Clone, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
-}
-
-impl ErrorResponse {
-    pub fn new(error: impl ToString) -> Self {
-        Self {
-            error: error.to_string(),
-        }
-    }
-
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self)
-            .unwrap_or_else(|_| r#"{"error":"Serialization failed"}"#.to_string())
-    }
 }
 
 // ============ Analytics & Statistics ============

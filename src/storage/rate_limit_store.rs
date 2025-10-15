@@ -421,84 +421,6 @@ impl RateLimitStore {
 
         Ok(())
     }
-
-    /// Check if nonce exists (replay detection)
-    /// Returns true if nonce has been used before
-    pub fn check_nonce(&self, nonce: &str) -> Result<bool> {
-        let key = format!("nonce:{}", nonce);
-
-        match self.db.get(key.as_bytes()) {
-            Ok(Some(_)) => Ok(true), // Nonce exists (replay detected)
-            Ok(None) => Ok(false),   // Nonce not found (first use)
-            Err(e) => Err(GoudChainError::RocksDbError(format!(
-                "Failed to check nonce: {}",
-                e
-            ))),
-        }
-    }
-
-    /// Store nonce with expiry timestamp
-    /// Nonces expire after 10 minutes (NONCE_EXPIRY_SECONDS)
-    pub fn store_nonce(&self, nonce: &str) -> Result<()> {
-        use crate::constants::NONCE_EXPIRY_SECONDS;
-
-        let key = format!("nonce:{}", nonce);
-        let expires_at = Utc::now().timestamp() + NONCE_EXPIRY_SECONDS as i64;
-
-        self.db
-            .put(key.as_bytes(), expires_at.to_le_bytes())
-            .map_err(|e| GoudChainError::RocksDbError(format!("Failed to store nonce: {}", e)))?;
-
-        debug!(
-            nonce = %nonce,
-            expires_at = expires_at,
-            "Stored nonce for replay protection"
-        );
-
-        Ok(())
-    }
-
-    /// Clean up expired nonces (garbage collection)
-    /// Should be called periodically to prevent storage bloat
-    #[allow(dead_code)]
-    pub fn cleanup_expired_nonces(&self) -> Result<usize> {
-        let now = Utc::now().timestamp();
-        let mut deleted_count = 0;
-
-        // Iterate through all nonce keys
-        let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-        for item in iter {
-            let (key, value) = item.map_err(|e| {
-                GoudChainError::RocksDbError(format!("Failed to iterate nonces: {}", e))
-            })?;
-
-            // Check if this is a nonce key
-            if let Ok(key_str) = std::str::from_utf8(&key) {
-                if key_str.starts_with("nonce:") {
-                    // Check if expired
-                    if value.len() == 8 {
-                        let mut expiry_bytes = [0u8; 8];
-                        expiry_bytes.copy_from_slice(&value);
-                        let expires_at = i64::from_le_bytes(expiry_bytes);
-
-                        if now >= expires_at {
-                            // Delete expired nonce
-                            self.db.delete(&key).map_err(|e| {
-                                GoudChainError::RocksDbError(format!(
-                                    "Failed to delete nonce: {}",
-                                    e
-                                ))
-                            })?;
-                            deleted_count += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        info!(deleted = deleted_count, "Cleaned up expired nonces");
-        Ok(deleted_count)
-    }
 }
 
 #[cfg(test)]
@@ -615,40 +537,5 @@ mod tests {
         // Ban IP
         store.ban_ip(ip_hash).unwrap();
         assert!(store.is_ip_banned(ip_hash).unwrap());
-    }
-
-    #[test]
-    fn test_nonce_check_and_store() {
-        let store = create_test_store();
-        let nonce = "unique_nonce_123";
-
-        // Nonce should not exist initially
-        assert!(!store.check_nonce(nonce).unwrap());
-
-        // Store nonce
-        store.store_nonce(nonce).unwrap();
-
-        // Now nonce should exist (replay detected)
-        assert!(store.check_nonce(nonce).unwrap());
-    }
-
-    #[test]
-    fn test_nonce_replay_prevention() {
-        let store = create_test_store();
-        let nonce1 = "nonce_1";
-        let nonce2 = "nonce_2";
-
-        // Both nonces fresh
-        assert!(!store.check_nonce(nonce1).unwrap());
-        assert!(!store.check_nonce(nonce2).unwrap());
-
-        // Use nonce1
-        store.store_nonce(nonce1).unwrap();
-
-        // nonce1 should be marked as used
-        assert!(store.check_nonce(nonce1).unwrap());
-
-        // nonce2 should still be fresh
-        assert!(!store.check_nonce(nonce2).unwrap());
     }
 }

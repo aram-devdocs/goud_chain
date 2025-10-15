@@ -45,15 +45,10 @@ pub const EMPTY_MERKLE_ROOT: &str = "0";
 // Default network configuration
 pub const DEFAULT_HTTP_PORT: &str = "8080";
 pub const DEFAULT_P2P_PORT: &str = "9000";
-pub const PEER_SYNC_DELAY_SECONDS: u64 = 10; // Sync every 10 seconds to avoid thrashing
 
 // Peer reputation
 pub const REPUTATION_REWARD_VALID_BLOCK: i32 = 1;
 pub const REPUTATION_PENALTY_INVALID_BLOCK: i32 = -5;
-
-// HTTP headers
-pub const HEADER_CONTENT_TYPE: &[u8] = b"Content-Type";
-pub const HEADER_VALUE_JSON: &[u8] = b"application/json";
 
 // Proof of Authority validators
 // Reduced to 2 validators for single-VM GCP deployment (optimized for e2-micro 1GB RAM)
@@ -62,9 +57,8 @@ pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];
 // P2P Network Security
 pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
 pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
-pub const MAX_CONCURRENT_CONNECTIONS: usize = 50; // Increased from 10 to handle sync spikes on low-resource VMs
 
-// P2P Connection Timeouts (prevent hung connections)
+// P2P Connection Timeouts (async architecture - prevent hung connections)
 pub const P2P_CONNECT_TIMEOUT_SECONDS: u64 = 5;
 pub const P2P_READ_TIMEOUT_SECONDS: u64 = 10;
 pub const P2P_WRITE_TIMEOUT_SECONDS: u64 = 5;
@@ -83,11 +77,6 @@ pub const BAN_IP_24HR_SECONDS: u64 = 86400; // After complete blacklist: 24-hour
 
 // Performance tuning
 pub const RATE_LIMIT_CACHE_SIZE: usize = 10000; // LRU cache for hot API keys
-
-// Request signing - Replay Attack Prevention
-pub const SIGNATURE_HEADER_NAME: &str = "X-Signature";
-pub const SIGNATURE_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5 minutes
-pub const NONCE_EXPIRY_SECONDS: u64 = 600; // 10 minutes (nonce deduplication window)
 
 // Audit Logging - Operational Security
 pub const AUDIT_LABEL_PREFIX: &str = "AUDIT:"; // Special collection label prefix for audit logs

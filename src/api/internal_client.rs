@@ -1,25 +1,25 @@
-use std::io::Read;
-use std::net::TcpStream;
-use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::time::{sleep, Duration};
 use tracing::{info, warn};
 
 use crate::types::{GoudChainError, Result};
 
-/// Forward an HTTP request to another node
+/// Forward an HTTP request to another node (async)
 /// Used when current node is not the PoA validator
-pub fn forward_request_to_node(
+pub async fn forward_request_to_node(
     target_node: &str,
     method: &str,
     path: &str,
     body: &str,
     content_type: &str,
 ) -> Result<(u16, String)> {
-    forward_request_with_headers(target_node, method, path, body, content_type, None, None)
+    forward_request_with_headers(target_node, method, path, body, content_type, None, None).await
 }
 
-/// Forward an HTTP request with optional Authorization and X-Signature headers
+/// Forward an HTTP request with optional Authorization and X-Signature headers (async)
 /// Used when current node is not the PoA validator
-pub fn forward_request_with_headers(
+pub async fn forward_request_with_headers(
     target_node: &str,
     method: &str,
     path: &str,
@@ -53,45 +53,13 @@ pub fn forward_request_with_headers(
             warn!(
                 attempt = attempt + 1,
                 backoff_ms = backoff,
-                "Retrying connection after EAGAIN error"
+                "Retrying connection after error"
             );
-            std::thread::sleep(Duration::from_millis(backoff));
+            sleep(Duration::from_millis(backoff)).await;
         }
 
-        match TcpStream::connect(&target_addr) {
+        match TcpStream::connect(&target_addr).await {
             Ok(stream) => {
-                // Explicitly ensure blocking mode (default, but be explicit)
-                if let Err(e) = stream.set_nonblocking(false) {
-                    warn!(error = %e, "Failed to set blocking mode, continuing anyway");
-                }
-
-                // Set timeouts
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(30)))
-                    .map_err(GoudChainError::IoError)?;
-                stream
-                    .set_write_timeout(Some(Duration::from_secs(10)))
-                    .map_err(GoudChainError::IoError)?;
-
-                // Set TCP options for better reliability
-                #[cfg(unix)]
-                {
-                    use std::os::unix::io::AsRawFd;
-                    let fd = stream.as_raw_fd();
-
-                    // Enable TCP_NODELAY to disable Nagle's algorithm (reduce latency)
-                    unsafe {
-                        let flag: libc::c_int = 1;
-                        libc::setsockopt(
-                            fd,
-                            libc::IPPROTO_TCP,
-                            libc::TCP_NODELAY,
-                            &flag as *const _ as *const libc::c_void,
-                            std::mem::size_of::<libc::c_int>() as libc::socklen_t,
-                        );
-                    }
-                }
-
                 return perform_http_request(
                     stream,
                     method,
@@ -101,12 +69,13 @@ pub fn forward_request_with_headers(
                     &target_addr,
                     auth_header,
                     signature_header,
-                );
+                )
+                .await;
             }
             Err(e) => {
-                // Check if error is EAGAIN (Resource temporarily unavailable)
-                if e.kind() == std::io::ErrorKind::WouldBlock || e.raw_os_error() == Some(11)
-                // EAGAIN on Unix
+                // Check if error is transient
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::ConnectionRefused
                 {
                     last_error = Some(e);
                     continue;
@@ -130,9 +99,9 @@ pub fn forward_request_with_headers(
     )))
 }
 
-/// Perform the actual HTTP request over an established TCP stream
+/// Perform the actual HTTP request over an established TCP stream (async)
 #[allow(clippy::too_many_arguments)]
-fn perform_http_request(
+async fn perform_http_request(
     mut stream: TcpStream,
     method: &str,
     path: &str,
@@ -169,17 +138,24 @@ fn perform_http_request(
         body
     );
 
-    // Send request
-    use std::io::Write;
-    stream
-        .write_all(request.as_bytes())
-        .map_err(GoudChainError::IoError)?;
+    // Send request with timeout
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        stream.write_all(request.as_bytes()),
+    )
+    .await
+    .map_err(|_| GoudChainError::Internal("Write timeout".to_string()))?
+    .map_err(GoudChainError::IoError)?;
 
-    // Read response
+    // Read response with timeout
     let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(GoudChainError::IoError)?;
+    tokio::time::timeout(
+        Duration::from_secs(30),
+        stream.read_to_string(&mut response),
+    )
+    .await
+    .map_err(|_| GoudChainError::Internal("Read timeout".to_string()))?
+    .map_err(GoudChainError::IoError)?;
 
     // Parse HTTP response
     parse_http_response(&response)

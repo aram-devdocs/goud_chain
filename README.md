@@ -706,7 +706,7 @@ goud_chain/
 - **JWT** - Session tokens (jsonwebtoken)
 - **Base64** - API key encoding (base64)
 - **JSON** - Serialization (serde_json)
-- **HTTP** - API server (tiny_http)
+- **HTTP** - Async API server (axum + tokio)
 - **subtle** - Constant-time comparisons (timing attack prevention)
 - **zeroize** - Automatic memory clearing for sensitive data
 - **lru** - LRU cache with TTL for key derivation optimization

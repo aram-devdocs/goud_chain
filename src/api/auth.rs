@@ -6,7 +6,6 @@ use base64::{engine::general_purpose, Engine as _};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use tiny_http::Request;
 
 use crate::config::Config;
 use crate::constants::{NONCE_SIZE_BYTES, SESSION_EXPIRY_SECONDS};
@@ -131,21 +130,22 @@ pub enum AuthMethod {
     SessionToken(Claims), // Decoded JWT claims
 }
 
-/// Extract authentication from HTTP request
-pub fn extract_auth(request: &Request, config: &Config) -> Result<AuthMethod> {
+// Deprecated: extract_auth() for tiny_http - no longer used with axum architecture
+// Use extract_auth_from_headers() instead
+
+/// Extract authentication from axum HeaderMap
+pub fn extract_auth_from_headers(
+    headers: &axum::http::HeaderMap,
+    config: &Config,
+) -> Result<AuthMethod> {
     // Get Authorization header
-    let auth_header = request
-        .headers()
-        .iter()
-        .find(|h| {
-            h.field
-                .as_str()
-                .as_str()
-                .eq_ignore_ascii_case("authorization")
-        })
+    let auth_header = headers
+        .get("authorization")
         .ok_or_else(|| GoudChainError::Unauthorized("Missing Authorization header".to_string()))?;
 
-    let auth_value = auth_header.value.as_str();
+    let auth_value = auth_header.to_str().map_err(|_| {
+        GoudChainError::Unauthorized("Invalid Authorization header encoding".to_string())
+    })?;
 
     // Check if it's a Bearer token
     if let Some(token) = auth_value.strip_prefix("Bearer ") {

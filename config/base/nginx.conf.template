@@ -105,6 +105,15 @@ http {
         # AUDIT API - Authenticated read operations (Phase 4 - Operational Security)
         # Query audit logs for authenticated user
         location /api/audit {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Signature" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
             proxy_pass http://blockchain_readers;
 
             # Proxy headers (auth required)
@@ -133,6 +142,15 @@ http {
         # Public metrics endpoint (Phase 4 - Operational Security)
         # Provides dashboard-friendly metrics with CORS support
         location /api/metrics {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Signature" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
             proxy_pass http://blockchain_readers/metrics;
 
             # Proxy headers
@@ -185,6 +203,15 @@ http {
 
         # READ operations - Round-robin across all nodes
         location ~ ^/({{READ_ENDPOINTS}})$ {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Signature" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
             proxy_pass http://blockchain_readers;
 
             # Proxy headers
@@ -214,6 +241,15 @@ http {
         # PoA validator rotation handled via internal forwarding when needed
         # Hash approximates round-robin while maintaining session affinity
         location ~ ^/({{WRITE_ENDPOINTS}})$ {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Signature" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
             proxy_pass http://blockchain_nodes;
 
             # Proxy headers

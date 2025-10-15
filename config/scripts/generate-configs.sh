@@ -146,6 +146,15 @@ generate_account_operations_routing() {
         # ACCOUNT operations - Route to node1 only for consistency
         # This prevents "API key no longer valid" errors caused by chain inconsistency
         location ~ ^/(data/list|data/generate)$ {
+            # Handle CORS preflight (OPTIONS) requests
+            if (\$request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Signature" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
             proxy_pass http://${NODE1_HOSTNAME}:${HTTP_PORT};
 
             # Proxy headers

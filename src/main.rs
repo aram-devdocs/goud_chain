@@ -7,11 +7,15 @@ mod network;
 mod storage;
 mod types;
 
-use std::sync::{Arc, Mutex};
-use tiny_http::{Method, Server};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{error, info};
 
-use api::{create_preflight_response, route_request, RateLimiter};
+use api::RateLimiter;
 use config::Config;
 use domain::Block;
 use network::P2PNode;
@@ -48,7 +52,7 @@ async fn main() {
 
     // Load or create blockchain from RocksDB
     let blockchain = match load_blockchain(config.node_id.clone(), &blockchain_store) {
-        Ok(bc) => Arc::new(Mutex::new(bc)),
+        Ok(bc) => Arc::new(RwLock::new(bc)), // Changed from Mutex to RwLock for concurrent reads
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");
             std::process::exit(1);
@@ -73,20 +77,30 @@ async fn main() {
 
     let rate_limiter = Arc::new(RateLimiter::new(rate_limit_store, bypass_keys));
 
-    // Start P2P node
+    // Start P2P node (async-first)
     let p2p_node = Arc::new(P2PNode::new(
         Arc::clone(&blockchain),
         Arc::clone(&blockchain_store),
         config.peers.clone(),
     ));
-    p2p_node.start_p2p_server(config.p2p_port);
+
+    // Start P2P server in background
+    let p2p_clone = Arc::clone(&p2p_node);
+    let p2p_port = config.p2p_port;
+    tokio::spawn(async move {
+        p2p_clone.start_p2p_server(p2p_port).await;
+    });
 
     // Initialize audit logger for operational security
-    // Use callback to broadcast blocks without creating circular dependency
     let p2p_for_audit = Arc::clone(&p2p_node);
     let broadcast_callback = Arc::new(move |block: &Block| {
-        p2p_for_audit.broadcast_block(block);
+        let p2p = Arc::clone(&p2p_for_audit);
+        let block = block.clone();
+        tokio::spawn(async move {
+            p2p.broadcast_block(&block).await;
+        });
     });
+
     let audit_logger = AuditLogger::new(
         Arc::clone(&blockchain),
         Arc::clone(&blockchain_store),
@@ -94,58 +108,83 @@ async fn main() {
     );
     info!("Audit logger initialized with background flush task");
 
-    // Start continuous sync task (initial sync happens in background)
-    // NOTE: We start HTTP server immediately to avoid deadlock where all nodes
-    // wait for each other to be ready. Initial sync happens asynchronously.
-    let p2p_clone = Arc::clone(&p2p_node);
-    p2p_clone.start_sync_task();
+    // Build HTTP router with all endpoints
+    let app = Router::new()
+        // Account Management
+        .route(
+            "/account/create",
+            post(api::handlers::handle_create_account),
+        )
+        .route("/account/login", post(api::handlers::handle_login))
+        // Data Operations
+        .route("/data/submit", post(api::handlers::handle_submit_data))
+        .route("/data/list", get(api::handlers::handle_list_data))
+        .route(
+            "/data/decrypt/:collection_id",
+            post(api::handlers::handle_decrypt_data),
+        )
+        // Blockchain Explorer
+        .route("/chain", get(api::handlers::handle_get_chain))
+        .route("/peers", get(api::handlers::handle_get_peers))
+        .route("/sync", get(api::handlers::handle_sync))
+        // Health & Metrics
+        .route("/health", get(api::handlers::handle_health))
+        .route("/stats", get(api::handlers::handle_get_stats))
+        .route("/metrics", get(api::handlers::handle_get_metrics))
+        .route(
+            "/metrics/prometheus",
+            get(api::handlers::handle_get_prometheus_metrics),
+        )
+        // Validator Info (for load balancer routing)
+        .route(
+            "/validator/current",
+            get(api::handlers::handle_get_current_validator),
+        )
+        // Audit Logging
+        .route("/api/audit", get(api::handlers::handle_get_audit_logs))
+        // Shared state via Extension middleware
+        .layer(Extension(blockchain))
+        .layer(Extension(p2p_node))
+        .layer(Extension(config.clone()))
+        .layer(Extension(rate_limiter))
+        .layer(Extension(audit_logger));
 
-    // Start HTTP server
-    let server = match Server::http(config.http_bind_addr()) {
-        Ok(s) => s,
+    // NOTE: CORS handled by nginx reverse proxy (see nginx/cors.conf)
+    // Removed CorsLayer to prevent duplicate Access-Control-Allow-Origin headers
+
+    let bind_addr = config.http_bind_addr();
+
+    info!("\n🔗 Goud Chain - Encrypted Blockchain (Async-First Architecture)");
+    info!("   Node ID: {}", config.node_id);
+    info!("   HTTP API: http://{}", bind_addr);
+    info!("   P2P Port: {}", config.p2p_port);
+    info!("   Storage: RocksDB (high-performance embedded database)");
+    info!("\n📊 Endpoints:");
+    info!("   POST /account/create   - Create new account");
+    info!("   POST /account/login    - Login to existing account");
+    info!("   POST /data/submit      - Submit encrypted JSON data");
+    info!("   GET  /data/list        - List all encrypted data");
+    info!("   POST /data/decrypt/:id - Decrypt specific data with API key");
+    info!("   GET  /chain            - View full blockchain");
+    info!("   GET  /peers            - View P2P peers");
+    info!("   GET  /sync             - Manual sync with peers");
+    info!("   GET  /health           - Health check");
+    info!("   GET  /metrics          - Prometheus metrics\n");
+
+    // Start async HTTP server
+    let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
+        Ok(l) => l,
         Err(e) => {
-            error!(error = %e, "Failed to start HTTP server");
+            error!(error = %e, "Failed to bind HTTP server");
             std::process::exit(1);
         }
     };
 
-    info!("\n🔗 Goud Chain - Encrypted Blockchain");
-    info!("   Node ID: {}", config.node_id);
-    info!("   HTTP API: http://{}", config.http_bind_addr());
-    info!("   P2P Port: {}", config.p2p_port);
-    info!("   Storage: RocksDB (high-performance embedded database)");
-    info!("\n📊 Endpoints:");
-    info!("   POST /data/submit      - Submit encrypted JSON data");
-    info!("   GET  /data/list        - List all encrypted data");
-    info!("   POST /data/decrypt     - Decrypt specific data with API key");
-    info!("   GET  /chain            - View full blockchain");
-    info!("   GET  /peers            - View peers");
-    info!("   GET  /sync             - Sync with peers\n");
+    info!("HTTP server listening on {}", bind_addr);
 
-    // Handle requests
-    for request in server.incoming_requests() {
-        let blockchain = Arc::clone(&blockchain);
-        let p2p = Arc::clone(&p2p_node);
-        let config_clone = Arc::clone(&config);
-        let rate_limiter_clone = Arc::clone(&rate_limiter);
-        let audit_logger_clone = Arc::clone(&audit_logger);
-
-        // Handle OPTIONS preflight requests
-        if request.method() == &Method::Options {
-            if let Err(e) = request.respond(create_preflight_response()) {
-                error!(error = %e, "Failed to respond to OPTIONS request");
-            }
-            continue;
-        }
-
-        // Route and handle request
-        route_request(
-            request,
-            blockchain,
-            p2p,
-            config_clone,
-            rate_limiter_clone,
-            audit_logger_clone,
-        );
+    // Serve with graceful shutdown
+    if let Err(e) = axum::serve(listener, app).await {
+        error!(error = %e, "HTTP server error");
+        std::process::exit(1);
     }
 }

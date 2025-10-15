@@ -9,10 +9,11 @@
 //! - RocksDB index for fast queries (non-authoritative cache)
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex as StdMutex};
 
 use chrono::Utc;
 use sha2::{Digest, Sha256};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, Duration};
 use tracing::{error, info, warn};
@@ -34,13 +35,14 @@ pub type BroadcastCallback = Arc<dyn Fn(&Block) + Send + Sync>;
 
 /// Audit logger - manages audit log batching and storage on blockchain
 pub struct AuditLogger {
-    blockchain: Arc<Mutex<Blockchain>>,
+    blockchain: Arc<RwLock<Blockchain>>,
     blockchain_store: Arc<BlockchainStore>,
     broadcast_callback: Option<BroadcastCallback>,
 
     /// Batching buffer: account_hash → Vec<AuditLogEntry>
     /// Events accumulate here until flush (10s or 50 events)
-    pending_logs: Arc<Mutex<HashMap<String, Vec<AuditLogEntry>>>>,
+    /// Uses std::sync::Mutex for synchronous access from non-async contexts
+    pending_logs: Arc<StdMutex<HashMap<String, Vec<AuditLogEntry>>>>,
 
     /// Background flush task handle (kept alive by Arc, runs in background)
     #[allow(dead_code)]
@@ -48,7 +50,8 @@ pub struct AuditLogger {
 
     /// Cache: account_hash → API key bytes (for encryption)
     /// Note: In production, this should use secure memory (zeroization)
-    api_key_cache: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    /// Uses std::sync::Mutex for synchronous access from non-async contexts
+    api_key_cache: Arc<StdMutex<HashMap<String, Vec<u8>>>>,
 }
 
 impl AuditLogger {
@@ -59,7 +62,7 @@ impl AuditLogger {
     /// * `blockchain_store` - RocksDB storage for blocks
     /// * `broadcast_callback` - Optional callback for broadcasting blocks to P2P network
     pub fn new(
-        blockchain: Arc<Mutex<Blockchain>>,
+        blockchain: Arc<RwLock<Blockchain>>,
         blockchain_store: Arc<BlockchainStore>,
         broadcast_callback: Option<BroadcastCallback>,
     ) -> Arc<Self> {
@@ -67,9 +70,9 @@ impl AuditLogger {
             blockchain,
             blockchain_store,
             broadcast_callback,
-            pending_logs: Arc::new(Mutex::new(HashMap::new())),
+            pending_logs: Arc::new(StdMutex::new(HashMap::new())),
             flush_task: None,
-            api_key_cache: Arc::new(Mutex::new(HashMap::new())),
+            api_key_cache: Arc::new(StdMutex::new(HashMap::new())),
         });
 
         // Start background flush task
@@ -139,7 +142,7 @@ impl AuditLogger {
             loop {
                 ticker.tick().await;
 
-                if let Err(e) = logger.flush_all_batches() {
+                if let Err(e) = logger.flush_all_batches().await {
                     error!(error = %e, "Failed to flush audit log batches");
                 }
             }
@@ -149,33 +152,44 @@ impl AuditLogger {
     /// Flush all pending audit log batches to blockchain
     /// Creates EncryptedCollection for each user's batch
     /// Can be called manually after auditable operations for immediate flushing
-    pub fn flush_all_batches(&self) -> Result<()> {
-        let mut pending = self.pending_logs.lock().unwrap();
+    pub async fn flush_all_batches(&self) -> Result<()> {
+        // Collect all batches and API keys (drop locks before async work)
+        let batches_to_flush: Vec<(String, Vec<AuditLogEntry>, Vec<u8>)> = {
+            let mut pending = self.pending_logs.lock().unwrap();
 
-        if pending.is_empty() {
-            return Ok(()); // No logs to flush
-        }
-
-        let api_key_cache = self.api_key_cache.lock().unwrap();
-        let mut flushed_count = 0;
-
-        for (account_hash, entries) in pending.drain() {
-            if entries.is_empty() {
-                continue;
+            if pending.is_empty() {
+                return Ok(()); // No logs to flush
             }
 
-            // Get cached API key for encryption
-            let api_key = match api_key_cache.get(&account_hash) {
-                Some(key) => key.clone(),
-                None => {
-                    warn!(
-                        account_hash = %account_hash,
-                        "API key not in cache, skipping audit log flush"
-                    );
+            let api_key_cache = self.api_key_cache.lock().unwrap();
+            let mut result = Vec::new();
+
+            for (account_hash, entries) in pending.drain() {
+                if entries.is_empty() {
                     continue;
                 }
-            };
 
+                // Get cached API key for encryption
+                let api_key = match api_key_cache.get(&account_hash) {
+                    Some(key) => key.clone(),
+                    None => {
+                        warn!(
+                            account_hash = %account_hash,
+                            "API key not in cache, skipping audit log flush"
+                        );
+                        continue;
+                    }
+                };
+
+                result.push((account_hash, entries, api_key));
+            }
+
+            result
+        }; // Locks dropped here
+
+        let mut flushed_count = 0;
+
+        for (account_hash, entries, api_key) in batches_to_flush {
             // Create audit batch collection
             let batch = AuditLogBatch::new(entries.clone());
             let batch_json = serde_json::to_string(&batch).map_err(|e| {
@@ -184,7 +198,7 @@ impl AuditLogger {
 
             // Get node signing key
             let signing_key = {
-                let bc = self.blockchain.lock().unwrap();
+                let bc = self.blockchain.read().await;
                 bc.node_signing_key
                     .clone()
                     .unwrap_or_else(generate_signing_key)
@@ -200,7 +214,7 @@ impl AuditLogger {
             )?;
 
             // Add to blockchain pending collections
-            let mut bc = self.blockchain.lock().unwrap();
+            let mut bc = self.blockchain.write().await;
             bc.add_collection(collection)?;
 
             // Check if this node is the validator for the next block
@@ -273,7 +287,7 @@ impl AuditLogger {
 
     /// Query audit logs for a user
     /// Supports filtering by timestamp, event type, and pagination
-    pub fn query_logs(
+    pub async fn query_logs(
         &self,
         api_key: &[u8],
         filter: AuditLogFilter,
@@ -286,7 +300,7 @@ impl AuditLogger {
         // If index is empty/missing, fall back to scanning entire blockchain
         let block_indexes = self.get_audit_block_indexes(&account_hash)?;
 
-        let blockchain = self.blockchain.lock().unwrap();
+        let blockchain = self.blockchain.read().await;
         let indexes_to_scan: Vec<u64> = if block_indexes.is_empty() {
             // No index available, scan all blocks
             (0..blockchain.chain.len() as u64).collect()

@@ -2,7 +2,7 @@
 # Generated from template - DO NOT EDIT MANUALLY
 # Writer/Reader architecture: node1 (writer), node2 (reader)
 # Conservative allocation with 150M safety margin for OS + Docker
-# Generated: 2025-10-10 16:19:05 UTC
+# Generated: 2025-10-15 22:25:47 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.gcp.yml up -d
@@ -115,10 +115,10 @@ services:
       resources:
         limits:
           cpus: '0.50'
-          memory: 320M
+          memory: 384M
         reservations:
           cpus: '0.25'
-          memory: 288M
+          memory: 256M
 
   # Blockchain Node 2 - PASSIVE READER (read-only, syncs via P2P)
   node2:
@@ -140,10 +140,10 @@ services:
       resources:
         limits:
           cpus: '0.30'
-          memory: 160M
+          memory: 256M
         reservations:
           cpus: '0.15'
-          memory: 128M
+          memory: 192M
 
 networks:
   goud_network:

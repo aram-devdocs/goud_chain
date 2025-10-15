@@ -186,11 +186,4 @@ impl GoudChainError {
             _ => 500,
         }
     }
-
-    pub fn to_json(&self) -> String {
-        serde_json::json!({
-            "error": self.to_string()
-        })
-        .to_string()
-    }
 }
