@@ -45,7 +45,7 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Incremental Writes** - O(1) block writes (vs O(n) for full JSON serialization)
 - **Fast Lookups** - O(1) block retrieval by index
 - **50% Disk Space Savings** - Snappy compression reduces storage footprint
-- **Automatic Migration** - Seamless JSON-to-RocksDB upgrade on first startup
+- **Schema Versioning** - Automatic validation and regeneration on schema changes
 
 ### Blockchain & Consensus
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
@@ -54,10 +54,10 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Merkle Trees** - Tamper detection with encrypted data and blind indexes
 
 ### Privacy & Security
-- **Privacy-Preserving Architecture** - Full metadata encryption with blind indexes
-- **Per-User + Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks (Phase 5)
-- **Timestamp Obfuscation** - Daily granularity with random jitter (±4 hours) hides timing and timezone (Phase 5)
-- **Dual-Layer Encryption** - Master key for block data, API keys for collections
+- **Envelope Encryption** - Zero-knowledge storage architecture (node operators cannot decrypt user data)
+- **Per-User + Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks
+- **Timestamp Obfuscation** - Daily granularity with random jitter (±4 hours) hides timing and timezone
+- **Dual-Salt HMAC Blind Indexes** - User salt + block salt prevent pattern analysis across blocks
 - **Two-Tier HKDF Key Derivation** - OWASP-compliant security with optimized performance:
   - **Tier 1 (Authentication):** 100,000 iterations for API key hashing (brute-force resistance)
   - **Tier 2 (Encryption):** 1,000 iterations for encryption/MAC keys (domain separation)
@@ -203,7 +203,6 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Key Derivation**: HKDF with 100k iterations produces:
   - Encryption key (32 bytes for AES-256)
   - MAC key (32 bytes for HMAC-SHA256)
-  - Search key (32 bytes, future use)
 - **Encryption**: AES-256-GCM with 12-byte random nonce
 - **Integrity**: HMAC-SHA256 over encrypted payload
 - **Authentication**: Constant-time comparison prevents timing attacks
@@ -247,7 +246,7 @@ EncryptedCollection {
     nonce: String,                // 12-byte random nonce
     signature: String,            // Ed25519 signature
     public_key: String,           // Ed25519 public key
-    user_salt: String,            // Phase 5: Per-user random salt (prevents correlation)
+    user_salt: String,            // Per-user random salt (prevents correlation)
 }
 ```
 
@@ -549,344 +548,27 @@ curl http://localhost:8080/lb/health
 
 ## Cloud Deployment (Google Cloud Platform)
 
-**Cost:** **$0/month** - Runs on GCP's Always Free tier
+**Live Demo:** https://dev-api.goudchain.com (API), https://dev-dashboard.goudchain.com (Dashboard)
 
-**Live Demo:**
-- API: https://dev-api.goudchain.com
-- Dashboard: https://dev-dashboard.goudchain.com
+Runs on GCP's free tier (e2-micro VM, 1GB RAM) with Terraform-managed infrastructure. Single VM runs nginx load balancer, dashboard, and 2 blockchain nodes (node1: 384MB, node2: 384MB). Total memory footprint ~960MB leaves headroom for kernel and system processes.
 
-### Prerequisites
+**Deployment:** `./scripts/setup-gcp.sh` (one-time setup), `./scripts/deploy.sh` (deploy/update)
 
-1. **Google Cloud Account** - [Sign up](https://cloud.google.com/free) (free tier, no credit card required)
-2. **gcloud CLI** - [Install guide](https://cloud.google.com/sdk/docs/install)
-3. **Terraform** - `brew install terraform` (macOS) or [download](https://www.terraform.io/downloads)
-4. **Cloudflare Account** - [Sign up](https://cloudflare.com) (optional, for custom domain)
+**Secret Management:** JWT and session secrets stored in GitHub Secrets, injected at Docker build time. Rotation via `./scripts/rotate-secrets.sh` (recommended every 90 days). See [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md).
 
-### Quick Start
+**CI/CD:** GitHub Actions deploys on push to main branch. Requires secrets: GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_KEY, SSH keys, JWT_SECRET, SESSION_SECRET. Optional Cloudflare integration for custom domains with automatic DNS and SSL.
 
-**Step 1: Run setup script**
-```bash
-./scripts/setup-gcp.sh
-```
+**Troubleshooting:** Check nginx port 80 binding, Cloudflare SSL mode (Flexible), firewall rules, Docker service status, and memory usage (e2-micro has 1GB limit).
 
-This interactive script will:
-- Guide you through GCP project creation
-- Create a service account for Terraform
-- Generate SSH keys
-- Create `terraform/environments/dev/terraform.tfvars`
-
-**Step 2: Deploy**
-```bash
-./scripts/deploy.sh
-```
-
-This will:
-- Provision a GCP e2-micro instance (FREE tier)
-- Configure firewall rules
-- Create Cloudflare DNS records (if configured)
-- Deploy Docker containers
-- Run health checks
-
-**Step 3: Configure Cloudflare SSL (if using custom domain)**
-1. Go to Cloudflare Dashboard → SSL/TLS → Overview
-2. Set encryption mode to **"Flexible"**
-3. Wait 2-5 minutes for DNS propagation
-
-**Done!** Your blockchain is now live.
-
-### What Gets Deployed
-
-**GCP Resources (all FREE tier):**
-- 1× e2-micro VM (0.25-2 vCPU bursting, 1GB RAM)
-- 30GB standard persistent disk
-- Default VPC with firewall rules:
-  - Port 22 (SSH)
-  - Port 80 (HTTP - Cloudflare proxy)
-  - Port 8080 (API - direct access)
-  - Port 3000 (Dashboard - direct access)
-
-**Docker Containers on VM:**
-```
-e2-micro (1GB RAM)
-├── nginx:alpine        (~64MB)  - Load balancer + routing
-├── dashboard           (~128MB) - Web UI
-├── node1 (goud-chain)  (~384MB) - Blockchain node
-└── node2 (goud-chain)  (~384MB) - Blockchain node
-```
-
-**Access Points:**
-- **Direct IP**: `http://<VM_IP>:8080` (API), `http://<VM_IP>:3000` (Dashboard)
-- **With Cloudflare**: `https://dev-api.goudchain.com`, `https://dev-dashboard.goudchain.com`
-
-### Management Commands
-
-**Deploy/Update:**
-```bash
-./scripts/deploy.sh
-```
-
-**Destroy Infrastructure:**
-```bash
-./scripts/destroy.sh
-```
-
-**SSH to VM:**
-```bash
-ssh ubuntu@<VM_IP>
-```
-
-**View Logs:**
-```bash
-ssh ubuntu@<VM_IP> 'cd /opt/goud-chain && docker-compose -f docker-compose.gcp.yml logs -f'
-```
-
-**Restart Services:**
-```bash
-ssh ubuntu@<VM_IP> 'cd /opt/goud-chain && docker-compose -f docker-compose.gcp.yml restart'
-```
-
-**Check Container Status:**
-```bash
-ssh ubuntu@<VM_IP> 'cd /opt/goud-chain && docker-compose -f docker-compose.gcp.yml ps'
-```
-
-### Cloudflare DNS Setup (Optional)
-
-**1. Get your Zone ID and API Token:**
-- Login to [Cloudflare Dashboard](https://dash.cloudflare.com)
-- Select your domain → Overview
-- Copy "Zone ID" from the right sidebar
-- Create API Token: Profile → API Tokens → Create Token
-  - Template: "Edit zone DNS"
-  - Zone Resources: Include → Specific zone → your domain
-  - Copy the generated token
-
-**2. Add to `terraform/environments/dev/terraform.tfvars`:**
-```hcl
-enable_dns              = true
-domain_name             = "goudchain.com"
-cloudflare_api_token    = "your-api-token"
-cloudflare_zone_id      = "your-zone-id"
-enable_cloudflare_proxy = true
-dashboard_subdomain     = "dashboard"
-api_subdomain           = "api"
-```
-
-**3. Configure SSL/TLS in Cloudflare:**
-- Go to SSL/TLS → Overview
-- Set encryption mode to **"Flexible"**
-  - Visitor ↔ Cloudflare: **HTTPS** (encrypted)
-  - Cloudflare ↔ Your server: **HTTP** (unencrypted, but over Cloudflare's network)
-- (Optional) Enable "Always Use HTTPS"
-
-**4. Redeploy:**
-```bash
-./scripts/deploy.sh
-```
-
-DNS records will be created automatically:
-- `dev-api.goudchain.com` → VM IP
-- `dev-dashboard.goudchain.com` → VM IP
-
-### Secret Management
-
-Goud Chain uses **JWT and Session secrets** for authentication. Secrets are stored in GitHub Secrets and injected at Docker build time.
-
-**Setup (one-time):**
-```bash
-./scripts/setup-secrets.sh  # Generates secrets, stores in GitHub Secrets
-```
-
-**Rotation (every 90 days):**
-```bash
-./scripts/rotate-secrets.sh  # Updates GitHub Secrets, requires rebuild + redeploy
-```
-
-See [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md) for details.
-
-### GitHub Actions (CI/CD)
-
-**Setup GitHub Secrets:**
-```bash
-# Required secrets
-gh secret set GCP_PROJECT_ID
-gh secret set GCP_SERVICE_ACCOUNT_KEY < ~/.gcloud/goud-chain-terraform-key.json
-gh secret set SSH_PUBLIC_KEY < ~/.ssh/goud_chain_rsa.pub
-gh secret set SSH_PRIVATE_KEY < ~/.ssh/goud_chain_rsa
-gh secret set CLOUDFLARE_API_TOKEN  # Optional
-gh secret set CLOUDFLARE_ZONE_ID    # Optional
-
-# JWT/Session secrets (use scripts/setup-secrets.sh)
-gh secret set JWT_SECRET      # Auto-set by setup script
-gh secret set SESSION_SECRET  # Auto-set by setup script
-```
-
-**Deployment Triggers:**
-- Push to `main` → Automatic deployment
-- Manual → GitHub Actions UI → "Deploy Dev" workflow
-
-### Troubleshooting
-
-**"Web server is down" with Cloudflare:**
-- Ensure nginx is listening on port 80 (check `docker-compose.gcp.yml` has `"80:80"`)
-- Verify Cloudflare SSL mode is set to "Flexible"
-- Check firewall allows port 80: `gcloud compute firewall-rules list`
-
-**Dashboard shows API responses:**
-- Nginx config must have separate `server` blocks for different domains
-- Check `nginx/nginx.gcp.conf` has `server_name dev-dashboard.goudchain.com`
-
-**VM not accessible:**
-```bash
-# Check instance status
-gcloud compute instances list
-
-# Check firewall rules
-gcloud compute firewall-rules list
-
-# View startup logs
-gcloud compute instances get-serial-port-output goud-chain-dev-vm
-```
-
-**Docker not starting:**
-```bash
-ssh ubuntu@<VM_IP>
-sudo systemctl status docker
-sudo systemctl start docker
-sudo journalctl -u docker -f
-```
-
-**Out of memory (e2-micro has only 1GB):**
-```bash
-# Check memory usage
-ssh ubuntu@<VM_IP> "free -h"
-
-# Restart containers
-ssh ubuntu@<VM_IP> 'cd /opt/goud-chain && docker-compose -f docker-compose.gcp.yml restart'
-```
-
-### GCP Free Tier Limits
-
-**Always Free (no expiration):**
-- 1× e2-micro instance per month (us-west1, us-central1, or us-east1)
-- 30 GB standard persistent disk
-- 1 GB egress per month (excluding China & Australia)
-- 5 GB snapshot storage
-
-**After 12-month trial ($300 credits):**
-- Still FREE if you stay within Always Free limits
-- No automatic charges (billing account required but won't be charged unless you manually upgrade)
-
-### Production Considerations
-
-**Security:**
-- Restrict `allowed_ssh_cidrs` to your IP only
-- Restrict `allowed_http_cidrs` to known clients
-- Enable Cloudflare proxy for DDoS protection
-- Implement authentication for write operations
-- Rotate service account keys every 90 days
-
-**Scaling:**
-- Upgrade to e2-small (2GB RAM, ~$13/month) for 3+ nodes
-- Upgrade to e2-medium (4GB RAM, ~$27/month) for 4+ nodes
-- Add monitoring with Google Cloud Monitoring
-- Implement automated backups
-- Use remote state backend (already configured in `terraform/environments/dev/main.tf`)
-
-**Cost Comparison:**
-- e2-micro: $0/month (free tier)
-- e2-small: ~$13/month
-- e2-medium: ~$27/month
-- Still cheaper than most cloud providers!
+**Free Tier Limits:** 1× e2-micro instance (us-west1/central1/east1), 30GB disk, 1GB egress/month. Upgrade to e2-small ($13/mo) or e2-medium ($27/mo) for additional nodes.
 
 ## Configuration Management
 
-**Template-Based System:**
-All nginx and docker-compose configs are **generated from templates** to prevent configuration drift between local and GCP environments.
-
-**Generate configs:**
-```bash
-./config/scripts/generate-configs.sh local   # Local development (3 nodes)
-./config/scripts/generate-configs.sh gcp     # GCP deployment (2 nodes)
-./config/scripts/generate-configs.sh all     # Both environments
-```
-
-**Files you should edit:**
-- `config/base/constants.env` - Change ports, timeouts, memory limits, all magic numbers
-- `config/environments/local/overrides.env` - Local-specific overrides (3 nodes)
-- `config/environments/gcp/overrides.env` - GCP-specific overrides (2 nodes, e2-micro)
-- `config/base/nginx.conf.template` - Nginx structure changes
-- `config/environments/*/docker-compose.template.yml` - Service definitions
-
-**Files you should NOT edit directly (auto-generated):**
-- `nginx/nginx.local.conf` ⚠️ DO NOT EDIT MANUALLY
-- `nginx/nginx.gcp.conf` ⚠️ DO NOT EDIT MANUALLY
-- `docker-compose.local.yml` ⚠️ DO NOT EDIT MANUALLY
-- `docker-compose.gcp.yml` ⚠️ DO NOT EDIT MANUALLY
-
-**Automatic regeneration:**
-- Pre-commit hook: Detects template changes and regenerates configs automatically
-- `./run` script: Regenerates before starting local network
-- `scripts/deploy.sh`: Regenerates on VM before deployment
-- GitHub Actions: Regenerates during CI/CD pipeline
+Template-based configuration system prevents drift between local and production environments. All nginx and docker-compose configs are generated from base templates with environment-specific overrides. Pre-commit hooks automatically regenerate configs when templates change, ensuring consistency across deployments.
 
 ## Module Dependency Architecture
 
-This project enforces a **layered architecture** with automatic circular dependency prevention to maintain code quality and prevent technical debt.
-
-### Visual Dependency Graph
-
-![Module Dependencies](docs/module-structure.png)
-
-The graph shows how modules depend on each other, with dependencies flowing top-to-bottom through architectural layers. Colors represent different layers (Foundation → Utilities → Business Logic → Persistence → Network → Presentation).
-
-### How It Works
-
-**Automated Testing:**
-- Runs on every commit via [pre-commit hook](.cargo-husky/hooks/pre-commit)
-- Dynamically discovers all modules in `src/` directory (no hardcoded lists!)
-- Detects circular dependencies using depth-first search (DFS) algorithm
-- Blocks commits if violations are found
-- Enforces layered architecture rules
-
-**Layer Hierarchy:**
-- **Layer 0 (Foundation):** `constants`, `types` - Pure data types, no internal dependencies
-- **Layer 1 (Utilities):** `crypto`, `config` - Reusable helpers that depend only on Layer 0
-- **Layer 2 (Business Logic):** `domain` - Core blockchain models (blocks, accounts, collections)
-- **Layer 3 (Persistence):** `storage` - Data storage and retrieval
-- **Layer 4 (Network):** `network` - P2P networking and synchronization
-- **Layer 5 (Presentation):** `api` - HTTP API and external interfaces
-
-**Why This Matters:**
-- Prevents circular dependencies that cause build issues and tight coupling
-- Makes the codebase easier to understand and navigate
-- Enables independent testing of each layer
-- Facilitates future refactoring and feature additions
-- Enforces separation of concerns
-
-**Adding New Modules:**
-1. Create a new directory or `.rs` file in `src/`
-2. No manual registration needed - auto-discovered!
-3. Assign it to a layer by adding to `LAYER_MAP` in [scripts/generate_module_graph.sh](scripts/generate_module_graph.sh)
-4. Run `cargo test` to verify no circular dependencies or layer violations
-5. Commit triggers automatic regeneration of dependency graph
-
-**Manual Commands:**
-```bash
-# Run all dependency tests
-cargo test test_no_circular_dependencies
-cargo test test_foundation_modules_have_no_dependencies
-cargo test test_layered_architecture
-
-# Regenerate visual graph (requires GraphViz: brew install graphviz)
-./scripts/generate_module_graph.sh
-```
-
-**Key Files:**
-- Tests: [tests/module_dependencies.rs](tests/module_dependencies.rs) - Rust test suite
-- Script: [scripts/generate_module_graph.sh](scripts/generate_module_graph.sh) - Graph generation
-- DOT file: [docs/module-structure.dot](docs/module-structure.dot) - GraphViz source
-- Graph: [docs/module-structure.png](docs/module-structure.png) - Visual diagram
+Enforces strict layered architecture with automatic circular dependency detection. Dependencies flow unidirectionally from higher to lower layers (Presentation → Network → Persistence → Business Logic → Utilities → Foundation). Pre-commit hooks validate architecture rules and block commits that introduce circular dependencies. See [docs/module-structure.png](docs/module-structure.png) for visual dependency graph.
 
 ## Local Development
 
@@ -1069,31 +751,7 @@ enum P2PMessage {
 
 ## Configuration
 
-**Environment Variables:**
-```bash
-# Node configuration
-NODE_ID=node1                                      # Node identifier
-HTTP_PORT=8081                                     # API server port
-P2P_PORT=9000                                      # P2P network port
-PEERS=node2:9000                                   # Comma-separated peers
-
-# Master chain key (production)
-MASTER_CHAIN_KEY=abc123...def                      # 64-char hex (32 bytes)
-
-# Master key passphrase (development fallback)
-MASTER_KEY_PASSPHRASE=my_secure_passphrase         # SHA-256 hashed to derive key
-```
-
-**Docker Compose:**
-```yaml
-node1:
-  ports: ["8081:8080", "9001:9000"]
-  environment:
-    - HTTP_PORT=8080
-    - P2P_PORT=9000
-    - PEERS=node2:9000,node3:9000
-    - MASTER_KEY_PASSPHRASE=${MASTER_KEY_PASSPHRASE:-goud_chain_dev_passphrase}
-```
+Nodes configured via environment variables (NODE_ID, HTTP_PORT, P2P_PORT, PEERS). Production uses MASTER_CHAIN_KEY (64-char hex), development uses MASTER_KEY_PASSPHRASE (SHA-256 hashed). See docker-compose files for complete configuration examples.
 
 ## Privacy Architecture
 
@@ -1103,7 +761,7 @@ node1:
 - Obfuscate validator identity and timing information
 - Enable efficient queries without exposing data
 
-**Blind Indexes (Phase 5 Enhanced):**
+**Blind Indexes:**
 - HMAC-SHA256 based searchable encryption
 - **Per-user salt (32 bytes)** + per-block salt prevents cross-block correlation
 - Attacker cannot correlate their own data across blocks (missing user_salt)
@@ -1111,13 +769,14 @@ node1:
 - One-way: cannot reverse to find API key hash
 - Query complexity: O(n) blocks (trade-off for privacy)
 
-**Block Encryption:**
-- All accounts and collections encrypted with master chain key
-- Master key loaded from `MASTER_CHAIN_KEY` env var (production)
-- Development fallback: `MASTER_KEY_PASSPHRASE` hashed with SHA-256
-- Encrypted data includes validator identity (hidden from observers)
+**Envelope Encryption Architecture:**
+- User accounts encrypted with per-user keys derived from API key + block salt
+- Collections encrypted with user's API key (separate from block-level encryption)
+- Node operators cannot decrypt user data (zero-knowledge storage)
+- Master chain key encrypts block envelope container (structural integrity)
+- Each encryption layer uses independent key derivation with domain separation
 
-**Timestamp Obfuscation (Phase 5 Enhanced):**
+**Timestamp Obfuscation:**
 - Timestamps rounded to daily granularity (86400 seconds)
 - Random jitter added (±4 hours) to each block timestamp
 - Hides exact activity timing and timezone information
@@ -1144,82 +803,19 @@ node1:
 
 ## Security Model
 
-**Key Generation & Storage:**
-- 256-bit API keys generated using cryptographically secure random number generator
-- Only SHA-256 hash of API key stored on blockchain (not the key itself)
-- Keys cannot be recovered if lost - users must save them securely
+**Key Generation:** 256-bit cryptographically secure random API keys. Only SHA-256 hash stored on blockchain (keys cannot be recovered if lost).
 
-**Key Derivation (Two-Tier Strategy):**
+**Two-Tier HKDF Strategy:**
+- **Tier 1 (Authentication):** 100,000 iterations for API key hashing (OWASP-compliant brute-force resistance)
+- **Tier 2 (Encryption):** 1,000 iterations for encryption/MAC key derivation (domain separation after authentication)
+- Rationale: Authentication requires strong protection; encryption keys only need context isolation after API key validation
+- Hash caching: 5-minute TTL with LRU eviction (1000 entries), 3x performance improvement
 
-Goud Chain uses a **two-tier HKDF strategy** that balances OWASP security compliance with real-world performance:
+**Encryption:** AES-256-GCM with 12-byte random nonces, HMAC-SHA256 integrity verification, independent collection encryption.
 
-**Tier 1 - Authentication (Security-Critical):**
-- 100,000 HKDF iterations for API key hashing
-- OWASP recommended: 100k+ iterations to prevent offline brute-force attacks
-- Used once during login/authentication
-- Pre-computed hash cached and reused to avoid redundant computation
+**Authentication:** Constant-time comparison (timing attack prevention), JWT session tokens (1-hour expiry), dual-mode auth (API key or session token).
 
-**Tier 2 - Encryption (Performance-Critical):**
-- 1,000 HKDF iterations for encryption/MAC key derivation
-- Used after API key is already validated (security established)
-- Provides domain separation and context isolation
-- Derives separate keys from single API key:
-  - **Encryption key** (32 bytes for AES-256)
-  - **MAC key** (32 bytes for HMAC-SHA256)
-  - **Search key** (32 bytes, reserved for future use)
-- Each derivation uses unique context strings to ensure key separation
-
-**Rationale:** Once an API key passes authentication (100k iterations), deriving encryption keys only needs to prevent key reuse across contexts (1k iterations). This maintains OWASP compliance for authentication while enabling production-grade performance (~20-50ms block creation).
-
-**Hash Caching Optimization:**
-- API key hash computed once during login (expensive: 100k iterations)
-- Pre-computed hash reused across operations (3x performance improvement)
-- 5-minute TTL with LRU eviction (1000 entries maximum)
-- Automatic memory zeroization on eviction
-
-**Encryption:**
-- AES-256-GCM with authenticated encryption
-- 12-byte random nonce per collection (prevents replay attacks)
-- HMAC-SHA256 for additional integrity verification
-- Each collection encrypted independently
-
-**Authentication:**
-- Constant-time comparison using `subtle` crate prevents timing attacks on API key verification
-- JWT session tokens with 1-hour expiry reduce API key exposure
-- Dual-mode auth: API key (long-lived) or session token (short-lived)
-- Pre-computed hash optimization reduces login from 300k iterations (3x hashing) to 100k iterations (1x hashing)
-
-**Signatures:**
-- Ed25519 public-key cryptography for blockchain data
-- Every account and collection is digitally signed
-- Prevents tampering and ensures authenticity
-- Signatures verified during chain validation
-
-**Schema Versioning:**
-- Automatic detection of schema changes
-- Auto-deletion of incompatible blockchain data
-- Seamless migration during development
-- Dashboard validates API keys on load
-
-**Limitations (Proof of Concept):**
-- API key security is symmetric (anyone with API key can decrypt)
-- No key rotation mechanism
-- No password recovery (keys lost = data lost)
-- JWT secret hardcoded in constants (use env var in production)
-- No audit logging of authentication events
-- Suitable for PoC only, not production use
-
-**Production Hardening Recommendations:**
-- Configure rate limit bypass whitelist for trusted clients
-- Fine-tune rate limits based on expected traffic patterns
-- Monitor violation trends to detect coordinated attacks
-- Add HTTPS/TLS for all connections
-- Use environment variables for JWT secret
-- Implement account recovery mechanism (with security questions or backup keys)
-- Add audit logging for security events and rate limit violations
-- Add multi-factor authentication
-- Implement key rotation with backward compatibility
-- Use hardware security modules (HSM) for validator keys
+**Signatures:** Ed25519 digital signatures on all blockchain data (tamper detection, authenticity verification).
 
 ## License
 

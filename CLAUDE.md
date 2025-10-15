@@ -16,21 +16,7 @@ Goud Chain is an encrypted blockchain with API key-based authentication using Pr
 
 ## Development Commands
 
-### Build & Test
-```bash
-cargo build --release
-cargo test
-cargo clippy
-```
-
-### Running the Network
-```bash
-./run dev          # Development mode with hot reload
-./run start        # Production mode
-./run stop         # Stop all containers
-./run clean        # Remove all data and containers
-./run logs node1   # View logs for specific node
-```
+Use `cargo` for build/test, `./run` script for network management (dev/start/stop/clean/logs).
 
 ## Coding Principles
 
@@ -60,608 +46,70 @@ cargo clippy
 ### Code Organization
 
 **Layered Architecture:**
-This project follows a strict layered architecture to prevent circular dependencies and maintain clean separation of concerns. Dependencies flow **unidirectionally** from higher layers to lower layers.
+Strict 6-layer unidirectional dependency hierarchy enforces separation of concerns. Dependencies flow from higher to lower layers only (Presentation → Infrastructure → Persistence → Business Logic → Utilities → Foundation). Foundation layer has zero internal dependencies. Automated tests detect circular dependencies via pre-commit hooks and block violating commits.
 
-**The Layer Hierarchy:**
-```
-Layer 0: Foundation     → Pure data types, constants (no internal dependencies)
-Layer 1: Utilities      → Reusable helpers (crypto, config)
-Layer 2: Business Logic → Core domain models and rules
-Layer 3: Persistence    → Data storage and retrieval
-Layer 4: Infrastructure → Network, external integrations
-Layer 5: Presentation   → API, user interfaces
-Entry Point             → Application startup and orchestration
-```
+**Layer Responsibilities:**
+- **Layer 0 (Foundation):** Constants, type definitions, errors (no dependencies, affects all layers)
+- **Layer 1 (Utilities):** Crypto, configuration management (pure functions, reusable across project)
+- **Layer 2 (Business Logic):** Domain models, validation, consensus (blockchain core, independent of storage/network)
+- **Layer 3 (Persistence):** RocksDB storage, serialization (incremental writes, O(1) reads, Bincode format)
+- **Layer 4 (Infrastructure):** P2P networking, external integrations (validates data from network)
+- **Layer 5 (Presentation):** HTTP API, interfaces (orchestrates all layers, no business logic)
 
 **Key Principles:**
-
-1. **Unidirectional Dependencies:**
-   - Lower layers NEVER import from higher layers
-   - Each layer can only depend on layers below it
-   - Foundation layer (Layer 0) has ZERO internal dependencies
-   - This prevents circular dependencies and keeps code testable
-
-2. **Layer Responsibilities:**
-   - **Foundation (Layer 0):** Constants, configuration values, pure type definitions (errors, API types)
-     - No business logic, no external dependencies
-     - Changes here affect all layers, so keep minimal and stable
-
-   - **Utilities (Layer 1):** Reusable tools that don't depend on business logic
-     - Cryptography (encryption, signatures, hashing)
-     - Configuration management
-     - Pure functions that can be used anywhere
-
-   - **Business Logic (Layer 2):** Core domain models
-     - Blockchain structure, blocks, encrypted data
-     - Validation rules, consensus logic
-     - Uses utilities for crypto/hashing but knows nothing about storage or networking
-
-   - **Persistence (Layer 3):** Storage and retrieval
-     - RocksDB for blockchain block storage (incremental writes, O(1) reads)
-     - Bincode serialization (faster than JSON)
-     - Schema: `block:{index}` → Block, `metadata:*` → Chain metadata
-     - Uses business models to know what to store
-
-   - **Infrastructure (Layer 4):** External communication
-     - P2P networking, message passing
-     - Can depend on persistence for syncing data
-     - Uses business logic to validate received data
-
-   - **Presentation (Layer 5):** External interfaces
-     - HTTP API, command-line interfaces
-     - Orchestrates all lower layers
-     - Never contains business logic
-
-3. **When Adding New Code:**
-   - **Ask:** "Which layer does this belong to?"
-   - **Check:** "Does this create a circular dependency?" (run tests to verify)
-   - **Validate:** Add new module to dependency tests if it's a top-level module
-   - **Document:** Layer assignment should be obvious from module placement
-
-4. **Circular Dependency Prevention:**
-   - Automated tests detect cycles using depth-first search
-   - Tests run on every commit via pre-commit hooks
-   - If a cycle is detected, the commit is blocked
-   - To fix: move shared code to a lower layer or extract to a new utility module
-
-5. **Magic Numbers and Strings:**
-   - ALL magic values go in the foundation layer (constants module)
-   - Never hardcode timeouts, ports, file paths, cryptographic parameters
-   - Use semantic constant names: `CHECKPOINT_INTERVAL` not `100`
-   - This makes configuration changes safe and centralized
-
-6. **Type Safety:**
-   - Define custom error types in foundation layer
-   - Use `Result<T, E>` everywhere, never panic in library code
-   - Avoid string-based errors; use typed enums
-   - Make invalid states unrepresentable with Rust's type system
-
-**Modularity:**
-- Extract reusable logic into separate functions/modules
-- Keep functions focused on single responsibilities
-- Each module should have a clear, single purpose
-
-**DRY (Don't Repeat Yourself):**
-- Abstract common patterns (e.g., CORS headers, response builders)
-- Use traits for shared behavior across types
-- Create helper functions for repeated operations
-- If you copy-paste code more than once, extract it
-- **Configuration as Code:** Extract ALL magic values to `config/base/constants.env`
-- Use templates with variable substitution for infrastructure configs
-- Environment-specific overrides, not full config duplicates
-- Pre-commit hook ensures generated configs stay in sync with templates
-
-**Atomic Operations:**
-- Ensure blockchain state changes are atomic (add block + clear pending data together)
-- Use transactions or locks to prevent partial state updates
-- File persistence should be atomic (write to temp file, then rename)
-
-**Visual Documentation:**
-- Module dependency graph auto-generates on every commit
-- Review the graph to spot architectural issues
-- If the graph looks messy, the architecture needs refactoring
+- All magic numbers/strings centralized in constants module
+- Template-based configuration prevents environment drift (pre-commit hook enforces regeneration)
+- Atomic blockchain state changes (add block + clear pending data together)
+- Module dependency graph auto-generates on commit (visual architecture validation)
 
 ### Blockchain-Specific Principles
 
-**Immutability:**
-- Once blocks are added to the chain, they must never be modified
-- Validation logic should be deterministic and reproducible
-- Chain history is append-only
+**Immutability:** Append-only chain, deterministic validation, no modifications post-commit.
 
-**Consensus:**
-- Proof of Authority validator selection must be deterministic
-- Block creation should be instant (no mining in PoA)
-- Longest valid chain wins during synchronization
+**Consensus:** Proof of Authority with deterministic validator selection, instant block creation, longest valid chain wins.
 
-**Validation:**
-- Validate all data at ingestion (signatures, hashes, structure)
-- Re-validate the entire chain when syncing from peers
-- Check Merkle roots to detect tampering
-- Verify validator authorization for each block
+**Validation:** Full data validation at ingestion and peer sync (signatures, hashes, Merkle roots, validator authorization).
 
-**State Management:**
-- Separate pending data from committed blocks
-- Maintain clear boundaries between in-memory and persistent state
-- Handle chain reorganization gracefully
+**State Management:** Separate pending from committed data, clear in-memory/persistent boundaries, graceful chain reorganization.
 
-**Storage Architecture (RocksDB):**
-- **Incremental Writes:** New blocks written individually (O(1) vs O(n) for full JSON serialization)
-- **Fast Reads:** Block retrieval by index is O(1) with RocksDB key-value lookup
-- **Compression:** Snappy compression enabled (~50% disk space reduction)
-- **Schema Design:**
-  - `block:{index}` → Bincode-serialized Block
-  - `metadata:chain_length` → u64
-  - `metadata:schema_version` → String
-  - `checkpoint:{index}` → Block hash
-- **Migration:** Automatic JSON-to-RocksDB migration on first startup (legacy blockchain.json → RocksDB)
-- **Persistence Strategy:**
-  - Blocks saved immediately after creation (no batching)
-  - Checkpoints saved every 100 blocks
-  - In-memory blockchain loaded from RocksDB on startup
-  - Chain validation still requires full scan (security-critical)
+**Storage Architecture:** RocksDB with incremental O(1) writes, Snappy compression (~50% reduction), Bincode serialization. Schema uses block/metadata/checkpoint namespaces. Immediate block persistence, checkpoints every 100 blocks.
 
 ### Security Best Practices
 
-**Secret Management:**
-- **Architecture:** JWT/Session secrets stored in GitHub Secrets, injected at Docker build time
-- **Never in Git:** Secrets NEVER committed to repository (use `.gitignore`, GitHub Secrets only)
-- **Scripts for Management:**
-  - `scripts/setup-secrets.sh` - Generate 64-byte secrets, store in GitHub Secrets (one-time setup)
-  - `scripts/rotate-secrets.sh` - Generate new secrets, update GitHub Secrets (manual rotation)
-- **Build-Time Injection:** Secrets passed as Docker build args during GitHub Actions workflow
-- **Storage Location:** GitHub Secrets (JWT_SECRET, SESSION_SECRET) - accessed only by CI/CD
-- **Rotation Workflow:**
-  1. Run `./scripts/rotate-secrets.sh` (updates GitHub Secrets)
-  2. Push to main branch (triggers Docker rebuild with new secrets)
-  3. Redeploy application (pulls new Docker image)
-- **Rotation Impact:** Invalidates all user sessions (users must re-login with API key)
-- **User Data Safety:** User data encrypted with user's API key (NOT JWT/Session secrets), rotation doesn't affect data
-- **Rotation Schedule:** Every 90 days (manual via script, no auto-rotation currently)
+**Secret Management:** JWT/Session secrets in GitHub Secrets, injected at Docker build time. Rotation via scripts (90-day schedule), invalidates sessions but preserves user data (encrypted with API keys, not session secrets).
 
-**Cryptography:**
-- Never implement custom crypto primitives; use audited crates
-- Use constant-time comparison for sensitive data (API key hashes)
-- Generate cryptographically secure random values for nonces and keys
-- Always use authenticated encryption (AES-GCM, not plain AES)
+**Cryptography:** Use audited crates only, constant-time comparisons, authenticated encryption (AES-GCM), HKDF key derivation with salts.
 
-**Key Derivation:**
-- Use proper key derivation functions (PBKDF2, Argon2, or scrypt)
-- Include salt to prevent rainbow table attacks
-- Consider versioning salt/KDF to allow future upgrades
+**Input Validation:** Sanitize all external input, validate JSON structure, size limits for DoS prevention, signature verification before processing.
 
-**Input Validation:**
-- Sanitize all external input (HTTP requests, P2P messages)
-- Validate JSON structure before encryption/decryption
-- Limit data sizes to prevent DoS attacks
-- Verify signatures before processing any received data
-
-**Network Security:**
-- Validate all P2P messages before processing
-- Implement peer reputation/blacklisting for malicious nodes
-- Use timeouts to prevent resource exhaustion
-- Authenticate peers in production deployments
-
-### Testing Strategy
-
-**Unit Tests:**
-- Test cryptographic functions independently (encrypt/decrypt round-trips)
-- Verify signature creation and validation
-- Test Merkle tree construction and validation
-- Validate chain validation logic with malformed blocks
-
-**Integration Tests:**
-- Test multi-node consensus scenarios
-- Verify chain synchronization between peers
-- Test API endpoints with various inputs
-- Simulate network partitions and recovery
-
-**Property-Based Testing:**
-- Use `proptest` or `quickcheck` for blockchain invariants
-- Verify that any valid chain remains valid after adding valid blocks
-- Test that encryption/decryption is bijective
-
-**Security Testing:**
-- Test with invalid signatures
-- Attempt to modify blocks after creation
-- Try decrypting with wrong API keys
-- Test with malformed P2P messages
+**Testing Strategy:** Unit tests for crypto/signatures/Merkle trees, integration tests for consensus/sync/partitions, property-based testing for invariants, security tests with malformed input.
 
 ### Performance Considerations
 
-**Optimization Priorities:**
-1. Correctness first - never sacrifice security for performance
-2. Profile before optimizing - use `cargo flamegraph` or `perf`
-3. Optimize hot paths: hashing, signature verification, chain validation
-
-**Scaling:**
-- Consider pagination for large chain queries
-- Implement chain pruning or archival for long-running networks
-- Cache computed values (Merkle roots) when safe
-- Use async I/O for P2P networking to handle many concurrent peers
+Correctness first, profile before optimizing. Hot paths: hashing, signature verification, chain validation. Scaling: pagination, caching (Merkle roots), async I/O for P2P.
 
 ## Architecture Philosophy
 
-This is a proof-of-concept, so prioritize:
-- **Clarity over cleverness** - code should be easy to understand and modify
-- **Simplicity over features** - add complexity only when necessary
-- **Security over convenience** - never compromise cryptographic integrity
-- **Flexibility over optimization** - premature optimization adds rigidity
-
-Expect significant refactoring as the project evolves. Keep code modular and well-tested to enable rapid iteration.
+Proof-of-concept priorities: Clarity over cleverness, simplicity over features, security over convenience, flexibility over optimization. Code is modular and well-tested for rapid iteration.
 
 ## DevOps & Infrastructure
 
-### Load Balancer Architecture
+**Load Balancer:** Reverse proxy provides single entry point, automatic failover, health checks. Round-robin for reads, least-connections for writes. Supports transparent node maintenance.
 
-The system uses a **reverse proxy load balancer** as the single entry point for all API requests. This provides:
+**Deployment:** Containerized services (Docker Compose), internal P2P network, persistent volumes. Horizontal scaling (add nodes) and vertical scaling (increase resources).
 
-**High Availability:**
-- Automatic failover when nodes become unhealthy
-- Health checks monitor node responsiveness
-- No single point of failure (nodes operate independently)
+**Monitoring:** Health checks (load balancer + node state), metrics (request rate, chain length, peer count, resource usage).
 
-**Performance Optimization:**
-- **Read operations** use round-robin distribution to balance load evenly
-- **Write operations** use least-connections routing to avoid overwhelming nodes
-- Connection pooling reduces TCP handshake overhead
-- Appropriate cache headers for blockchain data (short TTL due to eventual consistency)
+**Blockchain State:** Append-only immutable data, P2P gossip sync, eventual consistency (longest valid chain wins), checkpoints prevent deep reorganizations.
 
-**Operational Benefits:**
-- Single endpoint simplifies client configuration
-- Transparent node maintenance (take nodes offline without API downtime)
-- Centralized logging and metrics
-- Easy to add/remove nodes without client changes
-
-### Deployment Strategy
-
-**Container Orchestration:**
-- All services run in isolated containers
-- Internal network for inter-node P2P communication
-- Only load balancer and dashboard exposed externally
-- Persistent volumes for blockchain data
-
-**Scaling Approach:**
-- **Horizontal scaling** - Add blockchain nodes to the upstream pool
-- **Vertical scaling** - Increase container resources (CPU/memory)
-- P2P peer discovery uses environment variables (configurable at runtime)
-
-**Production Hardening:**
-- Remove direct node access (only load balancer should be public)
-- Enable TLS/HTTPS at load balancer termination
-- Implement rate limiting to prevent abuse
-- Add authentication layer for write operations
-- Use secrets management for cryptographic keys
-- Configure resource limits and health check intervals
-
-### Infrastructure as Code
-
-The system is designed to be **cloud-native** and **Terraform-ready**:
-
-### Monitoring & Observability
-
-**Health Check Strategy:**
-- **Load balancer health**: Checks if reverse proxy is responsive
-- **Node health**: Checks blockchain state (chain length, peer count, node ID)
-- **Passive health checks**: Mark nodes unhealthy after failed requests
-- **Active health checks**: Periodic probes to health endpoint
-
-**Metrics to Monitor:**
-- Load balancer: Request rate, error rate, connection count, upstream latency
-- Blockchain nodes: Chain length, block creation time, peer count, pending transactions
-- System: CPU, memory, disk I/O, network throughput
-
-**Operational Commands:**
-- Check overall system status (load balancer + all nodes)
-- Get detailed load balancer statistics
-- View logs from specific services
-- Gracefully stop/start individual nodes
-
-### Blockchain-Specific DevOps Considerations
-
-**State Management:**
-- Blockchain data is **append-only** and **immutable**
-- Nodes synchronize via P2P gossip protocol
-- Longest valid chain wins (eventual consistency)
-- Checkpoints prevent deep chain reorganizations
-
-**Consensus Coordination:**
-- Proof of Authority uses deterministic validator rotation
-- Load balancer routing doesn't interfere with consensus
-- Write operations can go to any node (PoA validator creates block)
-- P2P network handles block propagation independently
-
-**Backup & Recovery:**
-- Blockchain state stored in structured files (simple backup)
-- Nodes can resync from peers if data is lost
-- Genesis block is deterministic (always reconstructable)
-- Consider periodic snapshots for faster recovery
-
-**Network Partitions:**
-- Nodes continue operating independently during partitions
-- Chain sync occurs when partition heals
-- Checkpoints provide safety against long-range attacks
-- Monitor peer count to detect isolation
-
-### Security Architecture
-
-**Network Segmentation:**
-- Public-facing: Load balancer, Dashboard
-- Internal-only: P2P communication between nodes
-- Debug endpoints: Individual node APIs (can be disabled in production)
-
-**Attack Surface Reduction:**
-- Load balancer performs input validation and rate limiting
-- CORS headers restrict browser-based access if needed
-- Individual nodes not directly accessible in production
-- P2P messages validated before processing
-
-**Cryptographic Operations:**
-- API key-based encryption uses secure key derivation
-- Digital signatures prevent data tampering
-- Cryptographic hashing for integrity checks
-- All crypto uses audited libraries, no custom primitives
-
-**Future Enhancements:**
-- OAuth2/JWT for API authentication
-- TLS mutual authentication for P2P connections
-- Hardware security modules (HSM) for key storage
-- Audit logging for compliance requirements
+**Security:** Network segmentation (public load balancer, internal P2P), input validation at edge, rate limiting, audited crypto libraries.
 
 ## Configuration Management
 
-### DRY Principle for Infrastructure
-
-This project uses a **template-based configuration system** to eliminate duplication and prevent drift between local and GCP environments (the root cause of the EAGAIN socket error bug).
-
-**Core Philosophy:**
-- ALL configuration values live in `config/base/constants.env` (magic numbers, ports, timeouts, memory limits)
-- Environment-specific overrides in `config/environments/{local,gcp}/overrides.env` (ONLY differences)
-- Templates use `{{VARIABLE}}` placeholders for substitution
-- Generation script (`config/scripts/generate-configs.sh`) produces final configs
-- Pre-commit hook automatically regenerates when templates change
-
-### Template System Architecture
-
-**Base Layer (Shared Across All Environments):**
-- `config/base/constants.env` - Single source of truth for all magic values
-  - Network ports (HTTP_PORT=8080, P2P_PORT=9000)
-  - Nginx settings (worker processes, timeouts, buffer sizes)
-  - Docker resource limits (separate for local vs GCP)
-  - Health check intervals
-  - Logging configuration
-  - All kernel tuning parameters
-
-- `config/base/nginx.conf.template` - Nginx structure with variable placeholders
-  - Uses `{{VARIABLE_NAME}}` syntax for substitution
-  - Contains the full nginx configuration structure
-  - Variables filled in by generation script from constants + overrides
-
-- `config/base/docker-compose.base.yml` - YAML anchors for reusability
-  - Shared service configurations (logging, health checks, networks)
-  - Referenced by environment-specific templates using `<<: *anchor-name`
-
-**Environment-Specific Layer (Overrides Only):**
-- `config/environments/local/overrides.env`
-  - NODE_COUNT=3 (local has 3 validators)
-  - Local hostname patterns (node1, node2, node3)
-  - Development-friendly resource limits
-  - READ_ENDPOINTS includes data/list
-
-- `config/environments/gcp/overrides.env`
-  - NODE_COUNT=2 (GCP e2-micro limited to 2 nodes)
-  - GCP hostname patterns (goud_node1, goud_node2)
-  - Conservative memory limits (320M node1, 160M node2)
-  - ACCOUNT_OPERATIONS_ROUTING_STRATEGY=node1_only (prevents chain inconsistency)
-  - Reduced worker processes and connections
-
-- `config/environments/{env}/docker-compose.template.yml`
-  - Service definitions specific to environment
-  - Uses YAML anchors from base for shared config
-  - Variables substituted during generation
-
-### Config Generation Workflow
-
-**Manual Generation:**
-```bash
-./config/scripts/generate-configs.sh local   # Local development (3 nodes)
-./config/scripts/generate-configs.sh gcp     # GCP deployment (2 nodes)
-./config/scripts/generate-configs.sh all     # Both environments
-```
-
-**Automatic Generation:**
-1. **Pre-commit Hook:** Detects changes to `config/` directory, regenerates all configs, stages them for commit
-2. **./run Script:** Regenerates local config before starting containers
-3. **scripts/deploy.sh:** Regenerates GCP config on VM before deployment
-4. **GitHub Actions:** Regenerates configs during CI/CD pipeline before deployment
-
-**Generation Process:**
-1. Load `config/base/constants.env` (all default values)
-2. Load `config/environments/{env}/overrides.env` (environment-specific overrides)
-3. Generate dynamic sections (upstream nodes list, routing blocks)
-4. Substitute all `{{VARIABLE}}` placeholders in templates
-5. Output final configs:
-   - `nginx/nginx.{env}.conf`
-   - `docker-compose.{env}.yml`
-
-### Generated Files (DO NOT EDIT MANUALLY)
-
-**Warning:** These files are auto-generated from templates:
-- `nginx/nginx.local.conf` ⚠️ Changes will be overwritten
-- `nginx/nginx.gcp.conf` ⚠️ Changes will be overwritten
-- `docker-compose.local.yml` ⚠️ Changes will be overwritten
-- `docker-compose.gcp.yml` ⚠️ Changes will be overwritten
-
-**Pre-commit hook enforcement:**
-- If you edit a template file, the hook regenerates configs automatically
-- Generated files are committed to git (visible diffs in PRs, easier debugging)
-- Comment headers clearly mark files as "DO NOT EDIT MANUALLY"
-
-### Adding New Configuration Values
-
-**Example: Adding a new timeout value**
-
-1. Add constant to `config/base/constants.env`:
-```bash
-NGINX_PROXY_TIMEOUT_NEW=120s
-```
-
-2. Use in template `config/base/nginx.conf.template`:
-```nginx
-proxy_timeout {{NGINX_PROXY_TIMEOUT_NEW}};
-```
-
-3. (Optional) Override for specific environment in `config/environments/gcp/overrides.env`:
-```bash
-NGINX_PROXY_TIMEOUT_NEW=60s  # Shorter timeout for GCP
-```
-
-4. Commit changes - pre-commit hook regenerates configs automatically
-
-### Why This Matters
-
-**Problem Solved:**
-- **EAGAIN Bug Root Cause:** GCP nginx config had hardcoded `proxy_pass http://goud_node1:8080` while local used hash-based routing. Manual edits caused drift.
-- **Magic Number Sprawl:** Timeouts, ports, memory limits scattered across multiple files
-- **Copy-Paste Errors:** 85% duplication between nginx.local.conf and nginx.gcp.conf
-- **Merge Conflicts:** Hard to track what actually differs between environments
-
-**Benefits:**
-- **Single Source of Truth:** Change a port in one place, affects all generated configs
-- **Environment Comparison:** Easy to see differences (just diff the override files)
-- **No Configuration Drift:** Templates enforce consistency
-- **Pre-commit Validation:** Can't commit template changes without regenerating configs
-- **Audit Trail:** Git history shows what values changed and when
-
-**Development Workflow:**
-1. Edit templates or constants (source of truth)
-2. Commit → Pre-commit hook regenerates and stages configs
-3. Deploy → Scripts regenerate on target environment
-4. Zero manual config editing required
-
-**Best Practices:**
-- Never edit generated files directly (changes will be lost)
-- Always add new values to `constants.env` first
-- Use descriptive constant names (NGINX_PROXY_READ_TIMEOUT not TIMEOUT_1)
-- Document non-obvious values with inline comments in constants.env
-- When in doubt, regenerate: `./config/scripts/generate-configs.sh all`
+Template-based system eliminates duplication and prevents environment drift. Base constants with environment-specific overrides, variable substitution in templates, pre-commit hook auto-regeneration. Never edit generated nginx/docker-compose files directly (marked with warnings). Single source of truth prevents configuration sprawl and merge conflicts.
 
 ## Operational Security & Observability
 
-### Audit Logging Architecture
+**Audit Logging:** Blockchain-native storage (encrypted collections), privacy-preserving (per-user encryption, IP hashing), batched for efficiency (10s or 50 events), immutable and tamper-proof, non-blocking (fail-open design). Events: account creation/login, data submit/decrypt/list. Query performance: O(n) scan with pagination.
 
-The audit logging system provides comprehensive operational security by tracking all user activities on the blockchain. This is critical for compliance, security investigations, and user transparency.
-
-**Design Philosophy:**
-- **Blockchain-Native Storage:** Audit logs are stored as `EncryptedCollection` objects directly on the blockchain (no separate database)
-- **Privacy-Preserving:** Only the account owner can decrypt their audit logs (encrypted with their API key)
-- **Batched for Efficiency:** Events are buffered and flushed every 10 seconds or when 50 events accumulate (reduces blockchain bloat)
-- **Immutable by Design:** Blockchain immutability ensures audit logs cannot be tampered with or deleted
-- **Non-Blocking:** Audit logging is asynchronous and never blocks API operations
-
-**Layer Assignment:**
-- **Layer 0 (Foundation):** `src/types/audit.rs` - Pure audit data types (AuditEventType, AuditLogEntry, AuditLogBatch)
-- **Layer 3 (Persistence):** `src/storage/audit_log.rs` - Audit logger implementation, batching, and storage
-- **Layer 5 (Presentation):** `src/api/handlers.rs` - Audit query API endpoint (`GET /api/audit`)
-
-**Event Types Logged:**
-1. **AccountCreated** - New account registration (POST /account/create)
-2. **AccountLogin** - User authentication with API key (POST /account/login)
-3. **DataSubmitted** - Data written to blockchain (POST /data/submit)
-4. **DataDecrypted** - Data read from blockchain (POST /data/decrypt/{id})
-5. **DataListed** - User queried their collections (GET /data/list)
-
-**Storage Format:**
-```rust
-// Audit logs stored as encrypted collections with "AUDIT:" label prefix
-EncryptedCollection {
-    collection_id: "uuid-...",
-    owner_api_key_hash: "sha256(api_key)",
-    encrypted_metadata: "AUDIT:2024-01-01T00:00:00Z", // Label with batch timestamp
-    encrypted_payload: "AES-GCM(JSON(AuditLogBatch))", // Array of AuditLogEntry
-    mac: "HMAC-SHA256(...)",
-    nonce: "random-12-bytes",
-    signature: "Ed25519(...)",
-}
-```
-
-**Batching Strategy:**
-- **Time-based flush:** Every 10 seconds (configurable via `AUDIT_BATCH_INTERVAL_SECONDS`)
-- **Size-based flush:** When 50 events accumulate (configurable via `AUDIT_BATCH_SIZE`)
-- **Graceful shutdown:** Flushes all pending logs on node shutdown
-- **Per-account buffering:** Separate buffers per API key hash prevent cross-user interference
-
-**Privacy Considerations:**
-- **IP Address Hashing:** Client IPs are hashed using SHA-256, then truncated to 8 bytes (prevents reverse lookup)
-- **Encryption:** Logs encrypted with user's API key (not master chain key) so only owner can read
-- **Soft Deletion:** `invalidated` flag supports retention policies without actually deleting (blockchain is immutable)
-- **Metadata Separation:** Event metadata stored as JSON (flexible schema for different event types)
-
-**Query Performance:**
-- **Linear Scan:** Currently O(n) scan of all blocks (acceptable for PoC with <10k blocks)
-- **Future Optimization:** Add RocksDB index for fast time-range queries
-- **Pagination:** API supports page/page_size parameters to limit memory usage
-- **Filtering:** Filter by event type, time range, and invalidation status
-
-**Integration Points:**
-1. **API Handlers:** Call `audit_logger.log()` after successful operations (non-blocking)
-2. **Authentication Middleware:** Log login attempts (both success and failure)
-3. **Data Operations:** Log submit, decrypt, list operations with collection IDs
-4. **Background Task:** Tokio async task flushes pending logs periodically
-5. **Dashboard:** Visual timeline of audit events with export capabilities
-
-**Error Handling:**
-- Audit logging failures NEVER block API operations (fail-open design)
-- Errors logged to tracing but operation succeeds
-- Critical for availability: audit system downtime doesn't affect blockchain operations
-- Trade-off: Some audit events may be lost if flush fails
-
-**Testing Strategy:**
-- Unit tests for batching logic and serialization
-- Integration tests for end-to-end audit trail verification
-- Simulate failure scenarios (flush errors, disk full, encryption failures)
-- Verify audit logs survive node restarts and P2P synchronization
-
-**Configuration:**
-```bash
-# src/constants.rs
-pub const AUDIT_LABEL_PREFIX: &str = "AUDIT:";
-pub const AUDIT_BATCH_SIZE: usize = 50;         // Max events per batch
-pub const AUDIT_BATCH_INTERVAL_SECONDS: u64 = 10; // Flush interval
-pub const AUDIT_IP_HASH_LENGTH: usize = 8;      // Truncated SHA-256 length
-```
-
-**Future Enhancements:**
-- Retention policies (auto-invalidate logs older than N days)
-- RocksDB index for O(log n) queries
-- Real-time audit event streaming (WebSocket)
-- Audit log export to external SIEM systems
-- Anomaly detection (unusual access patterns)
-- Compliance reports (GDPR, HIPAA, SOC2)
-
-### System Metrics
-
-The metrics endpoint (`GET /api/metrics`) provides real-time operational visibility into blockchain performance.
-
-**Metrics Tracked:**
-- **Chain Statistics:** Length, latest block index, timestamp
-- **Network Health:** Peer count, node status
-- **Performance:** Total operations (accounts + collections), cache hit rates
-- **Future:** Operations per second (requires time-series tracking)
-
-**Cache Hit Rate Calculation:**
-```rust
-// Key derivation cache (HKDF results cached for 5 minutes)
-let cache_stats = global_key_cache().stats();
-let hit_rate = cache_stats.hit_rate(); // hits / (hits + misses) * 100.0
-```
-
-**Prometheus Integration:**
-- Endpoint: `GET /metrics` (Prometheus scrape format)
-- Metrics exposed: chain_length, peer_count, operations_total, cache_hit_rate
-- Useful for Grafana dashboards and alerting
-
-**Best Practices:**
-- Use metrics to identify performance bottlenecks (low cache hit rate = too many HKDF computations)
-- Monitor peer_count to detect network partitions
-- Track operations_total to understand blockchain growth rate
-- Compare metrics across nodes to detect inconsistencies
+**System Metrics:** Real-time monitoring via API endpoint. Metrics: chain statistics (length, latest block), network health (peer count), performance (cache hit rates, operations total). Prometheus-compatible for Grafana dashboards.
