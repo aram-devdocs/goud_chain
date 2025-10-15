@@ -11,6 +11,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   # Fast-fail formatting check
@@ -27,9 +29,9 @@ jobs:
       - name: Run cargo fmt
         run: cargo fmt -- --check
 
-  # Fast-fail linting check
-  rust-clippy:
-    name: Rust Clippy
+  # Shared compilation job - compiles once, used by clippy and test
+  rust-build:
+    name: Rust Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -38,19 +40,53 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          shared-key: "build"
+
+      - name: Build all targets
+        run: cargo build --all-targets --all-features
+
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  # Parallel linting check - uses build artifacts
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    needs: [rust-build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: "build"
 
       - name: Run cargo clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  # Parallel test execution
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  # Parallel test execution - uses build artifacts
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
-    needs: [rust-fmt, rust-clippy]
+    needs: [rust-build]
 
     steps:
       - name: Checkout code
@@ -59,10 +95,14 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.6
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          shared-key: "build"
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -72,20 +112,13 @@ jobs:
       - name: Run tests with nextest
         run: cargo nextest run --all-targets --all-features --verbose
 
-  # Docker build test (multi-arch) - only runs if Docker/config files changed
+      - name: Show sccache stats
+        run: sccache --show-stats
+
+  # Docker build test (multi-arch)
   docker-build:
     name: Docker Build Test
     runs-on: ubuntu-latest
-    # Skip if only Rust/Terraform/docs changed
-    if: |
-      contains(github.event.head_commit.message, '[skip docker]') == false &&
-      (
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.changed_files, 'Dockerfile') ||
-        contains(github.event.pull_request.changed_files, 'docker-compose') ||
-        contains(github.event.pull_request.changed_files, 'nginx/') ||
-        contains(github.event.pull_request.changed_files, 'config/')
-      )
 
     steps:
       - name: Checkout code
@@ -104,17 +137,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Terraform validation - only runs if Terraform files changed
+  # Terraform validation
   terraform-validate:
     name: Terraform Validation
     runs-on: ubuntu-latest
-    # Skip if only Rust/Docker/docs changed
-    if: |
-      contains(github.event.head_commit.message, '[skip terraform]') == false &&
-      (
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.changed_files, 'terraform/')
-      )
 
     steps:
       - name: Checkout code
@@ -137,17 +163,10 @@ jobs:
         run: terraform validate
         working-directory: ./terraform/environments/dev
 
-  # Security scanning - always run on main/develop, conditional on PRs
+  # Security scanning
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    # Run on main/develop always, or on PRs if Rust/Docker/deps changed
-    if: |
-      github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/develop' ||
-      contains(github.event.pull_request.changed_files, 'Cargo') ||
-      contains(github.event.pull_request.changed_files, 'Dockerfile') ||
-      contains(github.event.pull_request.changed_files, 'src/')
     permissions:
       security-events: write  # Required to upload SARIF results to GitHub Security
 

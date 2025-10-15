@@ -55,8 +55,8 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 
 ### Privacy & Security
 - **Privacy-Preserving Architecture** - Full metadata encryption with blind indexes
-- **Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks
-- **Timestamp Obfuscation** - Hourly granularity hides exact activity timing
+- **Per-User + Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks (Phase 5)
+- **Timestamp Obfuscation** - Daily granularity with random jitter (±4 hours) hides timing and timezone (Phase 5)
 - **Dual-Layer Encryption** - Master key for block data, API keys for collections
 - **Two-Tier HKDF Key Derivation** - OWASP-compliant security with optimized performance:
   - **Tier 1 (Authentication):** 100,000 iterations for API key hashing (brute-force resistance)
@@ -247,6 +247,7 @@ EncryptedCollection {
     nonce: String,                // 12-byte random nonce
     signature: String,            // Ed25519 signature
     public_key: String,           // Ed25519 public key
+    user_salt: String,            // Phase 5: Per-user random salt (prevents correlation)
 }
 ```
 
@@ -1085,10 +1086,11 @@ node1:
 - Obfuscate validator identity and timing information
 - Enable efficient queries without exposing data
 
-**Blind Indexes:**
+**Blind Indexes (Phase 5 Enhanced):**
 - HMAC-SHA256 based searchable encryption
-- Per-block random salt (32 bytes) prevents correlation
-- Deterministic for same API key + block salt combination
+- **Per-user salt (32 bytes)** + per-block salt prevents cross-block correlation
+- Attacker cannot correlate their own data across blocks (missing user_salt)
+- Deterministic for same API key + user_salt + block_salt combination
 - One-way: cannot reverse to find API key hash
 - Query complexity: O(n) blocks (trade-off for privacy)
 
@@ -1098,10 +1100,11 @@ node1:
 - Development fallback: `MASTER_KEY_PASSPHRASE` hashed with SHA-256
 - Encrypted data includes validator identity (hidden from observers)
 
-**Timestamp Obfuscation:**
-- Timestamps rounded to hourly granularity (3600 seconds)
-- Hides exact activity timing
-- Prevents timing-based correlation attacks
+**Timestamp Obfuscation (Phase 5 Enhanced):**
+- Timestamps rounded to daily granularity (86400 seconds)
+- Random jitter added (±4 hours) to each block timestamp
+- Hides exact activity timing and timezone information
+- Prevents timing-based correlation and bulk submission pattern detection
 
 **Validator Obfuscation:**
 - Validator identity stored inside encrypted block data

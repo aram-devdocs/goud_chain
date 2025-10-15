@@ -8,7 +8,9 @@ use super::{
     envelope::{AccountEnvelope, BlockEnvelopeContainer, CollectionEnvelope},
     user_account::UserAccount,
 };
-use crate::constants::{EMPTY_MERKLE_ROOT, GENESIS_TIMESTAMP, TIMESTAMP_GRANULARITY_SECONDS};
+use crate::constants::{
+    EMPTY_MERKLE_ROOT, GENESIS_TIMESTAMP, TIMESTAMP_GRANULARITY_SECONDS, TIMESTAMP_JITTER_SECONDS,
+};
 use crate::crypto::hash_api_key_hex;
 use crate::types::{GoudChainError, Result};
 
@@ -19,10 +21,17 @@ pub fn generate_block_salt() -> String {
     hex::encode(salt_bytes)
 }
 
-/// Obfuscate timestamp to hourly granularity for privacy
-/// Rounds down to the nearest hour to hide exact activity timing
+/// Obfuscate timestamp to daily granularity with random jitter for privacy (Phase 5)
+///
+/// 1. Rounds down to the nearest day to hide exact timing and timezone
+/// 2. Adds random jitter (±4 hours) to prevent pattern analysis
+///
+/// This makes bulk submissions appear as separate events across different time periods
 fn obfuscate_timestamp(timestamp: i64) -> i64 {
-    timestamp - (timestamp % TIMESTAMP_GRANULARITY_SECONDS)
+    let mut rng = rand::thread_rng();
+    let rounded = timestamp - (timestamp % TIMESTAMP_GRANULARITY_SECONDS);
+    let jitter = rng.gen_range(-TIMESTAMP_JITTER_SECONDS..=TIMESTAMP_JITTER_SECONDS);
+    rounded + jitter
 }
 
 /// Configuration for creating a new block

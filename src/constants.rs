@@ -11,7 +11,8 @@ pub const ROCKSDB_PATH: &str = "/data/rocksdb";
 // Blockchain parameters
 pub const CHECKPOINT_INTERVAL: u64 = 100;
 pub const TIMESTAMP_TOLERANCE_SECONDS: i64 = 120;
-pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 3600; // 1 hour (privacy: hides exact timing)
+pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 86400; // 1 day (Phase 5: privacy - hides exact timing and timezone)
+pub const TIMESTAMP_JITTER_SECONDS: i64 = 14400; // ±4 hours random jitter (Phase 5: prevents pattern analysis)
 
 // Cryptography constants
 pub const ENCRYPTION_SALT: &[u8] = b"goud_chain_salt_v2";
