@@ -13,57 +13,79 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Rust tests and linting
-  rust-test:
-    name: Rust Tests & Linting
+  # Fast-fail formatting check
+  rust-fmt:
+    name: Rust Format Check
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run cargo fmt
+        run: cargo fmt -- --check
+
+  # Fast-fail linting check
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Run cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # Parallel test execution
+  rust-test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    needs: [rust-fmt, rust-clippy]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache Cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-
-
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        run: rustup show
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          profile: minimal
-          toolchain: stable
-          components: rustfmt, clippy
-          override: true
+          cache-on-failure: true
 
-      - name: Run cargo fmt
-        run: cargo fmt -- --check
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
 
-      - name: Run cargo clippy
-        run: cargo clippy -- -D warnings
+      - name: Run tests with nextest
+        run: cargo nextest run --all-targets --all-features --verbose
 
-      - name: Run tests
-        run: cargo test --verbose
-
-      - name: Run module dependency tests
-        run: cargo test --test module_dependencies --verbose
-
-  # Docker build test (multi-arch)
+  # Docker build test (multi-arch) - only runs if Docker/config files changed
   docker-build:
     name: Docker Build Test
     runs-on: ubuntu-latest
+    # Skip if only Rust/Terraform/docs changed
+    if: |
+      contains(github.event.head_commit.message, '[skip docker]') == false &&
+      (
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.changed_files, 'Dockerfile') ||
+        contains(github.event.pull_request.changed_files, 'docker-compose') ||
+        contains(github.event.pull_request.changed_files, 'nginx/') ||
+        contains(github.event.pull_request.changed_files, 'config/')
+      )
 
     steps:
       - name: Checkout code
@@ -82,10 +104,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Terraform validation
+  # Terraform validation - only runs if Terraform files changed
   terraform-validate:
     name: Terraform Validation
     runs-on: ubuntu-latest
+    # Skip if only Rust/Docker/docs changed
+    if: |
+      contains(github.event.head_commit.message, '[skip terraform]') == false &&
+      (
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.changed_files, 'terraform/')
+      )
 
     steps:
       - name: Checkout code
@@ -108,10 +137,17 @@ jobs:
         run: terraform validate
         working-directory: ./terraform/environments/dev
 
-  # Security scanning
+  # Security scanning - always run on main/develop, conditional on PRs
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    # Run on main/develop always, or on PRs if Rust/Docker/deps changed
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop' ||
+      contains(github.event.pull_request.changed_files, 'Cargo') ||
+      contains(github.event.pull_request.changed_files, 'Dockerfile') ||
+      contains(github.event.pull_request.changed_files, 'src/')
     permissions:
       security-events: write  # Required to upload SARIF results to GitHub Security
 
@@ -126,6 +162,7 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          skip-dirs: 'target,tests'  # Skip build artifacts and test fixtures
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
