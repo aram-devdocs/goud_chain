@@ -188,8 +188,8 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 1. Account Creation → Generate 256-bit API Key → Hash with SHA-256 → Store on Blockchain
 2. Authentication → API Key → JWT Session Token (1hr expiry)
 3. Data Submission → JSON → Encrypt with API-derived key (HKDF) → HMAC → Sign (Ed25519) → Collection
-4. Block Creation → Validator creates block → Encrypt with master key → Generate blind indexes → Merkle Root → Blockchain
-5. Data Retrieval → Find via blind index → Decrypt block → Decrypt collection with API key → Verify HMAC → Return JSON
+4. Block Creation → Validator creates block → Encode envelopes (Base64) → Merkle Root → Blockchain
+5. Data Retrieval → Decrypt envelope with API key → Decrypt collection → Verify HMAC → Return JSON
 ```
 
 **Consensus:** Proof of Authority (PoA)
@@ -609,7 +609,7 @@ goud_chain/
 ├── src/
 │   ├── main.rs                     # Entry point
 │   ├── lib.rs                      # Library exports for testing
-│   ├── config.rs                   # Environment configuration & master key loading
+│   ├── config.rs                   # Environment configuration & secret management
 │   ├── constants.rs                # Configuration constants & schema version
 │   ├── crypto/
 │   │   ├── api_key.rs              # API key generation & validation
@@ -751,7 +751,7 @@ enum P2PMessage {
 
 ## Configuration
 
-Nodes configured via environment variables (NODE_ID, HTTP_PORT, P2P_PORT, PEERS). Production uses MASTER_CHAIN_KEY (64-char hex), development uses MASTER_KEY_PASSPHRASE (SHA-256 hashed). See docker-compose files for complete configuration examples.
+Nodes configured via environment variables (NODE_ID, HTTP_PORT, P2P_PORT, PEERS). JWT_SECRET and SESSION_SECRET are auto-generated on first run if not provided (stored in `/data` directory). For production deployments, set these secrets via environment variables or GitHub Secrets (see [SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md)).
 
 ## Privacy Architecture
 
@@ -771,9 +771,9 @@ Nodes configured via environment variables (NODE_ID, HTTP_PORT, P2P_PORT, PEERS)
 
 **Envelope Encryption Architecture:**
 - User accounts encrypted with per-user keys derived from API key + block salt
-- Collections encrypted with user's API key (separate from block-level encryption)
+- Collections encrypted with user's API key (separate from envelope encryption)
 - Node operators cannot decrypt user data (zero-knowledge storage)
-- Master chain key encrypts block envelope container (structural integrity)
+- Block envelope container is Base64-encoded (envelopes contain encrypted data)
 - Each encryption layer uses independent key derivation with domain separation
 
 **Timestamp Obfuscation:**
