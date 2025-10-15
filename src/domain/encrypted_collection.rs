@@ -20,12 +20,12 @@ pub struct EncryptedCollection {
     pub nonce: String,              // Nonce used for encryption (hex)
     pub signature: String,
     pub public_key: String,
-    pub user_salt: String, // Phase 5 P5-001: Random per-collection salt (prevents cross-block correlation)
+    pub user_salt: String, // Random per-collection salt (prevents cross-block correlation)
 }
 
 impl EncryptedCollection {
     /// Create a new encrypted collection
-    /// Note: Size validation happens at API layer (P3-002) before reaching this function
+    /// Note: Size validation happens at API layer before reaching this function
     /// Encryption adds ~1.33x overhead (base64 encoding + nonce + MAC)
     pub fn new(
         label: String,
@@ -39,7 +39,7 @@ impl EncryptedCollection {
         let collection_id = Uuid::new_v4().to_string();
         let public_key = get_public_key_hex(signing_key);
 
-        // Phase 5 P5-001: Generate random per-user salt (32 bytes)
+        // Generate random per-user salt (32 bytes)
         // This prevents cross-block correlation attacks
         let mut rng = rand::thread_rng();
         let user_salt_bytes: [u8; 32] = rng.gen();

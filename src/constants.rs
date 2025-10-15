@@ -11,8 +11,8 @@ pub const ROCKSDB_PATH: &str = "/data/rocksdb";
 // Blockchain parameters
 pub const CHECKPOINT_INTERVAL: u64 = 100;
 pub const TIMESTAMP_TOLERANCE_SECONDS: i64 = 120;
-pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 86400; // 1 day (Phase 5: privacy - hides exact timing and timezone)
-pub const TIMESTAMP_JITTER_SECONDS: i64 = 14400; // ±4 hours random jitter (Phase 5: prevents pattern analysis)
+pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 86400; // 1 day - hides exact timing and timezone
+pub const TIMESTAMP_JITTER_SECONDS: i64 = 14400; // ±4 hours random jitter prevents pattern analysis
 
 // Cryptography constants
 pub const ENCRYPTION_SALT: &[u8] = b"goud_chain_salt_v2";
@@ -59,15 +59,12 @@ pub const HEADER_VALUE_JSON: &[u8] = b"application/json";
 // Reduced to 2 validators for single-VM GCP deployment (optimized for e2-micro 1GB RAM)
 pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];
 
-// P2P Network Security (Phase 4)
-// Whitelist of allowed peer node IDs (must match NODE_ID env var of allowed peers)
-// In production, this should be configured via environment variable
-pub const ALLOWED_PEERS: [&str; 3] = ["node1", "node2", "node3"];
+// P2P Network Security
 pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
 pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
 pub const MAX_CONCURRENT_CONNECTIONS: usize = 10;
 
-// Rate Limiting (Phase 3 - DoS Protection)
+// Rate Limiting - DoS Protection
 // Request limits per API key
 pub const RATE_LIMIT_WRITE_PER_SECOND: u32 = 10; // Maximum write operations per second
 pub const RATE_LIMIT_READ_PER_SECOND: u32 = 100; // Maximum read operations per second
@@ -82,28 +79,15 @@ pub const BAN_IP_24HR_SECONDS: u64 = 86400; // After complete blacklist: 24-hour
 // Performance tuning
 pub const RATE_LIMIT_CACHE_SIZE: usize = 10000; // LRU cache for hot API keys
 
-// Request signing (P3-003 - Replay Attack Prevention)
+// Request signing - Replay Attack Prevention
 pub const SIGNATURE_HEADER_NAME: &str = "X-Signature";
 pub const SIGNATURE_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5 minutes
 pub const NONCE_EXPIRY_SECONDS: u64 = 600; // 10 minutes (nonce deduplication window)
 
-// Audit Logging (Phase 4 - Operational Security)
+// Audit Logging - Operational Security
 pub const AUDIT_LABEL_PREFIX: &str = "AUDIT:"; // Special collection label prefix for audit logs
 pub const AUDIT_BATCH_INTERVAL_SECONDS: u64 = 10; // Flush audit logs every 10 seconds
 pub const AUDIT_BATCH_SIZE: usize = 50; // Or when 50 events accumulated
-/// Minimum audit log retention period (1 year for GDPR/HIPAA compliance)
-/// NOTE: Currently unused, reserved for future retention policy implementation
-#[allow(dead_code)]
-pub const AUDIT_LOG_RETENTION_DAYS: u64 = 365;
 pub const AUDIT_IP_HASH_LENGTH: usize = 8; // Store truncated SHA256(IP) for privacy
 
-// Metrics (Phase 4 - Operational Security)
-/// Prometheus-compatible metrics endpoint path
-/// NOTE: Currently unused, reserved for future Prometheus integration
-#[allow(dead_code)]
-pub const METRICS_ENDPOINT: &str = "/metrics";
-
-/// Metrics update interval for time-series tracking
-/// NOTE: Currently unused, reserved for future time-series metrics implementation
-#[allow(dead_code)]
-pub const METRICS_UPDATE_INTERVAL_SECS: u64 = 5;
+// Metrics - Operational Security

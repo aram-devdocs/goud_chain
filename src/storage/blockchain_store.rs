@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::constants::{CHECKPOINT_INTERVAL, ROCKSDB_PATH};
-use crate::domain::{Block, Blockchain};
+use crate::domain::Block;
 use crate::types::{GoudChainError, Result};
 
 /// Thread-safe wrapper around RocksDB for blockchain storage
@@ -223,33 +223,6 @@ impl BlockchainStore {
     /// Check if RocksDB contains blockchain data
     pub fn is_empty(&self) -> bool {
         self.db.get(b"metadata:chain_length").unwrap().is_none()
-    }
-
-    /// Migrate from JSON file to RocksDB (one-time migration)
-    pub fn migrate_from_json(&self, blockchain: &Blockchain) -> Result<()> {
-        warn!("Migrating blockchain from JSON to RocksDB");
-
-        // Save all blocks
-        for block in &blockchain.chain {
-            self.save_block(block)?;
-        }
-
-        // Save checkpoints
-        for (i, checkpoint_hash) in blockchain.checkpoints.iter().enumerate() {
-            let block_index = (i as u64 + 1) * CHECKPOINT_INTERVAL;
-            self.save_checkpoint(block_index, checkpoint_hash)?;
-        }
-
-        // Save metadata
-        self.save_metadata(&blockchain.node_id, &blockchain.schema_version)?;
-
-        info!(
-            blocks = blockchain.chain.len(),
-            checkpoints = blockchain.checkpoints.len(),
-            "Migration to RocksDB complete"
-        );
-
-        Ok(())
     }
 
     /// Clear all blockchain data (for testing/reset)

@@ -11,13 +11,13 @@ type HmacSha256 = Hmac<Sha256>;
 /// They are deterministic (same input = same output) but cryptographically
 /// one-way (cannot reverse to get the original value).
 ///
-/// # Security Properties (Phase 5 P5-001)
+/// # Security Properties
 /// - Deterministic: Same api_key_hash + context + user_salt + block_salt always produces same index
 /// - One-way: Cannot recover api_key_hash from blind index
 /// - Unlinkable: Different user_salts prevent cross-block correlation (attacker cannot track their own data)
 /// - Searchable: Holder of api_key_hash can generate matching index if they know both salts
 ///
-/// # Phase 5 Privacy Enhancement
+/// # Privacy Enhancement with Dual Salts
 /// - **user_salt**: Random per-collection salt (prevents attacker from correlating their data across blocks)
 /// - **block_salt**: Random per-block salt (additional entropy layer)
 /// - Combined salt = user_salt || block_salt ensures maximum privacy
@@ -27,7 +27,7 @@ pub fn generate_blind_index_with_salt(
     user_salt: &str,
     block_salt: &str,
 ) -> Result<String> {
-    // Phase 5: Combine user_salt and block_salt for maximum privacy
+    // Combine user_salt and block_salt for maximum privacy
     let combined_salt = format!("{}{}", user_salt, block_salt);
 
     let mut mac = HmacSha256::new_from_slice(combined_salt.as_bytes())
@@ -43,7 +43,7 @@ pub fn generate_blind_index_with_salt(
 }
 
 /// Generate a blind index for an account lookup with per-block salt
-/// Note: Accounts don't have per-user salts (only collections do in Phase 5)
+/// Note: Accounts don't have per-user salts (only collections do)
 /// Use empty string for user_salt to maintain backward compatibility
 pub fn generate_account_blind_index_with_salt(
     api_key_hash: &str,
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_phase5_per_user_salt_prevents_correlation() {
-        // Phase 5 P5-001: Verify that per-user salts prevent cross-block correlation
+        // Verify that per-user salts prevent cross-block correlation
         // Even with the same API key and block salt, different user_salts produce different indexes
         let api_key_hash = "attacker_key_hash";
         let context = "collection_lookup";

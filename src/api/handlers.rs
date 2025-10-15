@@ -192,7 +192,7 @@ pub fn handle_get_prometheus_metrics(
     )
 }
 
-/// Handle GET /api/audit - Query audit logs (Phase 4 - Operational Security)
+/// Handle GET /api/audit - Query audit logs for operational security
 /// Returns paginated audit logs for authenticated user
 /// Query params: start_ts, end_ts, event_type, page, page_size
 pub fn handle_get_audit_logs(
@@ -417,7 +417,7 @@ pub fn route_request(
             let _ = request.respond(handle_get_prometheus_metrics(blockchain, p2p));
         }
 
-        // ========== Audit Logging (Phase 4) ==========
+        // ========== Audit Logging ==========
         (Method::Get, "/api/audit") => {
             let response =
                 handle_get_audit_logs(&request, Arc::clone(&audit_logger), Arc::clone(&config));

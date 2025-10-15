@@ -93,7 +93,7 @@ pub enum GoudChainError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
-    // Rate limiting errors (Phase 3 - DoS Protection)
+    // Rate limiting errors - DoS Protection
     #[error(
         "Rate limit exceeded: {retry_after} seconds until reset (violation #{violation_count})"
     )]
@@ -108,14 +108,14 @@ pub enum GoudChainError {
     #[error("IP address banned: expires at {expires_at}")]
     IpAddressBanned { expires_at: i64 },
 
-    // Size limit errors (P3-002 - DoS Protection)
+    // Size limit errors - DoS Protection
     #[error("Payload too large: {actual_bytes} bytes (max: {max_bytes} bytes)")]
     PayloadTooLarge {
         actual_bytes: usize,
         max_bytes: usize,
     },
 
-    // Input validation errors (P3-004 - Injection Prevention)
+    // Input validation errors - Injection Prevention
     #[error("Invalid label: {0}")]
     InvalidLabel(String),
 
@@ -125,7 +125,7 @@ pub enum GoudChainError {
     #[error("JSON too deep: maximum {max_depth} levels allowed")]
     JsonTooDeep { max_depth: usize },
 
-    // Request signing errors (P3-003 - Replay Attack Prevention)
+    // Request signing errors - Replay Attack Prevention
     #[error("Signature verification failed: {0}")]
     InvalidRequestSignature(String),
 
@@ -139,7 +139,7 @@ pub enum GoudChainError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
-    // Audit logging errors (Phase 4)
+    // Audit logging errors
     #[error("Audit log operation failed: {0}")]
     AuditLogError(String),
 

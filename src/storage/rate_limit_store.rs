@@ -422,7 +422,7 @@ impl RateLimitStore {
         Ok(())
     }
 
-    /// Check if nonce exists (replay detection) - P3-003
+    /// Check if nonce exists (replay detection)
     /// Returns true if nonce has been used before
     pub fn check_nonce(&self, nonce: &str) -> Result<bool> {
         let key = format!("nonce:{}", nonce);
@@ -437,7 +437,7 @@ impl RateLimitStore {
         }
     }
 
-    /// Store nonce with expiry timestamp (P3-003)
+    /// Store nonce with expiry timestamp
     /// Nonces expire after 10 minutes (NONCE_EXPIRY_SECONDS)
     pub fn store_nonce(&self, nonce: &str) -> Result<()> {
         use crate::constants::NONCE_EXPIRY_SECONDS;

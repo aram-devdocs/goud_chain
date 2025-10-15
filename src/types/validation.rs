@@ -1,4 +1,4 @@
-//! Input validation module (P3-004 - Injection Prevention)
+//! Input validation module for Injection Prevention
 //! Layer 5: Presentation - Validates user input before processing
 //!
 //! **Validations:**

@@ -16,7 +16,7 @@ pub use self::blockchain_store::BlockchainStore;
 pub use self::rate_limit_store::{BanLevel, RateLimitStore};
 
 /// Load the blockchain from RocksDB or create a new one
-/// Handles schema migration and JSON-to-RocksDB conversion automatically
+/// Handles schema versioning automatically
 pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Blockchain> {
     // Check if RocksDB has data
     if !store.is_empty() {
@@ -67,78 +67,18 @@ pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Block
             node_signing_key: Some(generate_signing_key()),
         })
     } else {
-        // RocksDB is empty - check for legacy JSON file
-        check_json_migration(&node_id, store)
-    }
-}
+        // RocksDB is empty - create new blockchain
+        info!("No existing blockchain found, creating new one");
+        let blockchain = Blockchain::new(node_id.clone())?;
 
-/// Check if JSON file exists and migrate to RocksDB
-fn check_json_migration(node_id: &str, store: &BlockchainStore) -> Result<Blockchain> {
-    // Legacy JSON path (keeping for migration)
-    const LEGACY_JSON_PATH: &str = "/data/blockchain.json";
-
-    match fs::read_to_string(LEGACY_JSON_PATH) {
-        Ok(content) => {
-            warn!("Found legacy JSON blockchain file - migrating to RocksDB");
-
-            // Try to parse JSON
-            match serde_json::from_str::<Blockchain>(&content) {
-                Ok(mut blockchain) => {
-                    // Update runtime fields
-                    blockchain.node_id = node_id.to_string();
-                    blockchain.pending_accounts_with_keys = Vec::new();
-                    blockchain.pending_collections = Vec::new();
-                    blockchain.node_signing_key = Some(generate_signing_key());
-
-                    info!(
-                        chain_length = blockchain.chain.len(),
-                        "Migrating {} blocks from JSON to RocksDB",
-                        blockchain.chain.len()
-                    );
-
-                    // Migrate to RocksDB
-                    store.migrate_from_json(&blockchain)?;
-
-                    // Rename JSON file to .backup
-                    if let Err(e) = fs::rename(LEGACY_JSON_PATH, "/data/blockchain.json.backup") {
-                        warn!(error = %e, "Failed to rename JSON file to backup");
-                    } else {
-                        info!("Legacy JSON file backed up to blockchain.json.backup");
-                    }
-
-                    Ok(blockchain)
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        "Failed to parse legacy JSON file - creating new blockchain"
-                    );
-
-                    // Delete corrupted JSON
-                    if let Err(e) = fs::remove_file(LEGACY_JSON_PATH) {
-                        warn!(error = %e, "Failed to delete corrupted JSON file");
-                    }
-
-                    let blockchain = Blockchain::new(node_id.to_string())?;
-                    store.save_metadata(node_id, SCHEMA_VERSION)?;
-                    Ok(blockchain)
-                }
-            }
+        // Save genesis block to RocksDB
+        if let Some(genesis) = blockchain.chain.first() {
+            store.save_block(genesis)?;
+            info!("Genesis block saved to RocksDB");
         }
-        Err(_) => {
-            // No JSON file found - create new blockchain
-            info!("No existing blockchain found, creating new one");
-            let blockchain = Blockchain::new(node_id.to_string())?;
 
-            // Save genesis block to RocksDB
-            if let Some(genesis) = blockchain.chain.first() {
-                store.save_block(genesis)?;
-                info!("Genesis block saved to RocksDB");
-            }
-
-            store.save_metadata(node_id, SCHEMA_VERSION)?;
-            Ok(blockchain)
-        }
+        store.save_metadata(&node_id, SCHEMA_VERSION)?;
+        Ok(blockchain)
     }
 }
 

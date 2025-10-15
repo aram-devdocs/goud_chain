@@ -163,7 +163,7 @@ pub fn handle_submit_data(
             }
             info!("=== END DEBUG ===");
 
-            // Verify request signature (P3-003 - Replay Protection)
+            // Verify request signature (Replay Protection)
             // NOTE: To disable signature verification (not recommended), comment out this block
             if let Err(e) = super::verify_request_signature(
                 &request,
@@ -180,7 +180,7 @@ pub fn handle_submit_data(
                 return;
             }
 
-            // Validate request size BEFORE encryption (P3-002 - DoS Protection)
+            // Validate request size BEFORE encryption (DoS Protection)
             if let Err(e) = req.validate() {
                 let _ = request.respond(error_response(e.to_json(), e.status_code()));
                 return;
@@ -325,8 +325,7 @@ pub fn handle_submit_data(
                                                 block_number: block.index,
                                             };
 
-                                            // Audit log: Data submitted (Phase 4)
-                                            // Logs are batched and flushed by background task every 10s
+                                            // Audit log: Data submitted (batched and flushed every 10s)
                                             if let Err(e) = audit_logger.log(
                                                 &api_key,
                                                 AuditEventType::DataSubmitted,
@@ -509,11 +508,12 @@ pub fn handle_list_data(
             Err(_) => 0,
         };
 
+        // Block number lookup requires scanning all blocks - skip for performance
         result.push(CollectionListItem {
             collection_id: collection.collection_id.clone(),
             label,
             created_at,
-            block_number: 0, // TODO: Add block number lookup if needed
+            block_number: 0,
         });
     }
 
@@ -521,8 +521,7 @@ pub fn handle_list_data(
         collections: result.clone(),
     };
 
-    // Audit log: Data listed (Phase 4)
-    // Logs are batched and flushed by background task every 10s
+    // Audit log: Data listed (batched and flushed every 10s)
     let client_ip = extract_client_ip(request);
     if let Err(e) = audit_logger.log(
         &api_key,
@@ -654,8 +653,7 @@ pub fn handle_decrypt_data(
                         created_at: metadata["created_at"].as_i64().unwrap_or(0),
                     };
 
-                    // Audit log: Data decrypted (Phase 4)
-                    // Logs are batched and flushed by background task every 10s
+                    // Audit log: Data decrypted (batched and flushed every 10s)
                     let client_ip = extract_client_ip(request);
                     if let Err(e) = audit_logger.log(
                         &api_key,

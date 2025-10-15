@@ -204,11 +204,10 @@ pub fn handle_create_account(
                                     let response = CreateAccountResponse {
                                         account_id: account_id.clone(),
                                         api_key: encode_api_key(&api_key),
-                                        warning: "⚠️ SAVE THIS API KEY SECURELY. It cannot be recovered and provides full access to your data.".to_string(),
+                                        warning: "SAVE THIS API KEY SECURELY. It cannot be recovered and provides full access to your data.".to_string(),
                                     };
 
-                                    // Audit log: Account created (Phase 4)
-                                    // Logs are batched and flushed by background task every 10s
+                                    // Audit log: Account created (batched and flushed every 10s)
                                     if let Err(e) = audit_logger.log(
                                         &api_key,
                                         AuditEventType::AccountCreated,
@@ -316,8 +315,7 @@ pub fn handle_login(
                                             // Drop blockchain lock before audit logging to avoid deadlock
                                             drop(blockchain_guard);
 
-                                            // Audit log: Account login (Phase 4)
-                                            // Logs are batched and flushed by background task every 10s
+                                            // Audit log: Account login (batched and flushed every 10s)
                                             let client_ip = extract_client_ip(&request);
                                             if let Err(e) = audit_logger.log(
                                                 &api_key,

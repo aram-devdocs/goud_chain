@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
 use crate::constants::{
-    ALLOWED_PEERS, CHECKPOINT_INTERVAL, MAX_CONCURRENT_CONNECTIONS, MAX_MESSAGES_PER_MINUTE,
+    CHECKPOINT_INTERVAL, MAX_CONCURRENT_CONNECTIONS, MAX_MESSAGES_PER_MINUTE,
     MIN_REPUTATION_THRESHOLD, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
     REPUTATION_REWARD_VALID_BLOCK,
 };
@@ -145,70 +145,6 @@ impl P2PNode {
                     }
                 }
             });
-        }
-    }
-
-    /// Check if a peer is whitelisted
-    #[allow(dead_code)] // Phase 4: Will be used in authentication handshake
-    fn is_peer_allowed(&self, node_id: &str) -> bool {
-        ALLOWED_PEERS.contains(&node_id)
-    }
-
-    /// Check if a peer is blacklisted
-    #[allow(dead_code)] // Phase 4: Used in connection handler (inline for now)
-    fn is_peer_blacklisted(&self, peer_addr: &str) -> bool {
-        let blacklist = self.blacklist.lock().unwrap();
-        blacklist.contains(&peer_addr.to_string())
-    }
-
-    /// Blacklist a peer permanently
-    #[allow(dead_code)] // Phase 4: Will be used when implementing malicious peer detection
-    fn blacklist_peer(&self, peer_addr: &str) {
-        let mut blacklist = self.blacklist.lock().unwrap();
-        if !blacklist.contains(&peer_addr.to_string()) {
-            blacklist.push(peer_addr.to_string());
-            warn!(peer = %peer_addr, "Peer blacklisted");
-        }
-    }
-
-    /// Check if a peer has acceptable reputation
-    #[allow(dead_code)] // Phase 4: Used inline in handle_connection
-    fn check_peer_reputation(&self, peer_addr: &str) -> bool {
-        let reputation = self.peer_reputation.lock().unwrap();
-        let rep = reputation.get(peer_addr).unwrap_or(&0);
-        *rep >= MIN_REPUTATION_THRESHOLD
-    }
-
-    /// Check rate limit for a peer
-    #[allow(dead_code)] // Phase 4: Used inline in handle_connection
-    fn check_rate_limit(&self, peer_addr: &str) -> bool {
-        let mut limiters = self.rate_limiters.lock().unwrap();
-        let tracker = limiters
-            .entry(peer_addr.to_string())
-            .or_insert_with(RateLimitTracker::new);
-        tracker.check_and_increment()
-    }
-
-    /// Check if max concurrent connections reached
-    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
-    fn can_accept_connection(&self) -> bool {
-        let active = self.active_connections.lock().unwrap();
-        *active < MAX_CONCURRENT_CONNECTIONS
-    }
-
-    /// Increment active connection count
-    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
-    fn increment_connections(&self) {
-        let mut active = self.active_connections.lock().unwrap();
-        *active += 1;
-    }
-
-    /// Decrement active connection count
-    #[allow(dead_code)] // Phase 4: Used inline in start_p2p_server
-    fn decrement_connections(&self) {
-        let mut active = self.active_connections.lock().unwrap();
-        if *active > 0 {
-            *active -= 1;
         }
     }
 

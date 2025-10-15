@@ -13,7 +13,7 @@ pub enum P2PMessage {
     NewAccount(UserAccount),
     NewCollection(EncryptedCollection),
 
-    // Authentication messages (Phase 4)
+    // Authentication messages
     Hello {
         node_id: String,
         signature: String, // Ed25519 signature of node_id using node's signing key

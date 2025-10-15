@@ -1,4 +1,4 @@
-//! Audit logging storage layer (Phase 4 - Operational Security)
+//! Audit logging storage layer for operational security
 //! Layer 3: Persistence - Stores audit logs as encrypted collections on the blockchain
 //!
 //! **Architecture**:

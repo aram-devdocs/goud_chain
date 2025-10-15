@@ -87,7 +87,7 @@ pub fn extract_client_ip(request: &Request) -> String {
     "unknown".to_string()
 }
 
-/// Verify request signature (P3-003 - Replay Attack Prevention)
+/// Verify request signature (Replay Attack Prevention)
 /// Format: X-Signature: ts={timestamp},nonce={random},sig={hex}
 /// Signature = HMAC-SHA256(api_key, timestamp || nonce || SHA256(body))
 pub fn verify_request_signature(

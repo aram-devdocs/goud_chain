@@ -123,14 +123,6 @@ pub fn constant_time_compare_bytes(a: &[u8], b: &[u8]) -> bool {
     a.ct_eq(b).into()
 }
 
-/// Legacy string comparison (for backward compatibility with tests)
-/// DEPRECATED: Use constant_time_compare_bytes for security-critical code
-#[cfg(test)]
-#[deprecated(note = "Use constant_time_compare_bytes for better security")]
-fn constant_time_compare(a: &str, b: &str) -> bool {
-    constant_time_compare_bytes(a.as_bytes(), b.as_bytes())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,25 +163,6 @@ mod tests {
         let hex2 = hash_api_key_hex(api_key);
         assert_eq!(hex1, hex2, "Hex hash should be deterministic");
         assert_eq!(hex1.len(), 64, "SHA-256 hex hash should be 64 hex chars");
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_constant_time_compare() {
-        let a = "abc123";
-        let b = "abc123";
-        let c = "abc124";
-        let d = "abc12";
-
-        assert!(constant_time_compare(a, b), "Equal strings should match");
-        assert!(
-            !constant_time_compare(a, c),
-            "Different strings should not match"
-        );
-        assert!(
-            !constant_time_compare(a, d),
-            "Different length strings should not match"
-        );
     }
 
     #[test]

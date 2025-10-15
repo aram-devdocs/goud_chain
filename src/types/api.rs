@@ -40,8 +40,8 @@ pub struct SubmitDataRequest {
 }
 
 impl SubmitDataRequest {
-    /// Validate request size limits (P3-002 - DoS Protection)
-    /// and input format (P3-004 - Injection Prevention)
+    /// Validate request size limits (DoS Protection)
+    /// and input format (Injection Prevention)
     /// Checks BEFORE encryption to prevent resource exhaustion
     pub fn validate(&self) -> Result<(), crate::types::GoudChainError> {
         use crate::types::validation::{validate_json_structure, validate_label};
@@ -51,10 +51,10 @@ impl SubmitDataRequest {
         const MAX_COLLECTION_SIZE_BYTES: usize = 10_000_000; // 10MB
         const MAX_LABEL_LENGTH: usize = 100;
 
-        // Validate label format (P3-004 - no control characters)
+        // Validate label format (no control characters)
         validate_label(&self.label)?;
 
-        // Validate label length (P3-002)
+        // Validate label length
         if self.label.len() > MAX_LABEL_LENGTH {
             return Err(GoudChainError::PayloadTooLarge {
                 actual_bytes: self.label.len(),
@@ -62,10 +62,10 @@ impl SubmitDataRequest {
             });
         }
 
-        // Validate JSON structure and depth (P3-004)
+        // Validate JSON structure and depth
         validate_json_structure(&self.data)?;
 
-        // Validate data size (P3-002 - before encryption adds overhead)
+        // Validate data size (before encryption adds overhead)
         let data_size = self.data.len();
         if data_size > MAX_COLLECTION_SIZE_BYTES {
             return Err(GoudChainError::PayloadTooLarge {

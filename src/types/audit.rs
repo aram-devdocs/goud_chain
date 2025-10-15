@@ -1,4 +1,4 @@
-//! Audit logging types for operational security (Phase 4)
+//! Audit logging types for operational security
 //! Layer 0: Foundation - Pure data types for audit trails
 
 use serde::{Deserialize, Serialize};

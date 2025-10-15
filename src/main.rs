@@ -81,7 +81,7 @@ async fn main() {
     ));
     p2p_node.start_p2p_server(config.p2p_port);
 
-    // Initialize audit logger (Phase 4 - Operational Security)
+    // Initialize audit logger for operational security
     // Use callback to broadcast blocks without creating circular dependency
     let p2p_for_audit = Arc::clone(&p2p_node);
     let broadcast_callback = Arc::new(move |block: &Block| {

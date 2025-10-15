@@ -21,7 +21,7 @@ pub fn generate_block_salt() -> String {
     hex::encode(salt_bytes)
 }
 
-/// Obfuscate timestamp to daily granularity with random jitter for privacy (Phase 5)
+/// Obfuscate timestamp to daily granularity with random jitter for privacy
 ///
 /// 1. Rounds down to the nearest day to hide exact timing and timezone
 /// 2. Adds random jitter (±4 hours) to prevent pattern analysis
