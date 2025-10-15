@@ -2,11 +2,16 @@ use std::sync::{Arc, Mutex};
 use tiny_http::Request;
 use tracing::{error, info, warn};
 
-use super::auth::{generate_session_token, verify_api_key_hash};
+use super::auth::generate_session_token;
 use super::internal_client::{forward_request_to_node, get_validator_node_address};
-use super::middleware::{error_response, json_response};
+use super::middleware::{
+    error_response, error_response_with_headers, extract_client_ip, json_response,
+    json_response_with_headers,
+};
+use super::RateLimitResult;
+use crate::config::Config;
 use crate::constants::{CHECKPOINT_INTERVAL, SESSION_EXPIRY_SECONDS};
-use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key};
+use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key_hex};
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, UserAccount};
 use crate::network::P2PNode;
@@ -17,7 +22,68 @@ pub fn handle_create_account(
     mut request: Request,
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) {
+    // Extract client IP for rate limiting (no API key yet for new accounts)
+    let client_ip = extract_client_ip(&request);
+
+    // Use IP hash as the rate limit key for account creation
+    let ip_hash = hash_api_key_hex(client_ip.as_bytes());
+
+    // Check rate limit (write operation - account creation)
+    let rate_limit_result = match _rate_limiter.check_limit(&ip_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing account creation");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                client_ip = %client_ip,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Account creation blocked by rate limiter"
+            );
+            let error = GoudChainError::RateLimitExceeded {
+                retry_after: *retry_after,
+                violation_count: *violation_count,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            let _ = request.respond(error_response_with_headers(error.to_json(), 429, headers));
+            return;
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                client_ip = %client_ip,
+                violation_count = violation_count,
+                "Rate limit warning on account creation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                client_ip = %client_ip,
+                remaining = remaining,
+                "Account creation rate limit check passed"
+            );
+        }
+    }
+
     let mut content = String::new();
     if request.as_reader().read_to_string(&mut content).is_err() {
         let _ = request.respond(error_response(
@@ -109,9 +175,9 @@ pub fn handle_create_account(
                 Ok(account) => {
                     let account_id = account.account_id.clone();
 
-                    // Add account to blockchain
+                    // Add account to blockchain WITH API key for envelope creation
                     let mut blockchain_guard = blockchain.lock().unwrap();
-                    match blockchain_guard.add_account(account) {
+                    match blockchain_guard.add_account_with_key(account, api_key.clone()) {
                         Ok(_) => {
                             // Create block
                             match blockchain_guard.add_block() {
@@ -136,14 +202,28 @@ pub fn handle_create_account(
                                     drop(blockchain_guard);
 
                                     let response = CreateAccountResponse {
-                                        account_id,
+                                        account_id: account_id.clone(),
                                         api_key: encode_api_key(&api_key),
-                                        warning: "⚠️ SAVE THIS API KEY SECURELY. It cannot be recovered and provides full access to your data.".to_string(),
+                                        warning: "SAVE THIS API KEY SECURELY. It cannot be recovered and provides full access to your data.".to_string(),
                                     };
 
+                                    // Audit log: Account created (batched and flushed every 10s)
+                                    if let Err(e) = audit_logger.log(
+                                        &api_key,
+                                        AuditEventType::AccountCreated,
+                                        None,
+                                        &client_ip,
+                                        serde_json::json!({"account_id": account_id, "block": block.index}),
+                                    ) {
+                                        error!(error = %e, "Failed to log account creation audit event");
+                                    }
+
                                     info!("New account created");
-                                    let _ = request.respond(json_response(
+                                    // Add rate limit headers to success response
+                                    let headers = _rate_limiter.create_headers(&rate_limit_result);
+                                    let _ = request.respond(json_response_with_headers(
                                         serde_json::to_string(&response).unwrap(),
+                                        headers,
                                     ));
 
                                     p2p.broadcast_block(&block);
@@ -178,7 +258,12 @@ pub fn handle_create_account(
 }
 
 /// Handle POST /account/login - Login with API key and get session token
-pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>) {
+pub fn handle_login(
+    mut request: Request,
+    blockchain: Arc<Mutex<Blockchain>>,
+    config: Arc<Config>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
+) {
     let mut content = String::new();
     if request.as_reader().read_to_string(&mut content).is_err() {
         let _ = request.respond(error_response(
@@ -193,26 +278,54 @@ pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>) {
             // Decode API key
             match crate::crypto::decode_api_key(&req.api_key) {
                 Ok(api_key) => {
-                    let api_key_hash = hash_api_key(&api_key);
+                    // Hash API key ONCE (expensive: 100k iterations)
+                    let api_key_hash_hex = hash_api_key_hex(&api_key);
 
-                    // Find account
+                    // Find account (requires API key to decrypt envelope)
+                    // Pass pre-computed hash to avoid re-hashing
                     let blockchain_guard = blockchain.lock().unwrap();
-                    match blockchain_guard.find_account(&api_key_hash) {
+                    match blockchain_guard
+                        .find_account_with_hash(&api_key, Some(api_key_hash_hex.clone()))
+                    {
                         Some(account) => {
                             // Verify API key hash matches (constant-time comparison)
-                            match verify_api_key_hash(&api_key, &account.api_key_hash) {
+                            // Use pre-computed hash to avoid re-hashing (saves 100k iterations!)
+                            match crate::api::auth::verify_api_key_hash_precomputed(
+                                Some(&api_key_hash_hex),
+                                &api_key,
+                                &account.api_key_hash,
+                            ) {
                                 Ok(_) => {
-                                    // Generate session token
+                                    // Generate session token with encrypted API key
+                                    // Reuse the hash we already computed!
+                                    let api_key_hash = api_key_hash_hex;
                                     match generate_session_token(
                                         account.account_id.clone(),
+                                        &api_key,
                                         api_key_hash,
+                                        &config,
                                     ) {
                                         Ok(token) => {
                                             let response = LoginResponse {
                                                 session_token: token,
                                                 expires_in: SESSION_EXPIRY_SECONDS,
-                                                account_id: account.account_id,
+                                                account_id: account.account_id.clone(),
                                             };
+
+                                            // Drop blockchain lock before audit logging to avoid deadlock
+                                            drop(blockchain_guard);
+
+                                            // Audit log: Account login (batched and flushed every 10s)
+                                            let client_ip = extract_client_ip(&request);
+                                            if let Err(e) = audit_logger.log(
+                                                &api_key,
+                                                AuditEventType::AccountLogin,
+                                                None,
+                                                &client_ip,
+                                                serde_json::json!({"account_id": account.account_id}),
+                                            ) {
+                                                error!(error = %e, "Failed to log login audit event");
+                                            }
 
                                             info!("User logged in");
                                             let _ = request.respond(json_response(

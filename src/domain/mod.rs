@@ -1,6 +1,7 @@
 pub mod block;
 pub mod blockchain;
 pub mod encrypted_collection;
+pub mod envelope;
 pub mod user_account;
 
 // Re-export commonly used types

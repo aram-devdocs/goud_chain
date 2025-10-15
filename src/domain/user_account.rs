@@ -5,8 +5,7 @@ use uuid::Uuid;
 
 use crate::constants::ENCRYPTION_SALT;
 use crate::crypto::{
-    encrypt_data_with_key, get_public_key_hex, global_key_cache, hash_api_key, sign_message,
-    verify_signature,
+    encrypt_data_with_key, get_public_key_hex, global_key_cache, hash_api_key_hex, sign_message,
 };
 use crate::types::Result;
 
@@ -24,7 +23,7 @@ impl UserAccount {
     /// Create a new user account with an API key
     pub fn new(api_key: &[u8], signing_key: &SigningKey, metadata: Option<String>) -> Result<Self> {
         let account_id = Uuid::new_v4().to_string();
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
         let public_key = get_public_key_hex(signing_key);
         let created_at = Utc::now().timestamp();
 
@@ -57,19 +56,6 @@ impl UserAccount {
             signature,
         })
     }
-
-    /// Verify the signature of this account
-    pub fn verify(&self) -> Result<()> {
-        let message = format!(
-            "{}{}{}{}",
-            self.account_id,
-            self.api_key_hash,
-            self.created_at,
-            self.metadata_encrypted.as_deref().unwrap_or("")
-        );
-
-        verify_signature(message.as_bytes(), &self.signature, &self.public_key)
-    }
 }
 
 #[cfg(test)]
@@ -99,15 +85,5 @@ mod tests {
         let account = UserAccount::new(api_key, &signing_key, Some(metadata)).unwrap();
 
         assert!(account.metadata_encrypted.is_some());
-    }
-
-    #[test]
-    fn test_verify_account() {
-        let api_key = b"test_api_key_12345678901234567890";
-        let signing_key = generate_signing_key();
-
-        let account = UserAccount::new(api_key, &signing_key, None).unwrap();
-
-        assert!(account.verify().is_ok());
     }
 }

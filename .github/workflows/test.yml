@@ -13,52 +13,63 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Rust tests and linting
+  # Fast-fail formatting check
+  rust-fmt:
+    name: Rust Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run cargo fmt
+        run: cargo fmt -- --check
+
+  # Parallel linting check
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Run cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # Parallel test execution
   rust-test:
-    name: Rust Tests & Linting
+    name: Rust Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache Cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-
-
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        run: rustup show
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          profile: minimal
-          toolchain: stable
-          components: rustfmt, clippy
-          override: true
+          cache-on-failure: true
 
-      - name: Run cargo fmt
-        run: cargo fmt -- --check
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
 
-      - name: Run cargo clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Run tests
-        run: cargo test --verbose
-
-      - name: Run module dependency tests
-        run: cargo test --test module_dependencies --verbose
+      - name: Run tests with nextest
+        run: cargo nextest run --all-targets --all-features --verbose
 
   # Docker build test (multi-arch)
   docker-build:
@@ -108,6 +119,24 @@ jobs:
         run: terraform validate
         working-directory: ./terraform/environments/dev
 
+  # Cargo audit - dependency vulnerability scan
+  cargo-audit:
+    name: Cargo Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit
+
   # Security scanning
   security-scan:
     name: Security Scan
@@ -126,6 +155,7 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          skip-dirs: 'target,tests'  # Skip build artifacts and test fixtures
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3

@@ -54,11 +54,15 @@ pub fn compute_mac(key: &[u8], message: &[u8]) -> String {
 }
 
 /// Verify HMAC with constant-time comparison
-pub fn verify_mac(key: &[u8], message: &[u8], expected_mac: &str) -> Result<()> {
-    let computed_mac = compute_mac(key, message);
+pub fn verify_mac(key: &[u8], message: &[u8], expected_mac_hex: &str) -> Result<()> {
+    let computed_mac = hmac_sha256(key, message);
 
-    // Use constant-time comparison to prevent timing attacks
-    if !crate::crypto::hkdf::constant_time_compare(&computed_mac, expected_mac) {
+    // Decode expected MAC from hex to bytes
+    let expected_mac =
+        hex::decode(expected_mac_hex).map_err(|_| GoudChainError::InvalidSignature)?;
+
+    // Use constant-time comparison of raw bytes to prevent timing attacks
+    if !crate::crypto::hkdf::constant_time_compare_bytes(&computed_mac, &expected_mac) {
         return Err(GoudChainError::InvalidSignature);
     }
 

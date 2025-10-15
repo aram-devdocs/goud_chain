@@ -31,14 +31,14 @@ systemctl start docker
 
 # Install Docker Compose V2 (plugin) to replace legacy v1.29.2
 echo "Installing Docker Compose V2..."
-DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
-mkdir -p $DOCKER_CONFIG/cli-plugins
-COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
-curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o $DOCKER_CONFIG/cli-plugins/docker-compose
-chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+DOCKER_CONFIG=$${DOCKER_CONFIG:-/usr/local/lib/docker}
+mkdir -p $$DOCKER_CONFIG/cli-plugins
+COMPOSE_VERSION=$$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
+curl -SL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o $$DOCKER_CONFIG/cli-plugins/docker-compose
+chmod +x $$DOCKER_CONFIG/cli-plugins/docker-compose
 
 # Create symlink for backwards compatibility (docker-compose -> docker compose)
-ln -sf $DOCKER_CONFIG/cli-plugins/docker-compose /usr/local/bin/docker-compose
+ln -sf $$DOCKER_CONFIG/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
 # Remove old docker-compose v1 if installed via apt
 apt-get remove -y docker-compose || true
@@ -69,6 +69,10 @@ echo "Creating data directory..."
 mkdir -p /data
 chmod 755 /data
 chown ubuntu:ubuntu /data
+
+# Note: JWT and Session secrets are injected at Docker build time via GitHub Actions
+# Secrets are passed as build args and written to /data/ during container startup
+# See .github/workflows/build-images.yml for build-time secret injection
 
 # Create application directory
 echo "Creating application directory..."

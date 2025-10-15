@@ -2,11 +2,15 @@ use std::sync::{Arc, Mutex};
 use tiny_http::{Request, Response};
 use tracing::{error, info, warn};
 
-use super::auth::{extract_auth, AuthMethod};
+use super::auth::{decrypt_api_key_from_jwt, extract_auth, AuthMethod};
 use super::internal_client::{forward_request_with_headers, get_validator_node_address};
-use super::middleware::{error_response, json_response};
+use super::middleware::{
+    error_response, error_response_with_headers, extract_client_ip, json_response_with_headers,
+};
+use super::RateLimitResult;
+use crate::config::Config;
 use crate::constants::CHECKPOINT_INTERVAL;
-use crate::crypto::hash_api_key;
+use crate::crypto::hash_api_key_hex;
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, EncryptedCollection};
 use crate::network::P2PNode;
@@ -17,6 +21,9 @@ pub fn handle_submit_data(
     mut request: Request,
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
+    config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) {
     // Extract Authorization header (needed for forwarding)
     let auth_header_value = request
@@ -31,7 +38,7 @@ pub fn handle_submit_data(
         .map(|h| h.value.as_str().to_string());
 
     // Extract authentication
-    let auth = match extract_auth(&request) {
+    let auth = match extract_auth(&request, &config) {
         Ok(a) => a,
         Err(e) => {
             let _ = request.respond(error_response(e.to_json(), e.status_code()));
@@ -42,7 +49,7 @@ pub fn handle_submit_data(
     // Get API key and hash based on auth method
     let (api_key, api_key_hash) = match auth {
         AuthMethod::ApiKey(key) => {
-            let hash = hash_api_key(&key);
+            let hash = hash_api_key_hex(&key);
             (key, hash)
         }
         AuthMethod::SessionToken(_) => {
@@ -58,9 +65,72 @@ pub fn handle_submit_data(
         }
     };
 
-    // Verify account exists
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(&request);
+
+    // Check rate limit (write operation)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            let _ = request.respond(error_response_with_headers(error.to_json(), 429, headers));
+            return;
+        }
+        RateLimitResult::Warning {
+            violation_count,
+            cooldown_secs,
+            ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                cooldown_secs = cooldown_secs,
+                "Rate limit warning issued"
+            );
+            // Continue processing but remember to add warning headers to response
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Rate limit check passed"
+            );
+        }
+    }
+
+    // Verify account exists (use cached hash to avoid re-hashing)
     let blockchain_guard = blockchain.lock().unwrap();
-    if blockchain_guard.find_account(&api_key_hash).is_none() {
+    if blockchain_guard
+        .find_account_with_hash(&api_key, Some(api_key_hash.clone()))
+        .is_none()
+    {
         drop(blockchain_guard);
         let _ = request.respond(error_response(
             GoudChainError::Unauthorized("Account not found".to_string()).to_json(),
@@ -82,6 +152,40 @@ pub fn handle_submit_data(
 
     match serde_json::from_str::<SubmitDataRequest>(&content) {
         Ok(req) => {
+            // DEBUG: Log all headers
+            info!("=== DEBUG: Request headers ===");
+            for header in request.headers() {
+                info!(
+                    "Header: {} = {}",
+                    header.field.as_str(),
+                    header.value.as_str()
+                );
+            }
+            info!("=== END DEBUG ===");
+
+            // Verify request signature (Replay Protection)
+            // NOTE: To disable signature verification (not recommended), comment out this block
+            if let Err(e) = super::verify_request_signature(
+                &request,
+                &api_key,
+                &content,
+                _rate_limiter.get_store(),
+            ) {
+                warn!(
+                    api_key_hash = %api_key_hash,
+                    error = %e,
+                    "Signature verification failed"
+                );
+                let _ = request.respond(error_response(e.to_json(), e.status_code()));
+                return;
+            }
+
+            // Validate request size BEFORE encryption (DoS Protection)
+            if let Err(e) = req.validate() {
+                let _ = request.respond(error_response(e.to_json(), e.status_code()));
+                return;
+            }
+
             // Check if this node is the authorized validator for the next block
             let blockchain_guard = blockchain.lock().unwrap();
             let next_block_number = blockchain_guard
@@ -105,6 +209,18 @@ pub fn handle_submit_data(
 
                 match get_validator_node_address(&expected_validator) {
                     Ok(validator_addr) => {
+                        // Extract X-Signature header to forward to validator
+                        let signature_header = request
+                            .headers()
+                            .iter()
+                            .find(|h| {
+                                h.field
+                                    .as_str()
+                                    .as_str()
+                                    .eq_ignore_ascii_case("X-Signature")
+                            })
+                            .map(|h| h.value.as_str());
+
                         match forward_request_with_headers(
                             &validator_addr,
                             "POST",
@@ -112,6 +228,7 @@ pub fn handle_submit_data(
                             &content,
                             "application/json",
                             auth_header_value.as_deref(),
+                            signature_header,
                         ) {
                             Ok((status_code, response_body)) => {
                                 info!(
@@ -165,7 +282,7 @@ pub fn handle_submit_data(
                 Some(key) => {
                     // Create encrypted collection
                     match EncryptedCollection::new(
-                        req.label,
+                        req.label.clone(),
                         req.data,
                         &api_key,
                         api_key_hash.clone(),
@@ -204,11 +321,27 @@ pub fn handle_submit_data(
                                             let response = SubmitDataResponse {
                                                 message: "Data encrypted and stored successfully"
                                                     .to_string(),
-                                                collection_id,
+                                                collection_id: collection_id.clone(),
                                                 block_number: block.index,
                                             };
-                                            let _ = request.respond(json_response(
+
+                                            // Audit log: Data submitted (batched and flushed every 10s)
+                                            if let Err(e) = audit_logger.log(
+                                                &api_key,
+                                                AuditEventType::DataSubmitted,
+                                                Some(collection_id.clone()),
+                                                &client_ip,
+                                                serde_json::json!({"block": block.index, "label": req.label}),
+                                            ) {
+                                                error!(error = %e, "Failed to log data submission audit event");
+                                            }
+
+                                            // Add rate limit headers to success response
+                                            let headers =
+                                                _rate_limiter.create_headers(&rate_limit_result);
+                                            let _ = request.respond(json_response_with_headers(
                                                 serde_json::to_string(&response).unwrap(),
+                                                headers,
                                             ));
 
                                             p2p.broadcast_block(&block);
@@ -257,26 +390,99 @@ pub fn handle_submit_data(
 pub fn handle_list_data(
     request: &Request,
     blockchain: Arc<Mutex<Blockchain>>,
+    config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication
-    let auth = match extract_auth(request) {
+    let auth = match extract_auth(request, &config) {
         Ok(a) => a,
         Err(e) => return error_response(e.to_json(), e.status_code()),
     };
 
-    // Get API key hash from auth
-    let (api_key, api_key_hash) = match auth {
-        AuthMethod::ApiKey(key) => {
-            let hash = hash_api_key(&key);
-            (Some(key), hash)
+    // Support both API keys and session tokens
+    let api_key = match auth {
+        AuthMethod::ApiKey(key) => key,
+        AuthMethod::SessionToken(claims) => {
+            // Decrypt API key from JWT's encrypted_api_key field
+            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(key) => key,
+                Err(e) => {
+                    return error_response(
+                        GoudChainError::Unauthorized(format!(
+                            "Failed to decrypt API key from session token: {}",
+                            e
+                        ))
+                        .to_json(),
+                        403,
+                    );
+                }
+            }
         }
-        AuthMethod::SessionToken(claims) => (None, claims.api_key_hash),
     };
+
+    // Get API key hash for rate limiting
+    let api_key_hash = hash_api_key_hex(&api_key);
+
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(request);
+
+    // Check rate limit (read operation)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, false) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 100,
+                remaining: 100,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Read request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            return error_response_with_headers(error.to_json(), 429, headers);
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                "Rate limit warning on read operation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Read rate limit check passed"
+            );
+        }
+    }
 
     let blockchain = blockchain.lock().unwrap();
 
     // Verify account exists
-    if blockchain.find_account(&api_key_hash).is_none() {
+    if blockchain.find_account(&api_key).is_none() {
         return error_response(
             GoudChainError::Unauthorized("Account not found".to_string()).to_json(),
             403,
@@ -284,46 +490,52 @@ pub fn handle_list_data(
     }
 
     // Find all collections for this user using blind index lookup
-    let collections = blockchain.find_collections_by_owner(&api_key_hash);
+    let collections = blockchain.find_collections_by_owner(&api_key);
     let mut result = Vec::new();
 
     for collection in collections {
-        // Try to decrypt metadata if we have the API key
-        let label = if let Some(ref key) = api_key {
-            match collection.decrypt_metadata(key) {
-                Ok(metadata) => metadata["label"]
-                    .as_str()
-                    .unwrap_or("[decryption failed]")
-                    .to_string(),
-                Err(_) => "[encrypted]".to_string(),
-            }
-        } else {
-            "[encrypted - use API key to decrypt]".to_string()
+        // Try to decrypt metadata (we have the API key)
+        let label = match collection.decrypt_metadata(&api_key) {
+            Ok(metadata) => metadata["label"]
+                .as_str()
+                .unwrap_or("[decryption failed]")
+                .to_string(),
+            Err(_) => "[encrypted]".to_string(),
         };
 
-        let created_at = if let Some(ref key) = api_key {
-            match collection.decrypt_metadata(key) {
-                Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
-                Err(_) => 0,
-            }
-        } else {
-            0
+        let created_at = match collection.decrypt_metadata(&api_key) {
+            Ok(metadata) => metadata["created_at"].as_i64().unwrap_or(0),
+            Err(_) => 0,
         };
 
-        // Note: We don't have block_number readily available in the new structure
-        // This would require additional lookup. For now, set to 0
+        // Block number lookup requires scanning all blocks - skip for performance
         result.push(CollectionListItem {
             collection_id: collection.collection_id.clone(),
             label,
             created_at,
-            block_number: 0, // TODO: Add block number lookup if needed
+            block_number: 0,
         });
     }
 
     let response = CollectionListResponse {
-        collections: result,
+        collections: result.clone(),
     };
-    json_response(serde_json::to_string(&response).unwrap())
+
+    // Audit log: Data listed (batched and flushed every 10s)
+    let client_ip = extract_client_ip(request);
+    if let Err(e) = audit_logger.log(
+        &api_key,
+        AuditEventType::DataListed,
+        None,
+        &client_ip,
+        serde_json::json!({"count": result.len()}),
+    ) {
+        error!(error = %e, "Failed to log data list audit event");
+    }
+
+    // Add rate limit headers to response
+    let headers = _rate_limiter.create_headers(&rate_limit_result);
+    json_response_with_headers(serde_json::to_string(&response).unwrap(), headers)
 }
 
 /// Handle POST /data/decrypt - Decrypt a specific collection
@@ -331,38 +543,102 @@ pub fn handle_decrypt_data(
     request: &Request,
     blockchain: Arc<Mutex<Blockchain>>,
     collection_id: &str,
+    config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
+    audit_logger: Arc<crate::storage::AuditLogger>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication - must be API key for decryption
-    let auth = match extract_auth(request) {
+    let auth = match extract_auth(request, &config) {
         Ok(a) => a,
         Err(e) => return error_response(e.to_json(), e.status_code()),
     };
 
+    // Support both API keys and session tokens
     let api_key = match auth {
         AuthMethod::ApiKey(key) => key,
-        AuthMethod::SessionToken(_) => {
-            return error_response(
-                GoudChainError::Unauthorized("Direct API key required for decryption".to_string())
-                    .to_json(),
-                403,
-            );
+        AuthMethod::SessionToken(claims) => {
+            // Decrypt API key from JWT's encrypted_api_key field
+            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(key) => key,
+                Err(e) => {
+                    return error_response(
+                        GoudChainError::Unauthorized(format!(
+                            "Failed to decrypt API key from session token: {}",
+                            e
+                        ))
+                        .to_json(),
+                        403,
+                    );
+                }
+            }
         }
     };
 
-    let api_key_hash = hash_api_key(&api_key);
+    // Get API key hash for rate limiting
+    let api_key_hash = hash_api_key_hex(&api_key);
+
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(request);
+
+    // Check rate limit (write operation - decryption is computationally expensive)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Decrypt request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            return error_response_with_headers(error.to_json(), 429, headers);
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                "Rate limit warning on decrypt operation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Decrypt rate limit check passed"
+            );
+        }
+    }
+
     let blockchain = blockchain.lock().unwrap();
 
-    // Find collection
-    match blockchain.find_collection(collection_id) {
+    // Find collection (requires API key to decrypt envelope and verify ownership)
+    match blockchain.find_collection(collection_id, &api_key) {
         Some(collection) => {
-            // Verify ownership
-            if collection.owner_api_key_hash != api_key_hash {
-                return error_response(
-                    GoudChainError::Unauthorized("Not the owner of this collection".to_string())
-                        .to_json(),
-                    403,
-                );
-            }
+            // Ownership already verified in find_collection
+            // (it only returns collections owned by the API key)
 
             // Decrypt metadata and payload
             match (
@@ -371,12 +647,27 @@ pub fn handle_decrypt_data(
             ) {
                 (Ok(metadata), Ok(data)) => {
                     let response = DecryptCollectionResponse {
-                        collection_id: collection.collection_id,
+                        collection_id: collection.collection_id.clone(),
                         label: metadata["label"].as_str().unwrap_or("unknown").to_string(),
                         data,
                         created_at: metadata["created_at"].as_i64().unwrap_or(0),
                     };
-                    json_response(serde_json::to_string(&response).unwrap())
+
+                    // Audit log: Data decrypted (batched and flushed every 10s)
+                    let client_ip = extract_client_ip(request);
+                    if let Err(e) = audit_logger.log(
+                        &api_key,
+                        AuditEventType::DataDecrypted,
+                        Some(collection.collection_id),
+                        &client_ip,
+                        serde_json::json!({"success": true}),
+                    ) {
+                        error!(error = %e, "Failed to log data decryption audit event");
+                    }
+
+                    // Add rate limit headers to response
+                    let headers = _rate_limiter.create_headers(&rate_limit_result);
+                    json_response_with_headers(serde_json::to_string(&response).unwrap(), headers)
                 }
                 _ => error_response(
                     GoudChainError::DecryptionFailed.to_json(),

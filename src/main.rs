@@ -11,18 +11,20 @@ use std::sync::{Arc, Mutex};
 use tiny_http::{Method, Server};
 use tracing::{error, info};
 
-use api::{create_preflight_response, route_request};
+use api::{create_preflight_response, route_request, RateLimiter};
 use config::Config;
+use domain::Block;
 use network::P2PNode;
-use storage::{init_data_directory, load_blockchain, BlockchainStore};
+use storage::{init_data_directory, load_blockchain, AuditLogger, BlockchainStore, RateLimitStore};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 
     // Load configuration
     let config = match Config::from_env() {
-        Ok(cfg) => cfg,
+        Ok(cfg) => Arc::new(cfg),
         Err(e) => {
             error!(error = %e, "Failed to load configuration");
             std::process::exit(1);
@@ -45,11 +47,7 @@ fn main() {
     };
 
     // Load or create blockchain from RocksDB
-    let blockchain = match load_blockchain(
-        config.node_id.clone(),
-        config.master_chain_key.clone(),
-        &blockchain_store,
-    ) {
+    let blockchain = match load_blockchain(config.node_id.clone(), &blockchain_store) {
         Ok(bc) => Arc::new(Mutex::new(bc)),
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");
@@ -57,19 +55,50 @@ fn main() {
         }
     };
 
+    // Initialize rate limiting store (reuses same RocksDB instance)
+    let rate_limit_store = Arc::new(RateLimitStore::new(blockchain_store.get_db()));
+
+    // Parse bypass whitelist from environment (comma-separated API key hashes)
+    let bypass_keys: Vec<String> = std::env::var("RATE_LIMIT_BYPASS_KEYS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    info!(
+        bypass_count = bypass_keys.len(),
+        "Rate limiting initialized with bypass whitelist"
+    );
+
+    let rate_limiter = Arc::new(RateLimiter::new(rate_limit_store, bypass_keys));
+
     // Start P2P node
-    let p2p_node = P2PNode::new(
+    let p2p_node = Arc::new(P2PNode::new(
         Arc::clone(&blockchain),
         Arc::clone(&blockchain_store),
         config.peers.clone(),
-    );
+    ));
     p2p_node.start_p2p_server(config.p2p_port);
+
+    // Initialize audit logger for operational security
+    // Use callback to broadcast blocks without creating circular dependency
+    let p2p_for_audit = Arc::clone(&p2p_node);
+    let broadcast_callback = Arc::new(move |block: &Block| {
+        p2p_for_audit.broadcast_block(block);
+    });
+    let audit_logger = AuditLogger::new(
+        Arc::clone(&blockchain),
+        Arc::clone(&blockchain_store),
+        Some(broadcast_callback),
+    );
+    info!("Audit logger initialized with background flush task");
 
     // Start continuous sync task (initial sync happens in background)
     // NOTE: We start HTTP server immediately to avoid deadlock where all nodes
     // wait for each other to be ready. Initial sync happens asynchronously.
-    let p2p_clone = Arc::new(p2p_node);
-    Arc::clone(&p2p_clone).start_sync_task();
+    let p2p_clone = Arc::clone(&p2p_node);
+    p2p_clone.start_sync_task();
 
     // Start HTTP server
     let server = match Server::http(config.http_bind_addr()) {
@@ -96,7 +125,10 @@ fn main() {
     // Handle requests
     for request in server.incoming_requests() {
         let blockchain = Arc::clone(&blockchain);
-        let p2p = Arc::clone(&p2p_clone);
+        let p2p = Arc::clone(&p2p_node);
+        let config_clone = Arc::clone(&config);
+        let rate_limiter_clone = Arc::clone(&rate_limiter);
+        let audit_logger_clone = Arc::clone(&audit_logger);
 
         // Handle OPTIONS preflight requests
         if request.method() == &Method::Options {
@@ -107,6 +139,13 @@ fn main() {
         }
 
         // Route and handle request
-        route_request(request, blockchain, p2p);
+        route_request(
+            request,
+            blockchain,
+            p2p,
+            config_clone,
+            rate_limiter_clone,
+            audit_logger_clone,
+        );
     }
 }

@@ -1,6 +1,7 @@
-use sha2::{Digest, Sha256};
-use std::env;
+use std::{env, fs, path::Path};
 use uuid::Uuid;
+
+use crate::constants::DATA_DIRECTORY;
 
 /// Configuration for the Goud Chain node
 #[derive(Debug, Clone)]
@@ -9,7 +10,8 @@ pub struct Config {
     pub http_port: String,
     pub p2p_port: u16,
     pub peers: Vec<String>,
-    pub master_chain_key: Vec<u8>,
+    pub jwt_secret: Vec<u8>,
+    pub session_secret: Vec<u8>,
 }
 
 impl Config {
@@ -26,15 +28,67 @@ impl Config {
             .map_err(|_| ConfigError::InvalidPort)?;
 
         let peers = Self::parse_peers();
-        let master_chain_key = Self::load_master_chain_key()?;
+
+        // Load JWT secret (auto-generate if not present)
+        let jwt_secret = Self::load_jwt_secret()?;
+
+        // Load session secret (auto-generate if not present)
+        let session_secret = Self::load_session_secret()?;
 
         Ok(Config {
             node_id,
             http_port,
             p2p_port,
             peers,
-            master_chain_key,
+            jwt_secret,
+            session_secret,
         })
+    }
+
+    /// Load JWT secret from environment or file, auto-generate if missing
+    fn load_jwt_secret() -> Result<Vec<u8>, ConfigError> {
+        // Try environment variable first
+        if let Ok(secret) = env::var("JWT_SECRET") {
+            let secret_bytes = secret.into_bytes();
+            if secret_bytes.len() < 32 {
+                return Err(ConfigError::WeakJwtSecret);
+            }
+            return Ok(secret_bytes);
+        }
+
+        // Try to load from persistent file
+        let secret_path = format!("{}/jwt_secret", DATA_DIRECTORY);
+        if Path::new(&secret_path).exists() {
+            return Ok(fs::read(&secret_path)?);
+        }
+
+        // Auto-generate and persist
+        let new_secret: [u8; 32] = rand::random();
+        fs::write(&secret_path, new_secret)?;
+        Ok(new_secret.to_vec())
+    }
+
+    /// Load session secret from environment or file, auto-generate if missing
+    fn load_session_secret() -> Result<Vec<u8>, ConfigError> {
+        // Try environment variable first
+        if let Ok(secret) = env::var("SESSION_SECRET") {
+            let secret_bytes = secret.into_bytes();
+            if secret_bytes.len() < 32 {
+                return Err(ConfigError::WeakSessionSecret);
+            }
+            return Ok(secret_bytes);
+        }
+
+        // Try to load from persistent file
+        let secret_path = format!("{}/session_secret", DATA_DIRECTORY);
+        if Path::new(&secret_path).exists() {
+            return Ok(fs::read(&secret_path)?);
+        }
+
+        // Auto-generate and persist
+        let new_secret: [u8; 32] = rand::random();
+        fs::write(&secret_path, new_secret)?;
+        Ok(new_secret.to_vec())
     }
 
     /// Parse peer URLs from environment variable
@@ -51,24 +105,6 @@ impl Config {
             .unwrap_or_default()
     }
 
-    /// Load master chain key from environment variable
-    /// Falls back to passphrase-derived key for development
-    fn load_master_chain_key() -> Result<Vec<u8>, ConfigError> {
-        // Try to load key from hex-encoded environment variable
-        if let Ok(key_hex) = env::var("MASTER_CHAIN_KEY") {
-            return hex::decode(&key_hex).map_err(|_| ConfigError::InvalidMasterKey);
-        }
-
-        // Development fallback: derive from passphrase using SHA256
-        let passphrase = env::var("MASTER_KEY_PASSPHRASE")
-            .unwrap_or_else(|_| "goud_chain_dev_passphrase_v3_change_in_production".to_string());
-
-        // Derive 32-byte key from passphrase using simple SHA256 hash
-        let mut hasher = Sha256::new();
-        hasher.update(passphrase.as_bytes());
-        Ok(hasher.finalize().to_vec())
-    }
-
     /// Get HTTP bind address
     pub fn http_bind_addr(&self) -> String {
         format!("0.0.0.0:{}", self.http_port)
@@ -80,6 +116,12 @@ pub enum ConfigError {
     #[error("Invalid port number in P2P_PORT environment variable")]
     InvalidPort,
 
-    #[error("Invalid master chain key format - must be 64-character hex string (32 bytes)")]
-    InvalidMasterKey,
+    #[error("JWT_SECRET must be at least 32 bytes (256 bits)")]
+    WeakJwtSecret,
+
+    #[error("SESSION_SECRET must be at least 32 bytes (256 bits)")]
+    WeakSessionSecret,
+
+    #[error("Failed to load/save secret: {0}")]
+    IoError(#[from] std::io::Error),
 }

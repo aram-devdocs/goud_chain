@@ -19,7 +19,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::constants::{CHECKPOINT_INTERVAL, ROCKSDB_PATH};
-use crate::domain::{Block, Blockchain};
+use crate::domain::Block;
 use crate::types::{GoudChainError, Result};
 
 /// Thread-safe wrapper around RocksDB for blockchain storage
@@ -47,6 +47,11 @@ impl BlockchainStore {
         info!("BlockchainStore initialized with optimized settings");
 
         Ok(Self { db: Arc::new(db) })
+    }
+
+    /// Get the underlying RocksDB instance (for rate limiting and other extensions)
+    pub fn get_db(&self) -> Arc<DB> {
+        Arc::clone(&self.db)
     }
 
     pub fn save_block(&self, block: &Block) -> Result<()> {
@@ -220,33 +225,6 @@ impl BlockchainStore {
         self.db.get(b"metadata:chain_length").unwrap().is_none()
     }
 
-    /// Migrate from JSON file to RocksDB (one-time migration)
-    pub fn migrate_from_json(&self, blockchain: &Blockchain) -> Result<()> {
-        warn!("Migrating blockchain from JSON to RocksDB");
-
-        // Save all blocks
-        for block in &blockchain.chain {
-            self.save_block(block)?;
-        }
-
-        // Save checkpoints
-        for (i, checkpoint_hash) in blockchain.checkpoints.iter().enumerate() {
-            let block_index = (i as u64 + 1) * CHECKPOINT_INTERVAL;
-            self.save_checkpoint(block_index, checkpoint_hash)?;
-        }
-
-        // Save metadata
-        self.save_metadata(&blockchain.node_id, &blockchain.schema_version)?;
-
-        info!(
-            blocks = blockchain.chain.len(),
-            checkpoints = blockchain.checkpoints.len(),
-            "Migration to RocksDB complete"
-        );
-
-        Ok(())
-    }
-
     /// Clear all blockchain data (for testing/reset)
     #[allow(dead_code)]
     pub fn clear_all(&self) -> Result<()> {
@@ -311,16 +289,14 @@ mod tests {
         let store = create_test_store();
         store.clear_all().unwrap();
 
-        let master_key = b"test_master_key_32_bytes_long!!";
         let block = Block::new(BlockConfig {
             index: 0,
-            user_accounts: Vec::new(),
-            encrypted_collections: Vec::new(),
+            account_envelopes: Vec::new(),
+            collection_envelopes: Vec::new(),
             previous_hash: "0".to_string(),
             validator: "Validator_1".to_string(),
             blind_indexes: Vec::new(),
             block_salt: "test_salt".to_string(),
-            master_key,
         })
         .unwrap();
 

@@ -22,3 +22,8 @@ tags = {
   environment = "dev"
   managed_by  = "terraform"
 }
+
+# Secret Management
+# JWT and Session secrets are managed via GitHub Secrets
+# Run: ./scripts/setup-secrets.sh (one-time setup)
+# See: docs/SECRET_MANAGEMENT.md

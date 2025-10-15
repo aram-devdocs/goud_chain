@@ -20,10 +20,13 @@ pub struct EncryptedCollection {
     pub nonce: String,              // Nonce used for encryption (hex)
     pub signature: String,
     pub public_key: String,
+    pub user_salt: String, // Random per-collection salt (prevents cross-block correlation)
 }
 
 impl EncryptedCollection {
     /// Create a new encrypted collection
+    /// Note: Size validation happens at API layer before reaching this function
+    /// Encryption adds ~1.33x overhead (base64 encoding + nonce + MAC)
     pub fn new(
         label: String,
         data: String,
@@ -31,8 +34,16 @@ impl EncryptedCollection {
         api_key_hash: String,
         signing_key: &SigningKey,
     ) -> Result<Self> {
+        use rand::Rng;
+
         let collection_id = Uuid::new_v4().to_string();
         let public_key = get_public_key_hex(signing_key);
+
+        // Generate random per-user salt (32 bytes)
+        // This prevents cross-block correlation attacks
+        let mut rng = rand::thread_rng();
+        let user_salt_bytes: [u8; 32] = rng.gen();
+        let user_salt = hex::encode(user_salt_bytes);
 
         let key_cache = global_key_cache();
         let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
@@ -48,17 +59,17 @@ impl EncryptedCollection {
             encrypt_data_with_key(&metadata_str, &encryption_key)?;
         let (encrypted_payload, nonce) = encrypt_data_with_key(&data, &encryption_key)?;
 
-        // Compute MAC over collection_id + encrypted data for integrity
+        // Compute MAC over collection_id + encrypted data + user_salt for integrity
         let mac_message = format!(
-            "{}{}{}",
-            collection_id, encrypted_metadata, encrypted_payload
+            "{}{}{}{}",
+            collection_id, encrypted_metadata, encrypted_payload, user_salt
         );
         let mac = compute_mac(&mac_key, mac_message.as_bytes());
 
-        // Sign the collection
+        // Sign the collection (include user_salt in signature)
         let signature_message = format!(
-            "{}{}{}{}{}",
-            collection_id, api_key_hash, encrypted_metadata, encrypted_payload, mac
+            "{}{}{}{}{}{}",
+            collection_id, api_key_hash, encrypted_metadata, encrypted_payload, mac, user_salt
         );
         let signature = sign_message(signature_message.as_bytes(), signing_key);
 
@@ -71,19 +82,21 @@ impl EncryptedCollection {
             nonce,
             signature,
             public_key,
+            user_salt,
         })
     }
 
     /// Verify the signature and MAC of this collection
     pub fn verify(&self, api_key: Option<&[u8]>) -> Result<()> {
-        // Verify signature first
+        // Verify signature first (include user_salt)
         let signature_message = format!(
-            "{}{}{}{}{}",
+            "{}{}{}{}{}{}",
             self.collection_id,
             self.owner_api_key_hash,
             self.encrypted_metadata,
             self.encrypted_payload,
-            self.mac
+            self.mac,
+            self.user_salt
         );
         verify_signature(
             signature_message.as_bytes(),
@@ -91,13 +104,13 @@ impl EncryptedCollection {
             &self.public_key,
         )?;
 
-        // If API key provided, verify MAC
+        // If API key provided, verify MAC (include user_salt)
         if let Some(key) = api_key {
             let key_cache = global_key_cache();
             let mac_key = key_cache.get_mac_key(key, ENCRYPTION_SALT);
             let mac_message = format!(
-                "{}{}{}",
-                self.collection_id, self.encrypted_metadata, self.encrypted_payload
+                "{}{}{}{}",
+                self.collection_id, self.encrypted_metadata, self.encrypted_payload, self.user_salt
             );
             verify_mac(&mac_key, mac_message.as_bytes(), &self.mac)?;
         }
@@ -126,12 +139,12 @@ impl EncryptedCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::{generate_api_key, generate_signing_key, hash_api_key};
+    use crate::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 
     #[test]
     fn test_create_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
 
         let collection = EncryptedCollection::new(
@@ -151,7 +164,7 @@ mod tests {
     #[test]
     fn test_verify_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
 
         let collection = EncryptedCollection::new(
@@ -170,7 +183,7 @@ mod tests {
     #[test]
     fn test_decrypt_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
         let original_data = r#"{"value": 42}"#;
 

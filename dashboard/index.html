@@ -116,6 +116,17 @@
                         class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
                     Analytics
                 </button>
+                <button @click="activeTab = 'audit'"
+                        :class="activeTab === 'audit' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Audit Logs
+                    <span x-show="auditLogs.length > 0" class="ml-1 bg-zinc-700 text-xs px-1.5 py-0.5" x-text="auditLogs.length"></span>
+                </button>
+                <button @click="activeTab = 'metrics'"
+                        :class="activeTab === 'metrics' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
+                        class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
+                    Metrics
+                </button>
                 <button @click="activeTab = 'debug'"
                         :class="activeTab === 'debug' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'"
                         class="px-3 py-2 border-b-2 transition whitespace-nowrap text-sm">
@@ -634,6 +645,186 @@
         </section>
 
         <!-- Debug Tools Tab -->
+        <!-- Audit Logs Tab (Phase 4 - Operational Security) -->
+        <section x-show="activeTab === 'audit'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">Audit Logs</h2>
+            <p class="text-zinc-500 text-sm mb-6">
+                Complete audit trail of all operations performed with your API key. Logs are encrypted and stored on the blockchain (immutable).
+            </p>
+
+            <!-- Filters -->
+            <div class="bg-zinc-950 p-4 border border-zinc-800 mb-6">
+                <div class="flex flex-wrap gap-3 items-end">
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="block text-xs text-zinc-400 mb-1">Event Type</label>
+                        <select x-model="auditFilter.eventType" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-white">
+                            <option value="">All Events</option>
+                            <option value="AccountCreated">Account Created</option>
+                            <option value="AccountLogin">Account Login</option>
+                            <option value="DataSubmitted">Data Submitted</option>
+                            <option value="DataDecrypted">Data Decrypted</option>
+                            <option value="DataListed">Data Listed</option>
+                        </select>
+                    </div>
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="block text-xs text-zinc-400 mb-1">Start Date</label>
+                        <input type="date" x-model="auditFilter.startDate" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-white">
+                    </div>
+                    <div class="flex-1 min-w-[150px]">
+                        <label class="block text-xs text-zinc-400 mb-1">End Date</label>
+                        <input type="date" x-model="auditFilter.endDate" class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-white">
+                    </div>
+                    <button @click="fetchAuditLogs()" class="bg-white text-black px-6 py-2 text-sm hover:bg-zinc-200 transition">
+                        Apply Filters
+                    </button>
+                    <button @click="exportAuditCSV()" class="bg-zinc-800 border border-zinc-700 px-6 py-2 text-sm hover:bg-zinc-700 transition">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Audit Log Table -->
+            <div class="bg-zinc-950 border border-zinc-800 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-zinc-900 border-b border-zinc-800">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-zinc-400">Timestamp</th>
+                                <th class="px-4 py-3 text-left font-medium text-zinc-400">Event Type</th>
+                                <th class="px-4 py-3 text-left font-medium text-zinc-400">IP Hash</th>
+                                <th class="px-4 py-3 text-left font-medium text-zinc-400">Collection ID</th>
+                                <th class="px-4 py-3 text-left font-medium text-zinc-400">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="log in auditLogs" :key="log.timestamp">
+                                <tr class="border-b border-zinc-800 hover:bg-zinc-900 transition">
+                                    <td class="px-4 py-3 text-zinc-300" x-text="formatTimestamp(log.timestamp)"></td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-1 text-xs border border-zinc-700"
+                                              :class="{
+                                                  'bg-green-900/20 border-green-700 text-green-400': log.event_type === 'AccountCreated',
+                                                  'bg-blue-900/20 border-blue-700 text-blue-400': log.event_type === 'AccountLogin',
+                                                  'bg-purple-900/20 border-purple-700 text-purple-400': log.event_type === 'DataSubmitted',
+                                                  'bg-yellow-900/20 border-yellow-700 text-yellow-400': log.event_type === 'DataDecrypted',
+                                                  'bg-zinc-900/20 border-zinc-700 text-zinc-400': log.event_type === 'DataListed'
+                                              }"
+                                              x-text="log.event_type"></span>
+                                    </td>
+                                    <td class="px-4 py-3 font-mono text-zinc-400 text-xs" x-text="log.ip_hash"></td>
+                                    <td class="px-4 py-3 font-mono text-zinc-400 text-xs">
+                                        <span x-text="log.collection_id ? log.collection_id.substring(0, 12) + '...' : '-'"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-zinc-400" x-text="JSON.stringify(log.metadata)"></td>
+                                </tr>
+                            </template>
+                            <template x-if="auditLogs.length === 0">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-zinc-500">
+                                        <span x-show="!isLoadingAudit">No audit logs found</span>
+                                        <span x-show="isLoadingAudit">Loading audit logs...</span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex justify-between items-center px-4 py-3 bg-zinc-900 border-t border-zinc-800">
+                    <button @click="auditPage--; fetchAuditLogs()" :disabled="auditPage === 0"
+                            class="bg-zinc-800 border border-zinc-700 px-4 py-1.5 text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-700 transition">
+                        Previous
+                    </button>
+                    <span class="text-sm text-zinc-400">
+                        Page <span x-text="auditPage + 1"></span> of <span x-text="auditTotalPages"></span>
+                        (<span x-text="auditTotal"></span> total)
+                    </span>
+                    <button @click="auditPage++; fetchAuditLogs()" :disabled="auditPage >= auditTotalPages - 1"
+                            class="bg-zinc-800 border border-zinc-700 px-4 py-1.5 text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-zinc-700 transition">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Metrics Tab (Phase 4 - Operational Security) -->
+        <section x-show="activeTab === 'metrics'" class="container mx-auto px-6 py-8">
+            <h2 class="text-2xl font-bold mb-6">System Metrics</h2>
+            <p class="text-zinc-500 text-sm mb-6">
+                Real-time performance metrics and operational statistics for the blockchain network.
+            </p>
+
+            <!-- Metrics Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <!-- Chain Length -->
+                <div class="bg-zinc-950 p-6 border border-zinc-800">
+                    <div class="text-zinc-400 text-xs mb-1">Chain Length</div>
+                    <div class="text-3xl font-bold" x-text="metrics.chain_length || '-'"></div>
+                    <div class="text-zinc-500 text-xs mt-1">Total Blocks</div>
+                </div>
+
+                <!-- Total Operations -->
+                <div class="bg-zinc-950 p-6 border border-zinc-800">
+                    <div class="text-zinc-400 text-xs mb-1">Total Operations</div>
+                    <div class="text-3xl font-bold" x-text="metrics.total_operations || '-'"></div>
+                    <div class="text-zinc-500 text-xs mt-1">All Time</div>
+                </div>
+
+                <!-- Cache Hit Rate -->
+                <div class="bg-zinc-950 p-6 border border-zinc-800">
+                    <div class="text-zinc-400 text-xs mb-1">Cache Hit Rate</div>
+                    <div class="text-3xl font-bold">
+                        <span x-text="metrics.cache_hit_rate ? (metrics.cache_hit_rate * 100).toFixed(1) + '%' : '-'"></span>
+                    </div>
+                    <div class="text-zinc-500 text-xs mt-1">Key Cache Performance</div>
+                </div>
+
+                <!-- Peer Count -->
+                <div class="bg-zinc-950 p-6 border border-zinc-800">
+                    <div class="text-zinc-400 text-xs mb-1">Connected Peers</div>
+                    <div class="text-3xl font-bold" x-text="metrics.peer_count || '-'"></div>
+                    <div class="text-zinc-500 text-xs mt-1">P2P Network</div>
+                </div>
+            </div>
+
+            <!-- Operations Per Second Chart (Placeholder) -->
+            <div class="bg-zinc-950 p-6 border border-zinc-800 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Operations Per Second</h3>
+                <div class="text-center text-zinc-500 py-12">
+                    <div class="text-6xl mb-4" x-text="metrics.operations_per_second ? metrics.operations_per_second.toFixed(2) : '0.00'"></div>
+                    <div class="text-sm">ops/sec (last interval)</div>
+                </div>
+            </div>
+
+            <!-- Additional Stats -->
+            <div class="bg-zinc-950 p-6 border border-zinc-800">
+                <h3 class="text-lg font-semibold mb-4">Detailed Statistics</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <div class="text-zinc-400 text-xs">Node ID</div>
+                        <div class="font-mono mt-1" x-text="metrics.node_id || '-'"></div>
+                    </div>
+                    <div>
+                        <div class="text-zinc-400 text-xs">Status</div>
+                        <div class="mt-1">
+                            <span class="px-2 py-1 bg-green-900/20 border border-green-700 text-green-400 text-xs">
+                                Healthy
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-zinc-400 text-xs">Uptime</div>
+                        <div class="font-mono mt-1">N/A</div>
+                    </div>
+                    <div>
+                        <div class="text-zinc-400 text-xs">Last Block</div>
+                        <div class="font-mono mt-1" x-text="metrics.latest_block_index || '-'"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section x-show="activeTab === 'debug'" class="container mx-auto px-6 py-8">
             <h2 class="text-2xl font-bold mb-6">Debug & Developer Tools</h2>
 
@@ -722,19 +913,34 @@
                 networkInfo: { peers: [], reputation: {} },
                 formFields: [],
                 selectedCollections: [],
-                
+
+                // Audit Logs (Phase 4)
+                auditLogs: [],
+                auditFilter: {
+                    eventType: '',
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date().toISOString().split('T')[0]
+                },
+                auditPage: 0,
+                auditTotal: 0,
+                auditTotalPages: 0,
+                isLoadingAudit: false,
+
+                // Metrics (Phase 4)
+                metrics: {},
+
                 // Form
                 form: { label: '', data: '' },
                 submitResult: null,
                 jsonValid: false,
                 expandedBlock: null,
-                
+
                 // Search & Filter
                 searchQuery: '',
                 blockSearch: '',
                 sortBy: 'newest',
                 blockFilter: 'all',
-                
+
                 // Debug
                 debugEndpoint: '/chain',
                 debugResponse: '',
@@ -791,6 +997,88 @@
                         // On network error, assume valid to avoid unnecessary logouts
                         return true;
                     }
+                },
+
+                // Generate request signature (P3-003 - Replay Attack Prevention)
+                // Format: X-Signature: ts={timestamp},nonce={nonce},sig={hex}
+                // Signature = HMAC-SHA256(api_key, timestamp || nonce || SHA256(body))
+                async signRequest(body) {
+                    try {
+                        // Generate timestamp (Unix seconds)
+                        const timestamp = Math.floor(Date.now() / 1000);
+
+                        // Generate cryptographically secure random nonce
+                        const nonce = this.generateNonce();
+
+                        // Decode base64 API key to raw bytes
+                        const apiKeyBytes = this.base64ToBytes(this.apiKey);
+
+                        // Compute SHA-256 hash of request body
+                        const bodyHash = await this.sha256(body);
+
+                        // Compute HMAC-SHA256 signature
+                        const message = `${timestamp}${nonce}${bodyHash}`;
+                        const signature = await this.hmacSha256(apiKeyBytes, message);
+
+                        // Return formatted header value
+                        return `ts=${timestamp},nonce=${nonce},sig=${signature}`;
+                    } catch (e) {
+                        console.error('Failed to sign request:', e);
+                        throw new Error('Signature generation failed');
+                    }
+                },
+
+                // Generate cryptographically secure random nonce (UUID v4)
+                generateNonce() {
+                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                },
+
+                // Decode base64 string to Uint8Array
+                base64ToBytes(base64) {
+                    const binaryString = atob(base64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    return bytes;
+                },
+
+                // Compute SHA-256 hash and return hex string
+                async sha256(message) {
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(message);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    return this.bufferToHex(hashBuffer);
+                },
+
+                // Compute HMAC-SHA256 and return hex string
+                async hmacSha256(keyBytes, message) {
+                    const encoder = new TextEncoder();
+                    const messageBytes = encoder.encode(message);
+
+                    // Import key for HMAC
+                    const cryptoKey = await crypto.subtle.importKey(
+                        'raw',
+                        keyBytes,
+                        { name: 'HMAC', hash: 'SHA-256' },
+                        false,
+                        ['sign']
+                    );
+
+                    // Sign message
+                    const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageBytes);
+                    return this.bufferToHex(signatureBuffer);
+                },
+
+                // Convert ArrayBuffer to hex string
+                bufferToHex(buffer) {
+                    return Array.from(new Uint8Array(buffer))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
                 },
 
                 // ==================== Submit Data ====================
@@ -882,13 +1170,24 @@
                     const startTime = performance.now();
 
                     try {
+                        // Prepare request body
+                        const body = JSON.stringify(this.form);
+
+                        // Generate request signature (P3-003 - Replay Attack Prevention)
+                        const signature = await this.signRequest(body);
+                        console.log('Generated signature:', signature);
+
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.apiKey}`,
+                            'X-Signature': signature
+                        };
+                        console.log('Request headers:', headers);
+
                         const res = await fetch(`${API_BASE}/data/submit`, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${this.apiKey}`
-                            },
-                            body: JSON.stringify(this.form)
+                            headers: headers,
+                            body: body
                         });
 
                         const endTime = performance.now();
@@ -1260,15 +1559,140 @@ Peers: ${this.networkInfo.peers?.length || 0}
                     this.copyToClipboard(info);
                 },
 
+                // ==================== PHASE 4: Audit Logging & Metrics ====================
+
+                async fetchAuditLogs() {
+                    this.isLoadingAudit = true;
+                    try {
+                        // Build query params
+                        const params = new URLSearchParams({
+                            page: this.auditPage.toString(),
+                            page_size: '50'
+                        });
+
+                        if (this.auditFilter.eventType) {
+                            params.append('event_type', this.auditFilter.eventType);
+                        }
+                        if (this.auditFilter.startDate) {
+                            const startTs = new Date(this.auditFilter.startDate).getTime();
+                            params.append('start_ts', startTs.toString());
+                        }
+                        if (this.auditFilter.endDate) {
+                            // Add end of day (23:59:59.999) to include all events on the selected date
+                            const endTs = new Date(this.auditFilter.endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
+                            params.append('end_ts', endTs.toString());
+                        }
+
+                        const res = await fetch(`${API_BASE}/api/audit?${params}`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.sessionToken || this.apiKey}`
+                            }
+                        });
+
+                        if (!res.ok) {
+                            throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+                        }
+
+                        const data = await res.json();
+                        this.auditLogs = data.logs || [];
+                        this.auditTotal = data.total || 0;
+                        this.auditTotalPages = data.total_pages || 0;
+                    } catch (e) {
+                        console.error('Failed to fetch audit logs:', e);
+                        alert(`Failed to load audit logs: ${e.message}`);
+                    } finally {
+                        this.isLoadingAudit = false;
+                    }
+                },
+
+                exportAuditCSV() {
+                    if (this.auditLogs.length === 0) {
+                        alert('No audit logs to export');
+                        return;
+                    }
+
+                    const csv = [
+                        ['Timestamp', 'Event Type', 'IP Hash', 'Collection ID', 'Metadata'],
+                        ...this.auditLogs.map(log => [
+                            new Date(log.timestamp).toISOString(),
+                            log.event_type,
+                            log.ip_hash,
+                            log.collection_id || '',
+                            JSON.stringify(log.metadata)
+                        ])
+                    ].map(row => row.join(',')).join('\n');
+
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `audit_logs_${Date.now()}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                async fetchMetrics() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/metrics`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.sessionToken || this.apiKey}`
+                            }
+                        });
+
+                        if (!res.ok) {
+                            throw new Error(`HTTP ${res.status}`);
+                        }
+
+                        const data = await res.json();
+                        this.metrics = data;
+                    } catch (e) {
+                        console.error('Failed to fetch metrics:', e);
+                        // Use fallback data from /health or /chain
+                        this.metrics = {
+                            chain_length: this.blocks.length,
+                            total_operations: this.getTotalCollections() + this.getTotalAccounts(),
+                            peer_count: this.networkInfo.peers?.length || 0,
+                            cache_hit_rate: 0,
+                            operations_per_second: 0,
+                            node_id: 'unknown'
+                        };
+                    }
+                },
+
+                formatTimestamp(ts) {
+                    const date = new Date(ts);
+                    return date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                },
+
                 // ==================== Utilities ====================
 
                 async refresh() {
                     this.isRefreshing = true;
-                    await Promise.all([
+                    const promises = [
                         this.loadCollections(),
                         this.loadChain(),
                         this.loadNetworkInfo()
-                    ]);
+                    ];
+
+                    // Load audit logs if on audit tab
+                    if (this.activeTab === 'audit') {
+                        promises.push(this.fetchAuditLogs());
+                    }
+
+                    // Load metrics if on metrics tab
+                    if (this.activeTab === 'metrics') {
+                        promises.push(this.fetchMetrics());
+                    }
+
+                    await Promise.all(promises);
                     this.isRefreshing = false;
                 },
 

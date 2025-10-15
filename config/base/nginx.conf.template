@@ -102,6 +102,87 @@ http {
 
 {{ACCOUNT_OPERATIONS_ROUTING}}
 
+        # AUDIT API - Authenticated read operations (Phase 4 - Operational Security)
+        # Query audit logs for authenticated user
+        location /api/audit {
+            proxy_pass http://blockchain_readers;
+
+            # Proxy headers (auth required)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Authorization $http_authorization;
+
+            # Connection reuse
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # Timeouts (audit log queries can involve blockchain scanning)
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_READ}};
+            proxy_send_timeout {{NGINX_PROXY_SEND_TIMEOUT_READ}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_READ}};
+
+            # CORS headers
+            include /etc/nginx/cors.conf;
+
+            # No caching (audit logs are user-specific)
+            add_header Cache-Control "private, no-store, no-cache, must-revalidate" always;
+        }
+
+        # Public metrics endpoint (Phase 4 - Operational Security)
+        # Provides dashboard-friendly metrics with CORS support
+        location /api/metrics {
+            proxy_pass http://blockchain_readers/metrics;
+
+            # Proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Connection reuse
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # Timeouts
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_READ}};
+            proxy_send_timeout {{NGINX_PROXY_SEND_TIMEOUT_READ}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_READ}};
+
+            # CORS headers
+            include /etc/nginx/cors.conf;
+
+            # Short cache (5 seconds)
+            add_header Cache-Control "public, max-age=5" always;
+        }
+
+        # Internal metrics endpoint - Monitoring only (block external access)
+        location = /metrics {
+            # Allow only internal Docker network
+            allow 172.16.0.0/12;
+            deny all;
+
+            proxy_pass http://blockchain_nodes;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            access_log off;
+        }
+
+        # Prometheus metrics endpoint - Internal monitoring only
+        location = /metrics/prometheus {
+            # Allow only internal Docker network
+            allow 172.16.0.0/12;
+            deny all;
+
+            proxy_pass http://blockchain_nodes;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            access_log off;
+        }
+
         # READ operations - Round-robin across all nodes
         location ~ ^/({{READ_ENDPOINTS}})$ {
             proxy_pass http://blockchain_readers;
@@ -111,6 +192,7 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Signature $http_x_signature;
 
             # Connection reuse
             proxy_http_version 1.1;
@@ -139,6 +221,7 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Signature $http_x_signature;
 
             # Connection reuse
             proxy_http_version 1.1;
