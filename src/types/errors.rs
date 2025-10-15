@@ -93,6 +93,21 @@ pub enum GoudChainError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    // Rate limiting errors (Phase 3 - DoS Protection)
+    #[error(
+        "Rate limit exceeded: {retry_after} seconds until reset (violation #{violation_count})"
+    )]
+    RateLimitExceeded {
+        retry_after: u64,
+        violation_count: u32,
+    },
+
+    #[error("API key banned ({ban_level}): expires at {expires_at}")]
+    ApiKeyBanned { ban_level: String, expires_at: i64 },
+
+    #[error("IP address banned: expires at {expires_at}")]
+    IpAddressBanned { expires_at: i64 },
+
     // Configuration errors
     #[error("Configuration error: {0}")]
     ConfigError(String),
@@ -126,6 +141,9 @@ impl GoudChainError {
             | Self::InvalidTimestamp(_)
             | Self::InvalidValidator { .. }
             | Self::NotAuthorizedValidator { .. } => 422,
+            Self::RateLimitExceeded { .. }
+            | Self::ApiKeyBanned { .. }
+            | Self::IpAddressBanned { .. } => 429,
             _ => 500,
         }
     }

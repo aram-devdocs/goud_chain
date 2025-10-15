@@ -49,6 +49,11 @@ impl BlockchainStore {
         Ok(Self { db: Arc::new(db) })
     }
 
+    /// Get the underlying RocksDB instance (for rate limiting and other extensions)
+    pub fn get_db(&self) -> Arc<DB> {
+        Arc::clone(&self.db)
+    }
+
     pub fn save_block(&self, block: &Block) -> Result<()> {
         let block_bytes = bincode::serialize(block)
             .map_err(|e| GoudChainError::SaveFailed(format!("Bincode serialization: {}", e)))?;

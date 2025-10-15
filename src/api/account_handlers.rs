@@ -4,7 +4,11 @@ use tracing::{error, info, warn};
 
 use super::auth::generate_session_token;
 use super::internal_client::{forward_request_to_node, get_validator_node_address};
-use super::middleware::{error_response, json_response};
+use super::middleware::{
+    error_response, error_response_with_headers, extract_client_ip, json_response,
+    json_response_with_headers,
+};
+use super::RateLimitResult;
 use crate::config::Config;
 use crate::constants::{CHECKPOINT_INTERVAL, SESSION_EXPIRY_SECONDS};
 use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key_hex};
@@ -18,7 +22,67 @@ pub fn handle_create_account(
     mut request: Request,
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
 ) {
+    // Extract client IP for rate limiting (no API key yet for new accounts)
+    let client_ip = extract_client_ip(&request);
+
+    // Use IP hash as the rate limit key for account creation
+    let ip_hash = hash_api_key_hex(client_ip.as_bytes());
+
+    // Check rate limit (write operation - account creation)
+    let rate_limit_result = match _rate_limiter.check_limit(&ip_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing account creation");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                client_ip = %client_ip,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Account creation blocked by rate limiter"
+            );
+            let error = GoudChainError::RateLimitExceeded {
+                retry_after: *retry_after,
+                violation_count: *violation_count,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            let _ = request.respond(error_response_with_headers(error.to_json(), 429, headers));
+            return;
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                client_ip = %client_ip,
+                violation_count = violation_count,
+                "Rate limit warning on account creation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                client_ip = %client_ip,
+                remaining = remaining,
+                "Account creation rate limit check passed"
+            );
+        }
+    }
+
     let mut content = String::new();
     if request.as_reader().read_to_string(&mut content).is_err() {
         let _ = request.respond(error_response(
@@ -143,8 +207,11 @@ pub fn handle_create_account(
                                     };
 
                                     info!("New account created");
-                                    let _ = request.respond(json_response(
+                                    // Add rate limit headers to success response
+                                    let headers = _rate_limiter.create_headers(&rate_limit_result);
+                                    let _ = request.respond(json_response_with_headers(
                                         serde_json::to_string(&response).unwrap(),
+                                        headers,
                                     ));
 
                                     p2p.broadcast_block(&block);

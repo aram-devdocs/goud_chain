@@ -65,3 +65,18 @@ pub const ALLOWED_PEERS: [&str; 3] = ["node1", "node2", "node3"];
 pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
 pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
 pub const MAX_CONCURRENT_CONNECTIONS: usize = 10;
+
+// Rate Limiting (Phase 3 - DoS Protection)
+// Request limits per API key
+pub const RATE_LIMIT_WRITE_PER_SECOND: u32 = 10; // Maximum write operations per second
+pub const RATE_LIMIT_READ_PER_SECOND: u32 = 100; // Maximum read operations per second
+pub const RATE_LIMIT_WINDOW_SECONDS: u64 = 1; // Sliding window duration
+
+// Graduated penalties (escalating ban durations)
+pub const VIOLATION_COOLDOWN_SECONDS: u64 = 30; // 1st violation: 30-second cooldown
+pub const BAN_WRITE_5MIN_SECONDS: u64 = 300; // 2nd violation: 5-minute write block
+pub const BAN_WRITE_1HR_SECONDS: u64 = 3600; // 3rd violation: 1-hour write block
+pub const BAN_IP_24HR_SECONDS: u64 = 86400; // After complete blacklist: 24-hour IP ban
+
+// Performance tuning
+pub const RATE_LIMIT_CACHE_SIZE: usize = 10000; // LRU cache for hot API keys

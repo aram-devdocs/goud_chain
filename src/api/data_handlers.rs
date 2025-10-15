@@ -4,7 +4,10 @@ use tracing::{error, info, warn};
 
 use super::auth::{decrypt_api_key_from_jwt, extract_auth, AuthMethod};
 use super::internal_client::{forward_request_with_headers, get_validator_node_address};
-use super::middleware::{error_response, json_response};
+use super::middleware::{
+    error_response, error_response_with_headers, extract_client_ip, json_response_with_headers,
+};
+use super::RateLimitResult;
 use crate::config::Config;
 use crate::constants::CHECKPOINT_INTERVAL;
 use crate::crypto::hash_api_key_hex;
@@ -19,6 +22,7 @@ pub fn handle_submit_data(
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
     config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>, // TODO: Implement rate limiting
 ) {
     // Extract Authorization header (needed for forwarding)
     let auth_header_value = request
@@ -59,6 +63,66 @@ pub fn handle_submit_data(
             return;
         }
     };
+
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(&request);
+
+    // Check rate limit (write operation)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            let _ = request.respond(error_response_with_headers(error.to_json(), 429, headers));
+            return;
+        }
+        RateLimitResult::Warning {
+            violation_count,
+            cooldown_secs,
+            ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                cooldown_secs = cooldown_secs,
+                "Rate limit warning issued"
+            );
+            // Continue processing but remember to add warning headers to response
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Rate limit check passed"
+            );
+        }
+    }
 
     // Verify account exists (use cached hash to avoid re-hashing)
     let blockchain_guard = blockchain.lock().unwrap();
@@ -212,8 +276,13 @@ pub fn handle_submit_data(
                                                 collection_id,
                                                 block_number: block.index,
                                             };
-                                            let _ = request.respond(json_response(
+
+                                            // Add rate limit headers to success response
+                                            let headers =
+                                                _rate_limiter.create_headers(&rate_limit_result);
+                                            let _ = request.respond(json_response_with_headers(
                                                 serde_json::to_string(&response).unwrap(),
+                                                headers,
                                             ));
 
                                             p2p.broadcast_block(&block);
@@ -263,6 +332,7 @@ pub fn handle_list_data(
     request: &Request,
     blockchain: Arc<Mutex<Blockchain>>,
     config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication
     let auth = match extract_auth(request, &config) {
@@ -290,6 +360,64 @@ pub fn handle_list_data(
             }
         }
     };
+
+    // Get API key hash for rate limiting
+    let api_key_hash = hash_api_key_hex(&api_key);
+
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(request);
+
+    // Check rate limit (read operation)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, false) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 100,
+                remaining: 100,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Read request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            return error_response_with_headers(error.to_json(), 429, headers);
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                "Rate limit warning on read operation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Read rate limit check passed"
+            );
+        }
+    }
 
     let blockchain = blockchain.lock().unwrap();
 
@@ -331,7 +459,10 @@ pub fn handle_list_data(
     let response = CollectionListResponse {
         collections: result,
     };
-    json_response(serde_json::to_string(&response).unwrap())
+
+    // Add rate limit headers to response
+    let headers = _rate_limiter.create_headers(&rate_limit_result);
+    json_response_with_headers(serde_json::to_string(&response).unwrap(), headers)
 }
 
 /// Handle POST /data/decrypt - Decrypt a specific collection
@@ -340,6 +471,7 @@ pub fn handle_decrypt_data(
     blockchain: Arc<Mutex<Blockchain>>,
     collection_id: &str,
     config: Arc<Config>,
+    _rate_limiter: Arc<crate::api::RateLimiter>,
 ) -> Response<std::io::Cursor<Vec<u8>>> {
     // Extract authentication - must be API key for decryption
     let auth = match extract_auth(request, &config) {
@@ -368,6 +500,64 @@ pub fn handle_decrypt_data(
         }
     };
 
+    // Get API key hash for rate limiting
+    let api_key_hash = hash_api_key_hex(&api_key);
+
+    // Extract client IP for rate limiting
+    let client_ip = extract_client_ip(request);
+
+    // Check rate limit (write operation - decryption is computationally expensive)
+    let rate_limit_result = match _rate_limiter.check_limit(&api_key_hash, &client_ip, true) {
+        Ok(result) => result,
+        Err(e) => {
+            // Rate limiter error - fail open (allow request but log error)
+            error!(error = %e, "Rate limit check failed, allowing request");
+            RateLimitResult::Allowed {
+                limit: 10,
+                remaining: 10,
+                reset_at: chrono::Utc::now().timestamp() + 60,
+            }
+        }
+    };
+
+    // Handle rate limit result
+    match &rate_limit_result {
+        RateLimitResult::Blocked {
+            ban_level,
+            retry_after,
+            violation_count,
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                ban_level = ?ban_level,
+                violation_count = violation_count,
+                "Decrypt request blocked by rate limiter"
+            );
+            let error = GoudChainError::ApiKeyBanned {
+                ban_level: format!("{:?}", ban_level),
+                expires_at: chrono::Utc::now().timestamp() + *retry_after as i64,
+            };
+            let headers = _rate_limiter.create_headers(&rate_limit_result);
+            return error_response_with_headers(error.to_json(), 429, headers);
+        }
+        RateLimitResult::Warning {
+            violation_count, ..
+        } => {
+            warn!(
+                api_key_hash = %api_key_hash,
+                violation_count = violation_count,
+                "Rate limit warning on decrypt operation"
+            );
+        }
+        RateLimitResult::Allowed { remaining, .. } => {
+            info!(
+                api_key_hash = %api_key_hash,
+                remaining = remaining,
+                "Decrypt rate limit check passed"
+            );
+        }
+    }
+
     let blockchain = blockchain.lock().unwrap();
 
     // Find collection (requires API key to decrypt envelope and verify ownership)
@@ -388,7 +578,9 @@ pub fn handle_decrypt_data(
                         data,
                         created_at: metadata["created_at"].as_i64().unwrap_or(0),
                     };
-                    json_response(serde_json::to_string(&response).unwrap())
+                    // Add rate limit headers to response
+                    let headers = _rate_limiter.create_headers(&rate_limit_result);
+                    json_response_with_headers(serde_json::to_string(&response).unwrap(), headers)
                 }
                 _ => error_response(
                     GoudChainError::DecryptionFailed.to_json(),

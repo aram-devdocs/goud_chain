@@ -11,10 +11,10 @@ use std::sync::{Arc, Mutex};
 use tiny_http::{Method, Server};
 use tracing::{error, info};
 
-use api::{create_preflight_response, route_request};
+use api::{create_preflight_response, route_request, RateLimiter};
 use config::Config;
 use network::P2PNode;
-use storage::{init_data_directory, load_blockchain, BlockchainStore};
+use storage::{init_data_directory, load_blockchain, BlockchainStore, RateLimitStore};
 
 fn main() {
     // Initialize tracing
@@ -52,6 +52,24 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    // Initialize rate limiting store (reuses same RocksDB instance)
+    let rate_limit_store = Arc::new(RateLimitStore::new(blockchain_store.get_db()));
+
+    // Parse bypass whitelist from environment (comma-separated API key hashes)
+    let bypass_keys: Vec<String> = std::env::var("RATE_LIMIT_BYPASS_KEYS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    info!(
+        bypass_count = bypass_keys.len(),
+        "Rate limiting initialized with bypass whitelist"
+    );
+
+    let rate_limiter = Arc::new(RateLimiter::new(rate_limit_store, bypass_keys));
 
     // Start P2P node
     let p2p_node = P2PNode::new(
@@ -94,6 +112,7 @@ fn main() {
         let blockchain = Arc::clone(&blockchain);
         let p2p = Arc::clone(&p2p_clone);
         let config_clone = Arc::clone(&config);
+        let rate_limiter_clone = Arc::clone(&rate_limiter);
 
         // Handle OPTIONS preflight requests
         if request.method() == &Method::Options {
@@ -104,6 +123,6 @@ fn main() {
         }
 
         // Route and handle request
-        route_request(request, blockchain, p2p, config_clone);
+        route_request(request, blockchain, p2p, config_clone, rate_limiter_clone);
     }
 }

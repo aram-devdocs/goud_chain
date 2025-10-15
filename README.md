@@ -65,6 +65,9 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **JWT Sessions** - Token-based authentication with 1-hour expiry
 - **Constant-Time Comparisons** - `subtle` crate prevents timing attacks
 - **Memory Protection** - Automatic key zeroization with 5-minute TTL and LRU cache
+- **Graduated Rate Limiting** - 5-tier DoS protection (10 writes/sec, 100 reads/sec)
+- **IP Banning** - 24-hour IP bans after 5th violation (complete blacklist)
+- **Privacy-Preserving Enforcement** - IP addresses hashed before storage
 
 ### Infrastructure
 - **Collection-Based Storage** - Group encrypted data by user account
@@ -72,6 +75,7 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Environment Variable Key Management** - Production-ready configuration
 - **Load Balanced** - NGINX reverse proxy with health checks
 - **Cloud-Native** - Runs on GCP free tier ($0/month)
+- **DoS Protection** - 5-tier graduated rate limiting with IP banning
 
 ## Quick Start (Local Development)
 
@@ -226,6 +230,97 @@ EncryptedCollection {
     public_key: String,           // Ed25519 public key
 }
 ```
+
+## Rate Limiting
+
+Goud Chain implements **graduated DoS protection** with a 5-tier penalty system to protect against abuse while preserving read access for legitimate users.
+
+### Rate Limits
+
+**Default (Local Development):**
+- **Writes:** 10 requests/second per API key
+- **Reads:** 100 requests/second per API key
+
+**GCP Production (e2-micro):**
+- **Writes:** 5 requests/second per API key
+- **Reads:** 50 requests/second per API key
+
+### Graduated Penalty System
+
+Violations escalate through 5 tiers with increasing severity:
+
+| Tier | Violation | Penalty | Blocks Writes? | Blocks Reads? | Duration |
+|------|-----------|---------|----------------|---------------|----------|
+| 1 | Warning | HTTP 200 with warning header | No | No | — |
+| 2 | 1st offense | Cooldown period | No | No | 30 seconds |
+| 3 | 2nd offense | Write operations blocked | Yes | No | 5 minutes |
+| 4 | 3rd offense | Write operations blocked | Yes | No | 1 hour |
+| 5 | 4th offense | Permanent write ban | Yes | No | Permanent |
+| 6 | 5th offense | Complete blacklist + IP ban | Yes | Yes | 24 hours (IP) |
+
+**Key Principles:**
+- **Read Access Preserved:** Users can always read their data (until complete blacklist)
+- **IP-Based Fallback:** If IP is blocked, read operations allowed at limited speed
+- **Privacy-Preserving:** IP addresses hashed using SHA-256 before storage
+- **Fail-Open Design:** If rate limiter errors, requests are allowed (availability over security)
+
+### HTTP Headers
+
+**Response Headers (All Requests):**
+```
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+X-RateLimit-Reset: 1704067260
+```
+
+**Warning State (Tier 1):**
+```
+X-RateLimit-Violation: warning
+X-RateLimit-Violation-Count: 0
+X-RateLimit-Cooldown: 30
+```
+
+**Blocked State (HTTP 429):**
+```json
+{
+  "error": "API key banned (WriteBlock5Min): expires at 1704067500"
+}
+```
+
+### Configuration
+
+**Environment Variables:**
+```bash
+# Rate limiting configuration
+RATE_LIMIT_WRITE_PER_SEC=10         # Write operations per second
+RATE_LIMIT_READ_PER_SEC=100         # Read operations per second
+RATE_LIMIT_BYPASS_KEYS=             # Comma-separated API keys to bypass rate limiting
+RATE_LIMIT_ENABLE_IP_BAN=true       # Enable 24-hour IP bans on 5th violation
+```
+
+**Bypass Whitelist:**
+For testing or trusted clients, add API keys to bypass rate limiting:
+```bash
+RATE_LIMIT_BYPASS_KEYS=api_key_1,api_key_2,api_key_3
+```
+
+### Storage Architecture
+
+**RocksDB Schema:**
+- `ratelimit:{api_key_hash}:{window_start}` → Request count (u32)
+- `violations:{api_key_hash}` → ViolationRecord (Bincode-serialized)
+- `bans:{api_key_hash}` → BanRecord (Bincode-serialized)
+- `ip_bans:{ip_hash}` → Expiry timestamp (i64)
+
+**Performance:**
+- LRU cache for 10,000 hot API keys
+- <500µs overhead per request
+- In-memory lookups for cached keys
+- RocksDB persistence for violations/bans
+
+### Testing
+
+See [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) for comprehensive testing strategy including isolated environment setup to avoid self-banning during development.
 
 ## API Reference
 
@@ -1010,7 +1105,6 @@ Goud Chain uses a **two-tier HKDF strategy** that balances OWASP security compli
 
 **Limitations (Proof of Concept):**
 - API key security is symmetric (anyone with API key can decrypt)
-- No rate limiting on login attempts
 - No key rotation mechanism
 - No password recovery (keys lost = data lost)
 - JWT secret hardcoded in constants (use env var in production)
@@ -1018,12 +1112,13 @@ Goud Chain uses a **two-tier HKDF strategy** that balances OWASP security compli
 - Suitable for PoC only, not production use
 
 **Production Hardening Recommendations:**
-- Implement rate limiting on authentication endpoints
+- Configure rate limit bypass whitelist for trusted clients
+- Fine-tune rate limits based on expected traffic patterns
+- Monitor violation trends to detect coordinated attacks
 - Add HTTPS/TLS for all connections
 - Use environment variables for JWT secret
 - Implement account recovery mechanism (with security questions or backup keys)
-- Add audit logging for security events
-- Implement IP-based access controls
+- Add audit logging for security events and rate limit violations
 - Add multi-factor authentication
 - Implement key rotation with backward compatibility
 - Use hardware security modules (HSM) for validator keys
