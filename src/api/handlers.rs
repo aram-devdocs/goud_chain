@@ -104,7 +104,7 @@ pub fn handle_get_stats(blockchain: Arc<Mutex<Blockchain>>) -> Response<std::io:
     json_response(serde_json::to_string(&stats).unwrap())
 }
 
-/// Handle GET /metrics - Node performance metrics
+/// Handle GET /metrics - Node performance metrics (JSON format)
 pub fn handle_get_metrics(
     blockchain: Arc<Mutex<Blockchain>>,
     p2p: Arc<P2PNode>,
@@ -126,6 +126,50 @@ pub fn handle_get_metrics(
     };
 
     json_response(serde_json::to_string(&metrics).unwrap())
+}
+
+/// Handle GET /metrics/prometheus - Prometheus-formatted metrics including key cache stats
+pub fn handle_get_prometheus_metrics(
+    blockchain: Arc<Mutex<Blockchain>>,
+    p2p: Arc<P2PNode>,
+) -> Response<std::io::Cursor<Vec<u8>>> {
+    use crate::crypto::global_key_cache;
+
+    let chain = blockchain.lock().unwrap();
+    let peers = p2p.peers.lock().unwrap();
+    let latest_block = chain.chain.last();
+
+    // Node metrics
+    let node_metrics = format!(
+        "# HELP goud_chain_length Total number of blocks in the chain\n\
+         # TYPE goud_chain_length gauge\n\
+         goud_chain_length {}\n\
+         # HELP goud_peer_count Number of connected P2P peers\n\
+         # TYPE goud_peer_count gauge\n\
+         goud_peer_count {}\n\
+         # HELP goud_latest_block_index Index of the latest block\n\
+         # TYPE goud_latest_block_index gauge\n\
+         goud_latest_block_index {}\n\
+         # HELP goud_latest_block_timestamp Timestamp of the latest block\n\
+         # TYPE goud_latest_block_timestamp gauge\n\
+         goud_latest_block_timestamp {}\n",
+        chain.chain.len(),
+        peers.len(),
+        latest_block.map(|b| b.index).unwrap_or(0),
+        latest_block.map(|b| b.timestamp).unwrap_or(0)
+    );
+
+    // Key cache metrics
+    let cache_metrics = global_key_cache().prometheus_metrics();
+
+    // Combine all metrics
+    let all_metrics = format!("{}\n{}", node_metrics, cache_metrics);
+
+    // Return plain text response for Prometheus scraping
+    Response::from_data(all_metrics.into_bytes()).with_header(
+        tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/plain; version=0.0.4"[..])
+            .unwrap(),
+    )
 }
 
 /// Handle GET /validator/current - Get current validator for next block
@@ -215,7 +259,10 @@ pub fn route_request(
             let _ = request.respond(handle_get_stats(blockchain));
         }
         (Method::Get, "/metrics") => {
-            let _ = request.respond(handle_get_metrics(blockchain, p2p));
+            let _ = request.respond(handle_get_metrics(blockchain, Arc::clone(&p2p)));
+        }
+        (Method::Get, "/metrics/prometheus") => {
+            let _ = request.respond(handle_get_prometheus_metrics(blockchain, p2p));
         }
 
         // ========== Validator Info (for load balancer routing) ==========

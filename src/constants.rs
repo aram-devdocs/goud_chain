@@ -20,7 +20,12 @@ pub const AES_KEY_SIZE_BYTES: usize = 32;
 pub const ED25519_PUBLIC_KEY_SIZE: usize = 32;
 pub const ED25519_SIGNATURE_SIZE: usize = 64;
 pub const API_KEY_SIZE_BYTES: usize = 32;
-pub const HKDF_ITERATIONS: u32 = 1_000;
+// HKDF iteration counts (context-aware security)
+// Security-critical: API key hashing for authentication (prevents offline brute-force)
+pub const HKDF_ITERATIONS: u32 = 100_000; // OWASP recommended: 100k+ iterations
+                                          // Performance-critical: Encryption key derivation from validated API keys (domain separation only)
+                                          // Used AFTER API key has been validated - iteration count doesn't affect domain separation security
+pub const HKDF_FAST_ITERATIONS: u32 = 1_000;
 
 // API Key derivation contexts
 pub const HKDF_CONTEXT_ENCRYPTION: &[u8] = b"goud_chain_encryption_v2";

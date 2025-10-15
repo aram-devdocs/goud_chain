@@ -11,7 +11,9 @@ use super::{
 use crate::constants::{
     CHECKPOINT_INTERVAL, GENESIS_PREVIOUS_HASH, SCHEMA_VERSION, TIMESTAMP_TOLERANCE_SECONDS,
 };
-use crate::crypto::{generate_account_blind_index_with_salt, generate_signing_key};
+use crate::crypto::{
+    generate_account_blind_index_with_salt, generate_signing_key, hash_api_key_hex,
+};
 use crate::types::{GoudChainError, Result};
 
 /// Get the current validator for a given block number (round-robin)
@@ -345,9 +347,16 @@ impl Blockchain {
     /// Find account by API key (requires full API key, not just hash)
     /// Searches all blocks and decrypts matching envelopes
     pub fn find_account(&self, api_key: &[u8]) -> Option<UserAccount> {
-        use crate::crypto::hash_api_key;
+        self.find_account_with_hash(api_key, None)
+    }
 
-        let api_key_hash = hash_api_key(api_key);
+    /// Find account with optional pre-computed hash (optimization)
+    pub fn find_account_with_hash(
+        &self,
+        api_key: &[u8],
+        api_key_hash: Option<String>,
+    ) -> Option<UserAccount> {
+        let api_key_hash = api_key_hash.unwrap_or_else(|| hash_api_key_hex(api_key));
 
         for block in &self.chain {
             let should_search_block = if block.blind_indexes.is_empty() {
@@ -376,8 +385,7 @@ impl Blockchain {
         collection_id: &str,
         api_key: &[u8],
     ) -> Option<EncryptedCollection> {
-        use crate::crypto::hash_api_key;
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
 
         // Search all blocks
         for block in &self.chain {
@@ -397,9 +405,7 @@ impl Blockchain {
 
     /// Find all collections owned by user (requires API key to access envelopes)
     pub fn find_collections_by_owner(&self, api_key: &[u8]) -> Vec<EncryptedCollection> {
-        use crate::crypto::hash_api_key;
-
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
         let mut results = Vec::new();
 
         for block in &self.chain {

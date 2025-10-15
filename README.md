@@ -58,9 +58,13 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Per-Block Salted Blind Indexes** - Prevents cross-block correlation attacks
 - **Timestamp Obfuscation** - Hourly granularity hides exact activity timing
 - **Dual-Layer Encryption** - Master key for block data, API keys for collections
-- **HKDF Key Derivation** - Separate encryption, MAC, and search keys (100k iterations)
+- **Two-Tier HKDF Key Derivation** - OWASP-compliant security with optimized performance:
+  - **Tier 1 (Authentication):** 100,000 iterations for API key hashing (brute-force resistance)
+  - **Tier 2 (Encryption):** 1,000 iterations for encryption/MAC keys (domain separation)
 - **API Key Authentication** - Cryptographically secure 256-bit keys
 - **JWT Sessions** - Token-based authentication with 1-hour expiry
+- **Constant-Time Comparisons** - `subtle` crate prevents timing attacks
+- **Memory Protection** - Automatic key zeroization with 5-minute TTL and LRU cache
 
 ### Infrastructure
 - **Collection-Based Storage** - Group encrypted data by user account
@@ -73,8 +77,17 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 
 ```bash
 ./run              # Start 3-node network (production mode)
-./run dev          # Start with hot reload (development mode)
+./run dev          # Start with hot reload (development mode - debug builds)
+./run dev-perf     # Start with hot reload (development mode - release builds)
 ```
+
+**Development Mode Comparison:**
+
+| Mode | Build Type | Rebuild Time | Block Creation | Use Case |
+|------|-----------|--------------|----------------|----------|
+| `./run start` | Release | ~2-3 min | ~20-50ms | Production testing, performance benchmarks |
+| `./run dev-perf` | Release | ~30-60s | ~20-50ms | Fast iteration + production performance |
+| `./run dev` | Debug | ~5-10s | ~4-10s | Quick prototyping, debugging |
 
 **🚀 Primary API Endpoint:** [http://localhost:8080](http://localhost:8080) (Load Balancer)
 
@@ -696,11 +709,25 @@ cargo fmt -- --check
 
 ### Running with Hot Reload
 
+**Debug Mode (Fast Rebuilds):**
 ```bash
 ./run dev
 ```
+- Rebuild time: ~5-10 seconds
+- Block creation: ~4-10 seconds
+- Best for: Quick iteration, debugging, testing logic changes
 
-This starts the blockchain with `cargo-watch` for automatic recompilation on file changes.
+**Release Mode (Production Performance):**
+```bash
+./run dev-perf
+```
+- Rebuild time: ~30-60 seconds
+- Block creation: ~20-50ms (100-200x faster!)
+- Best for: Testing performance, integration testing, pre-deployment validation
+
+Both modes use `cargo-watch` for automatic recompilation when source files change. Choose based on whether you need fast rebuilds or fast runtime performance.
+
+**Performance Deep Dive:** See [PERFORMANCE.md](PERFORMANCE.md) for detailed benchmarks and security analysis.
 
 ### Project Structure
 
@@ -715,7 +742,8 @@ goud_chain/
 │   │   ├── api_key.rs              # API key generation & validation
 │   │   ├── blind_index.rs          # HMAC-based searchable encryption
 │   │   ├── encryption.rs           # AES-256-GCM encryption
-│   │   ├── hkdf.rs                 # HKDF key derivation (100k iterations)
+│   │   ├── hkdf.rs                 # Two-tier HKDF (100k auth, 1k encryption)
+│   │   ├── key_cache.rs            # TTL cache with zeroization
 │   │   ├── mac.rs                  # HMAC-SHA256 message authentication
 │   │   └── signature.rs            # Ed25519 signatures
 │   ├── domain/
@@ -784,8 +812,10 @@ goud_chain/
 ├── docker-compose.local.yml    # Generated - Local 3-node network
 ├── docker-compose.gcp.yml      # Generated - GCP 2-node network (e2-micro optimized)
 ├── docker-compose.local.dev.yml # Dev mode overlay (hot reload, jupyter)
+├── docker-compose.local.dev-perf.yml # Dev mode with release builds
 ├── Dockerfile                  # Rust production build
-├── Dockerfile.dev              # Rust dev build with cargo-watch
+├── Dockerfile.dev              # Rust dev build with cargo-watch (debug)
+├── Dockerfile.dev-perf         # Rust dev build with cargo-watch (release)
 ├── run                         # CLI script
 ├── README.md                   # This file
 └── CLAUDE.md                   # AI assistant guidelines
@@ -796,7 +826,7 @@ goud_chain/
 **Backend:**
 - **Rust** - Core blockchain implementation
 - **AES-256-GCM** - Symmetric encryption (aes-gcm crate)
-- **HKDF** - Key derivation with 100k iterations (hkdf crate)
+- **HKDF** - Two-tier key derivation (100k auth, 1k encryption)
 - **HMAC-SHA256** - Message authentication (hmac + sha2)
 - **Ed25519** - Digital signatures (ed25519-dalek)
 - **SHA-256** - Hashing (sha2)
@@ -804,6 +834,9 @@ goud_chain/
 - **Base64** - API key encoding (base64)
 - **JSON** - Serialization (serde_json)
 - **HTTP** - API server (tiny_http)
+- **subtle** - Constant-time comparisons (timing attack prevention)
+- **zeroize** - Automatic memory clearing for sensitive data
+- **lru** - LRU cache with TTL for key derivation optimization
 
 **Infrastructure:**
 - **NGINX** - Load balancer and reverse proxy
@@ -923,13 +956,33 @@ node1:
 - Only SHA-256 hash of API key stored on blockchain (not the key itself)
 - Keys cannot be recovered if lost - users must save them securely
 
-**Key Derivation:**
-- HKDF (HMAC-based Key Derivation Function) with 100,000 iterations
+**Key Derivation (Two-Tier Strategy):**
+
+Goud Chain uses a **two-tier HKDF strategy** that balances OWASP security compliance with real-world performance:
+
+**Tier 1 - Authentication (Security-Critical):**
+- 100,000 HKDF iterations for API key hashing
+- OWASP recommended: 100k+ iterations to prevent offline brute-force attacks
+- Used once during login/authentication
+- Pre-computed hash cached and reused to avoid redundant computation
+
+**Tier 2 - Encryption (Performance-Critical):**
+- 1,000 HKDF iterations for encryption/MAC key derivation
+- Used after API key is already validated (security established)
+- Provides domain separation and context isolation
 - Derives separate keys from single API key:
   - **Encryption key** (32 bytes for AES-256)
   - **MAC key** (32 bytes for HMAC-SHA256)
   - **Search key** (32 bytes, reserved for future use)
 - Each derivation uses unique context strings to ensure key separation
+
+**Rationale:** Once an API key passes authentication (100k iterations), deriving encryption keys only needs to prevent key reuse across contexts (1k iterations). This maintains OWASP compliance for authentication while enabling production-grade performance (~20-50ms block creation).
+
+**Hash Caching Optimization:**
+- API key hash computed once during login (expensive: 100k iterations)
+- Pre-computed hash reused across operations (3x performance improvement)
+- 5-minute TTL with LRU eviction (1000 entries maximum)
+- Automatic memory zeroization on eviction
 
 **Encryption:**
 - AES-256-GCM with authenticated encryption
@@ -938,9 +991,10 @@ node1:
 - Each collection encrypted independently
 
 **Authentication:**
-- Constant-time comparison prevents timing attacks on API key verification
+- Constant-time comparison using `subtle` crate prevents timing attacks on API key verification
 - JWT session tokens with 1-hour expiry reduce API key exposure
 - Dual-mode auth: API key (long-lived) or session token (short-lived)
+- Pre-computed hash optimization reduces login from 300k iterations (3x hashing) to 100k iterations (1x hashing)
 
 **Signatures:**
 - Ed25519 public-key cryptography for blockchain data

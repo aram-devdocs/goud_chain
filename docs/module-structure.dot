@@ -36,7 +36,6 @@ digraph ModuleDependencies {
     api -> crypto;
     api -> domain;
     api -> network;
-    api -> storage;
     api -> types;
     crypto -> constants;
     crypto -> types;

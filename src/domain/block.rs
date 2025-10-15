@@ -9,7 +9,7 @@ use super::{
     user_account::UserAccount,
 };
 use crate::constants::{EMPTY_MERKLE_ROOT, GENESIS_TIMESTAMP, TIMESTAMP_GRANULARITY_SECONDS};
-use crate::crypto::hash_api_key;
+use crate::crypto::hash_api_key_hex;
 use crate::types::{GoudChainError, Result};
 
 /// Generate a random 32-byte salt for blind index generation
@@ -23,14 +23,6 @@ pub fn generate_block_salt() -> String {
 /// Rounds down to the nearest hour to hide exact activity timing
 fn obfuscate_timestamp(timestamp: i64) -> i64 {
     timestamp - (timestamp % TIMESTAMP_GRANULARITY_SECONDS)
-}
-
-/// Internal structure for block contents before encryption
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockData {
-    pub accounts: Vec<UserAccount>,
-    pub collections: Vec<EncryptedCollection>,
-    pub validator: String,
 }
 
 /// Configuration for creating a new block
@@ -163,7 +155,7 @@ impl Block {
     pub fn get_account(&self, api_key: &[u8]) -> Result<Option<UserAccount>> {
         use super::envelope::decrypt_account_envelope;
 
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
         let container = self.get_envelope_container()?;
 
         // Find matching envelope by api_key_hash
@@ -180,7 +172,7 @@ impl Block {
     /// Get all collections for a specific API key
     /// Returns empty vec if no matching collections found
     pub fn get_collections_by_owner(&self, api_key: &[u8]) -> Result<Vec<EncryptedCollection>> {
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
         let container = self.get_envelope_container()?;
 
         let collections = container

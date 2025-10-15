@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::constants::AES_KEY_SIZE_BYTES;
-use crate::crypto::{decrypt_data_with_key, encrypt_data_with_key, global_key_cache, hash_api_key};
+use crate::crypto::{
+    decrypt_data_with_key, encrypt_data_with_key, global_key_cache, hash_api_key_hex,
+};
 use crate::types::{GoudChainError, Result};
 
 use super::encrypted_collection::EncryptedCollection;
@@ -54,7 +56,7 @@ pub fn encrypt_account_envelope(
 
     Ok(AccountEnvelope {
         encrypted_data,
-        api_key_hash: hash_api_key(api_key),
+        api_key_hash: hash_api_key_hex(api_key),
         nonce,
     })
 }

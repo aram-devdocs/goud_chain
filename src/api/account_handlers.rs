@@ -2,12 +2,12 @@ use std::sync::{Arc, Mutex};
 use tiny_http::Request;
 use tracing::{error, info, warn};
 
-use super::auth::{generate_session_token, verify_api_key_hash};
+use super::auth::generate_session_token;
 use super::internal_client::{forward_request_to_node, get_validator_node_address};
 use super::middleware::{error_response, json_response};
 use crate::config::Config;
 use crate::constants::{CHECKPOINT_INTERVAL, SESSION_EXPIRY_SECONDS};
-use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key};
+use crate::crypto::{encode_api_key, generate_api_key, generate_signing_key, hash_api_key_hex};
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, UserAccount};
 use crate::network::P2PNode;
@@ -194,15 +194,27 @@ pub fn handle_login(mut request: Request, blockchain: Arc<Mutex<Blockchain>>, co
             // Decode API key
             match crate::crypto::decode_api_key(&req.api_key) {
                 Ok(api_key) => {
+                    // Hash API key ONCE (expensive: 100k iterations)
+                    let api_key_hash_hex = hash_api_key_hex(&api_key);
+
                     // Find account (requires API key to decrypt envelope)
+                    // Pass pre-computed hash to avoid re-hashing
                     let blockchain_guard = blockchain.lock().unwrap();
-                    match blockchain_guard.find_account(&api_key) {
+                    match blockchain_guard
+                        .find_account_with_hash(&api_key, Some(api_key_hash_hex.clone()))
+                    {
                         Some(account) => {
                             // Verify API key hash matches (constant-time comparison)
-                            match verify_api_key_hash(&api_key, &account.api_key_hash) {
+                            // Use pre-computed hash to avoid re-hashing (saves 100k iterations!)
+                            match crate::api::auth::verify_api_key_hash_precomputed(
+                                Some(&api_key_hash_hex),
+                                &api_key,
+                                &account.api_key_hash,
+                            ) {
                                 Ok(_) => {
                                     // Generate session token with encrypted API key
-                                    let api_key_hash = hash_api_key(&api_key);
+                                    // Reuse the hash we already computed!
+                                    let api_key_hash = api_key_hash_hex;
                                     match generate_session_token(
                                         account.account_id.clone(),
                                         &api_key,

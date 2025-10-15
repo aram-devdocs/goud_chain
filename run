@@ -44,12 +44,41 @@ case "$COMMAND" in
     echo "   Node 2: http://localhost:8082"
     echo "   Node 3: http://localhost:8083"
     echo ""
-    echo "✨ Hot reload enabled:"
+    echo "✨ Hot reload enabled (DEBUG MODE):"
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
-    echo "   - Nodes: Changes to src/ will auto-recompile and restart"
+    echo "   - Nodes: Changes to src/ will auto-recompile and restart (~5-10s)"
     echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
+    echo "   ⚠️  Debug builds are 10-100x slower (use './run dev-perf' for production speed)"
     echo ""
     docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml up --build
+    ;;
+
+  dev-perf)
+    echo "🚀 Starting Goud Chain network (development mode with RELEASE builds)..."
+    echo ""
+    echo "📋 Generating latest configs from templates..."
+    ./config/scripts/generate-configs.sh local
+    echo ""
+    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "   └─ Use this endpoint for all blockchain operations"
+    echo ""
+    echo "🌐 Dashboard: http://localhost:3000"
+    echo ""
+    echo "📓 Jupyter Lab: http://localhost:8888"
+    echo "   └─ API testing notebooks and experiments"
+    echo ""
+    echo "📡 Individual Nodes (for debugging):"
+    echo "   Node 1: http://localhost:8081"
+    echo "   Node 2: http://localhost:8082"
+    echo "   Node 3: http://localhost:8083"
+    echo ""
+    echo "✨ Hot reload enabled (RELEASE MODE):"
+    echo "   - Dashboard: Changes to dashboard/ will auto-reload"
+    echo "   - Nodes: Changes to src/ will auto-recompile (~30-60s) with optimizations"
+    echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
+    echo "   ⚡ Release builds match production performance (~20-50ms block creation)"
+    echo ""
+    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-perf.yml up --build
     ;;
 
   build)
@@ -253,7 +282,8 @@ case "$COMMAND" in
     echo "Network Commands:"
     echo "  (no args)           Start the 3-node network (production)"
     echo "  start               Start the network (production mode)"
-    echo "  dev                 Start the network (development mode with hot reload)"
+    echo "  dev                 Start with hot reload (DEBUG - fast rebuilds, slow runtime)"
+    echo "  dev-perf            Start with hot reload (RELEASE - slow rebuilds, fast runtime)"
     echo "  build               Build Docker images"
     echo "  down, stop          Stop the network"
     echo "  clean               Remove all containers, images, and volumes"
@@ -278,7 +308,8 @@ case "$COMMAND" in
     echo ""
     echo "Examples:"
     echo "  ./run                              # Start network (production)"
-    echo "  ./run dev                          # Start with hot reload"
+    echo "  ./run dev                          # Start with hot reload (fast iteration)"
+    echo "  ./run dev-perf                     # Start with hot reload (performance testing)"
     echo "  ./run status                       # Check load balancer + all nodes"
     echo "  ./run lb-status                    # Detailed load balancer stats"
     echo "  ./run logs nginx                   # View load balancer logs"

@@ -1,5 +1,5 @@
 /// Integration test to verify privacy-preserving properties of v8 envelope encryption
-use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key};
+use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection, UserAccount};
 
 #[test]
@@ -20,7 +20,7 @@ fn test_envelope_encryption_privacy() {
         .unwrap();
 
     // Create encrypted collection
-    let api_key_hash = hash_api_key(&api_key);
+    let api_key_hash = hash_api_key_hex(&api_key);
     let node_signing_key = blockchain.node_signing_key.as_ref().unwrap();
     let collection = EncryptedCollection::new(
         "Secret Data".to_string(),

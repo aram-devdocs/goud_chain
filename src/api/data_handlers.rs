@@ -7,7 +7,7 @@ use super::internal_client::{forward_request_with_headers, get_validator_node_ad
 use super::middleware::{error_response, json_response};
 use crate::config::Config;
 use crate::constants::CHECKPOINT_INTERVAL;
-use crate::crypto::hash_api_key;
+use crate::crypto::hash_api_key_hex;
 use crate::domain::blockchain::{get_current_validator, is_authorized_validator};
 use crate::domain::{Blockchain, EncryptedCollection};
 use crate::network::P2PNode;
@@ -44,7 +44,7 @@ pub fn handle_submit_data(
     // Get API key and hash based on auth method
     let (api_key, api_key_hash) = match auth {
         AuthMethod::ApiKey(key) => {
-            let hash = hash_api_key(&key);
+            let hash = hash_api_key_hex(&key);
             (key, hash)
         }
         AuthMethod::SessionToken(_) => {
@@ -60,9 +60,12 @@ pub fn handle_submit_data(
         }
     };
 
-    // Verify account exists
+    // Verify account exists (use cached hash to avoid re-hashing)
     let blockchain_guard = blockchain.lock().unwrap();
-    if blockchain_guard.find_account(&api_key).is_none() {
+    if blockchain_guard
+        .find_account_with_hash(&api_key, Some(api_key_hash.clone()))
+        .is_none()
+    {
         drop(blockchain_guard);
         let _ = request.respond(error_response(
             GoudChainError::Unauthorized("Account not found".to_string()).to_json(),

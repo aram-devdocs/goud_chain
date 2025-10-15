@@ -126,12 +126,12 @@ impl EncryptedCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::{generate_api_key, generate_signing_key, hash_api_key};
+    use crate::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 
     #[test]
     fn test_create_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
 
         let collection = EncryptedCollection::new(
@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn test_verify_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
 
         let collection = EncryptedCollection::new(
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn test_decrypt_collection() {
         let api_key = generate_api_key();
-        let api_key_hash = hash_api_key(&api_key);
+        let api_key_hash = hash_api_key_hex(&api_key);
         let signing_key = generate_signing_key();
         let original_data = r#"{"value": 42}"#;
 

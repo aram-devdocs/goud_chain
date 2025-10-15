@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::constants::ENCRYPTION_SALT;
 use crate::crypto::{
-    encrypt_data_with_key, get_public_key_hex, global_key_cache, hash_api_key, sign_message,
+    encrypt_data_with_key, get_public_key_hex, global_key_cache, hash_api_key_hex, sign_message,
 };
 use crate::types::Result;
 
@@ -23,7 +23,7 @@ impl UserAccount {
     /// Create a new user account with an API key
     pub fn new(api_key: &[u8], signing_key: &SigningKey, metadata: Option<String>) -> Result<Self> {
         let account_id = Uuid::new_v4().to_string();
-        let api_key_hash = hash_api_key(api_key);
+        let api_key_hash = hash_api_key_hex(api_key);
         let public_key = get_public_key_hex(signing_key);
         let created_at = Utc::now().timestamp();
 

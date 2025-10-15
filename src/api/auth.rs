@@ -10,7 +10,7 @@ use tiny_http::Request;
 
 use crate::config::Config;
 use crate::constants::{NONCE_SIZE_BYTES, SESSION_EXPIRY_SECONDS};
-use crate::crypto::{constant_time_compare, decode_api_key, hash_api_key, validate_api_key};
+use crate::crypto::{constant_time_compare_bytes, decode_api_key, hash_api_key, validate_api_key};
 use crate::types::{GoudChainError, Result};
 
 /// Encrypt API key with session secret for storage in JWT
@@ -172,11 +172,30 @@ pub fn extract_auth(request: &Request, config: &Config) -> Result<AuthMethod> {
     ))
 }
 
-/// Verify that the API key matches the expected hash (constant-time comparison)
-pub fn verify_api_key_hash(api_key: &[u8], expected_hash: &str) -> Result<()> {
-    let computed_hash = hash_api_key(api_key);
+/// Verify API key hash with optional pre-computed hash (optimization)
+pub fn verify_api_key_hash_precomputed(
+    computed_hash_hex: Option<&str>,
+    api_key: &[u8],
+    expected_hash_hex: &str,
+) -> Result<()> {
+    // Use provided hash or compute it
+    let computed_hash_hex = match computed_hash_hex {
+        Some(hash) => hash.to_string(),
+        None => {
+            // Compute hash of provided API key (expensive: 100k iterations)
+            let hash_bytes = hash_api_key(api_key);
+            hex::encode(hash_bytes)
+        }
+    };
 
-    if !constant_time_compare(&computed_hash, expected_hash) {
+    // Decode both hashes to bytes
+    let computed_hash = hex::decode(&computed_hash_hex)
+        .map_err(|_| GoudChainError::Internal("Invalid computed hash format".to_string()))?;
+    let expected_hash = hex::decode(expected_hash_hex)
+        .map_err(|_| GoudChainError::Unauthorized("Invalid hash format".to_string()))?;
+
+    // Constant-time comparison of raw bytes (prevents timing attacks)
+    if !constant_time_compare_bytes(&computed_hash, &expected_hash) {
         return Err(GoudChainError::Unauthorized(
             "API key does not match".to_string(),
         ));
@@ -252,10 +271,12 @@ mod tests {
 
     #[test]
     fn test_verify_api_key_hash() {
-        let api_key = b"test_api_key_12345678901234567890";
-        let correct_hash = hash_api_key(api_key);
+        use crate::crypto::hash_api_key_hex;
 
-        assert!(verify_api_key_hash(api_key, &correct_hash).is_ok());
-        assert!(verify_api_key_hash(api_key, "wrong_hash").is_err());
+        let api_key = b"test_api_key_12345678901234567890";
+        let correct_hash = hash_api_key_hex(api_key);
+
+        assert!(verify_api_key_hash_precomputed(None, api_key, &correct_hash).is_ok());
+        assert!(verify_api_key_hash_precomputed(None, api_key, "wrong_hash").is_err());
     }
 }
