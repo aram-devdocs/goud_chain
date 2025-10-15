@@ -1,5 +1,18 @@
 # Deploy to Google Cloud Platform Development Environment
 # Triggered manually or on push to main branch (after tests pass)
+#
+# Required GitHub Secrets:
+#   - GCP_PROJECT_ID: GCP project ID
+#   - GCP_SERVICE_ACCOUNT_KEY: Service account JSON key
+#   - SSH_PUBLIC_KEY: SSH public key for VM access
+#   - SSH_PRIVATE_KEY: SSH private key for VM access
+#   - CLOUDFLARE_API_TOKEN: Cloudflare API token (optional, for DNS)
+#   - CLOUDFLARE_ZONE_ID: Cloudflare zone ID (optional, for DNS)
+#   - JWT_SECRET: JWT signing secret (managed by scripts/setup-secrets.sh)
+#   - SESSION_SECRET: Session encryption secret (managed by scripts/setup-secrets.sh)
+#
+# Note: JWT_SECRET and SESSION_SECRET are stored in GCP Secret Manager
+# and fetched by the VM at runtime. GitHub Secrets are used for rotation automation.
 
 name: Deploy Dev
 

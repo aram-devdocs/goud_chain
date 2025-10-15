@@ -11,8 +11,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   # Fast-fail formatting check
@@ -29,45 +27,10 @@ jobs:
       - name: Run cargo fmt
         run: cargo fmt -- --check
 
-  # Shared compilation job - compiles once, used by clippy and test
-  rust-build:
-    name: Rust Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup show
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        continue-on-error: true  # Don't fail if sccache setup fails
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: "build"
-
-      - name: Build all targets
-        run: |
-          # If sccache failed to initialize, unset RUSTC_WRAPPER
-          if ! sccache --version &>/dev/null; then
-            echo "⚠️ sccache unavailable, falling back to direct compilation"
-            unset RUSTC_WRAPPER
-          fi
-          cargo build --all-targets --all-features
-
-      - name: Show sccache stats
-        if: success()
-        run: sccache --show-stats || echo "sccache not available"
-
-  # Parallel linting check - uses build artifacts
+  # Parallel linting check
   rust-clippy:
     name: Rust Clippy
     runs-on: ubuntu-latest
-    needs: [rust-build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,33 +38,18 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        continue-on-error: true
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: "build"
 
       - name: Run cargo clippy
-        run: |
-          if ! sccache --version &>/dev/null; then
-            echo "⚠️ sccache unavailable, falling back to direct compilation"
-            unset RUSTC_WRAPPER
-          fi
-          cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Show sccache stats
-        if: success()
-        run: sccache --show-stats || echo "sccache not available"
-
-  # Parallel test execution - uses build artifacts
+  # Parallel test execution
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
-    needs: [rust-build]
 
     steps:
       - name: Checkout code
@@ -110,15 +58,10 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        continue-on-error: true
-
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: "build"
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -126,16 +69,7 @@ jobs:
           tool: cargo-nextest
 
       - name: Run tests with nextest
-        run: |
-          if ! sccache --version &>/dev/null; then
-            echo "⚠️ sccache unavailable, falling back to direct compilation"
-            unset RUSTC_WRAPPER
-          fi
-          cargo nextest run --all-targets --all-features --verbose
-
-      - name: Show sccache stats
-        if: success()
-        run: sccache --show-stats || echo "sccache not available"
+        run: cargo nextest run --all-targets --all-features --verbose
 
   # Docker build test (multi-arch)
   docker-build:
@@ -184,6 +118,24 @@ jobs:
       - name: Terraform Validate (dev)
         run: terraform validate
         working-directory: ./terraform/environments/dev
+
+  # Cargo audit - dependency vulnerability scan
+  cargo-audit:
+    name: Cargo Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit
 
   # Security scanning
   security-scan:

@@ -202,6 +202,22 @@ Entry Point             → Application startup and orchestration
 
 ### Security Best Practices
 
+**Secret Management:**
+- **Architecture:** JWT/Session secrets stored in GitHub Secrets, injected at Docker build time
+- **Never in Git:** Secrets NEVER committed to repository (use `.gitignore`, GitHub Secrets only)
+- **Scripts for Management:**
+  - `scripts/setup-secrets.sh` - Generate 64-byte secrets, store in GitHub Secrets (one-time setup)
+  - `scripts/rotate-secrets.sh` - Generate new secrets, update GitHub Secrets (manual rotation)
+- **Build-Time Injection:** Secrets passed as Docker build args during GitHub Actions workflow
+- **Storage Location:** GitHub Secrets (JWT_SECRET, SESSION_SECRET) - accessed only by CI/CD
+- **Rotation Workflow:**
+  1. Run `./scripts/rotate-secrets.sh` (updates GitHub Secrets)
+  2. Push to main branch (triggers Docker rebuild with new secrets)
+  3. Redeploy application (pulls new Docker image)
+- **Rotation Impact:** Invalidates all user sessions (users must re-login with API key)
+- **User Data Safety:** User data encrypted with user's API key (NOT JWT/Session secrets), rotation doesn't affect data
+- **Rotation Schedule:** Every 90 days (manual via script, no auto-rotation currently)
+
 **Cryptography:**
 - Never implement custom crypto primitives; use audited crates
 - Use constant-time comparison for sensitive data (API key hashes)

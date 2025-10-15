@@ -19,6 +19,16 @@ cargo test || {
     exit 1
 }
 
+echo "Running cargo audit (security vulnerabilities)..."
+if ! command -v cargo-audit >/dev/null 2>&1; then
+    echo "Installing cargo-audit..."
+    cargo install cargo-audit
+fi
+cargo audit || {
+    echo "Error: Security vulnerabilities found. Run 'cargo audit' for details."
+    exit 1
+}
+
 echo "Building Rust project..."
 cargo build || {
     echo "Error: Build failed."

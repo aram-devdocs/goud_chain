@@ -688,20 +688,37 @@ DNS records will be created automatically:
 - `dev-api.goudchain.com` → VM IP
 - `dev-dashboard.goudchain.com` → VM IP
 
+### Secret Management
+
+Goud Chain uses **JWT and Session secrets** for authentication. Secrets are stored in GitHub Secrets and injected at Docker build time.
+
+**Setup (one-time):**
+```bash
+./scripts/setup-secrets.sh  # Generates secrets, stores in GitHub Secrets
+```
+
+**Rotation (every 90 days):**
+```bash
+./scripts/rotate-secrets.sh  # Updates GitHub Secrets, requires rebuild + redeploy
+```
+
+See [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md) for details.
+
 ### GitHub Actions (CI/CD)
 
 **Setup GitHub Secrets:**
 ```bash
-# Automated (recommended)
-./scripts/setup-secrets.sh
-
-# Or manually
+# Required secrets
 gh secret set GCP_PROJECT_ID
 gh secret set GCP_SERVICE_ACCOUNT_KEY < ~/.gcloud/goud-chain-terraform-key.json
 gh secret set SSH_PUBLIC_KEY < ~/.ssh/goud_chain_rsa.pub
 gh secret set SSH_PRIVATE_KEY < ~/.ssh/goud_chain_rsa
 gh secret set CLOUDFLARE_API_TOKEN  # Optional
 gh secret set CLOUDFLARE_ZONE_ID    # Optional
+
+# JWT/Session secrets (use scripts/setup-secrets.sh)
+gh secret set JWT_SECRET      # Auto-set by setup script
+gh secret set SESSION_SECRET  # Auto-set by setup script
 ```
 
 **Deployment Triggers:**
