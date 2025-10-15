@@ -62,7 +62,12 @@ pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];
 // P2P Network Security
 pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
 pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
-pub const MAX_CONCURRENT_CONNECTIONS: usize = 10;
+pub const MAX_CONCURRENT_CONNECTIONS: usize = 50; // Increased from 10 to handle sync spikes on low-resource VMs
+
+// P2P Connection Timeouts (prevent hung connections)
+pub const P2P_CONNECT_TIMEOUT_SECONDS: u64 = 5;
+pub const P2P_READ_TIMEOUT_SECONDS: u64 = 10;
+pub const P2P_WRITE_TIMEOUT_SECONDS: u64 = 5;
 
 // Rate Limiting - DoS Protection
 // Request limits per API key

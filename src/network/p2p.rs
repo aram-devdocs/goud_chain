@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -8,13 +8,42 @@ use tracing::{error, info, warn};
 
 use crate::constants::{
     CHECKPOINT_INTERVAL, MAX_CONCURRENT_CONNECTIONS, MAX_MESSAGES_PER_MINUTE,
-    MIN_REPUTATION_THRESHOLD, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
+    MIN_REPUTATION_THRESHOLD, P2P_CONNECT_TIMEOUT_SECONDS, P2P_READ_TIMEOUT_SECONDS,
+    P2P_WRITE_TIMEOUT_SECONDS, PEER_SYNC_DELAY_SECONDS, REPUTATION_PENALTY_INVALID_BLOCK,
     REPUTATION_REWARD_VALID_BLOCK,
 };
 use crate::domain::{Block, Blockchain};
 use crate::network::messages::P2PMessage;
 use crate::storage::BlockchainStore;
 use crate::types::{GoudChainError, Result};
+
+/// Connection guard - automatically decrements active connection count on drop
+/// Ensures connections are always released, even on errors or panics
+struct ConnectionGuard {
+    active_connections: Arc<Mutex<usize>>,
+}
+
+impl ConnectionGuard {
+    fn new(active_connections: Arc<Mutex<usize>>) -> Option<Self> {
+        {
+            let mut count = active_connections.lock().unwrap();
+            if *count >= MAX_CONCURRENT_CONNECTIONS {
+                return None; // Connection limit reached
+            }
+            *count += 1;
+        } // Release lock before moving active_connections
+        Some(Self { active_connections })
+    }
+}
+
+impl Drop for ConnectionGuard {
+    fn drop(&mut self) {
+        let mut count = self.active_connections.lock().unwrap();
+        if *count > 0 {
+            *count -= 1;
+        }
+    }
+}
 
 /// Rate limiting tracker for a single peer
 #[derive(Debug, Clone)]
@@ -64,6 +93,8 @@ pub struct P2PNode {
     pub rate_limiters: Arc<Mutex<HashMap<String, RateLimitTracker>>>,
     pub blacklist: Arc<Mutex<Vec<String>>>, // Permanently banned peer addresses
     pub active_connections: Arc<Mutex<usize>>,
+    last_chain_length: Arc<Mutex<usize>>, // Track chain length to detect if sync is needed
+    last_successful_sync: Arc<Mutex<u64>>, // Unix timestamp of last successful sync
 }
 
 impl P2PNode {
@@ -77,6 +108,8 @@ impl P2PNode {
             info!(peers = ?peers, "Configured peers");
         }
 
+        let initial_chain_length = blockchain.lock().unwrap().chain.len();
+
         P2PNode {
             peers: Arc::new(Mutex::new(peers)),
             blockchain,
@@ -85,6 +118,8 @@ impl P2PNode {
             rate_limiters: Arc::new(Mutex::new(HashMap::new())),
             blacklist: Arc::new(Mutex::new(Vec::new())),
             active_connections: Arc::new(Mutex::new(0)),
+            last_chain_length: Arc::new(Mutex::new(initial_chain_length)),
+            last_successful_sync: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -92,10 +127,22 @@ impl P2PNode {
     pub fn broadcast_block(&self, block: &Block) {
         let message = P2PMessage::NewBlock(block.clone());
         let peers = self.peers.lock().unwrap().clone();
+        let active_connections = Arc::clone(&self.active_connections);
 
         for peer in peers {
             let msg = message.clone();
+            let active = Arc::clone(&active_connections);
+
             thread::spawn(move || {
+                // Acquire connection guard for outbound connection
+                let _guard = match ConnectionGuard::new(Arc::clone(&active)) {
+                    Some(guard) => guard,
+                    None => {
+                        warn!(peer = %peer, "Skipped broadcast: max concurrent connections reached");
+                        return;
+                    }
+                };
+
                 if let Err(e) = Self::send_message(&peer, &msg) {
                     warn!(peer = %peer, error = %e, "Failed to broadcast block");
                 } else {
@@ -110,11 +157,23 @@ impl P2PNode {
         let peers = self.peers.lock().unwrap().clone();
         let blockchain = Arc::clone(&self.blockchain);
         let reputation = Arc::clone(&self.peer_reputation);
+        let active_connections = Arc::clone(&self.active_connections);
 
         for peer in peers {
             let bc = Arc::clone(&blockchain);
             let rep = Arc::clone(&reputation);
+            let active = Arc::clone(&active_connections);
+
             thread::spawn(move || {
+                // Acquire connection guard for outbound connection
+                let _guard = match ConnectionGuard::new(Arc::clone(&active)) {
+                    Some(guard) => guard,
+                    None => {
+                        warn!(peer = %peer, "Skipped sync: max concurrent connections reached");
+                        return;
+                    }
+                };
+
                 let message = P2PMessage::RequestChain;
                 match Self::send_and_receive(&peer, &message) {
                     Ok(response) => {
@@ -177,41 +236,28 @@ impl P2PNode {
                             .unwrap_or_default();
 
                         thread::spawn(move || {
-                            // Check blacklist BEFORE incrementing connection counter
+                            // Check blacklist BEFORE acquiring connection guard
                             if bl.lock().unwrap().contains(&peer_addr) {
                                 warn!(peer = %peer_addr, "Rejected blacklisted peer");
                                 return;
                             }
 
-                            // Check and increment connection limit atomically
-                            let should_handle = {
-                                let mut active_count = active.lock().unwrap();
-                                if *active_count >= MAX_CONCURRENT_CONNECTIONS {
+                            // Acquire connection guard (automatically releases on drop)
+                            let _guard = match ConnectionGuard::new(Arc::clone(&active)) {
+                                Some(guard) => guard,
+                                None => {
                                     warn!(peer = %peer_addr, "Rejected: max concurrent connections reached");
-                                    false
-                                } else {
-                                    *active_count += 1;
-                                    true
+                                    return;
                                 }
                             };
 
-                            if !should_handle {
-                                return; // Don't handle, and counter wasn't incremented
-                            }
-
-                            // Connection counter incremented - MUST decrement on ALL exit paths
-                            // Handle connection (rate limiting checked inside)
+                            // Handle connection (guard ensures cleanup on all exit paths)
                             if let Err(e) = Self::handle_connection(
                                 stream, bc, store, rep, limiters, &peer_addr,
                             ) {
                                 warn!(peer = %peer_addr, error = %e, "Connection handling failed");
                             }
-
-                            // Decrement connection count (guaranteed to run)
-                            let mut active_count = active.lock().unwrap();
-                            if *active_count > 0 {
-                                *active_count -= 1;
-                            }
+                            // _guard dropped here, automatically decrements counter
                         });
                     }
                 }
@@ -222,12 +268,58 @@ impl P2PNode {
         );
     }
 
-    /// Start a background sync task that runs continuously
+    /// Start a background sync task with smart sync logic
+    /// Only syncs when chain length changes or after exponential backoff
     pub fn start_sync_task(self: Arc<Self>) {
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_secs(PEER_SYNC_DELAY_SECONDS));
-            info!("Running periodic chain sync with peers");
-            self.request_chain_from_peers();
+        thread::spawn(move || {
+            let mut backoff_multiplier = 1;
+            let base_delay = PEER_SYNC_DELAY_SECONDS;
+
+            loop {
+                thread::sleep(Duration::from_secs(base_delay * backoff_multiplier));
+
+                // Check if chain has grown since last sync (indicates activity)
+                let current_chain_length = self.blockchain.lock().unwrap().chain.len();
+                let last_chain_length = *self.last_chain_length.lock().unwrap();
+
+                // Check time since last successful sync
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                let last_sync = *self.last_successful_sync.lock().unwrap();
+                let seconds_since_sync = now.saturating_sub(last_sync);
+
+                // Smart sync decision:
+                // 1. Chain grew → immediate sync (broadcast may have failed)
+                // 2. No change for 30+ seconds → try sync anyway (could be behind)
+                // 3. Otherwise → backoff (reduce sync frequency)
+                let should_sync = current_chain_length != last_chain_length
+                    || seconds_since_sync >= 30
+                    || last_sync == 0; // First run
+
+                if should_sync {
+                    info!(
+                        chain_length = current_chain_length,
+                        seconds_since_sync = seconds_since_sync,
+                        "Running chain sync with peers"
+                    );
+                    self.request_chain_from_peers();
+
+                    // Reset backoff on activity
+                    if current_chain_length != last_chain_length {
+                        backoff_multiplier = 1;
+                        *self.last_chain_length.lock().unwrap() = current_chain_length;
+                        *self.last_successful_sync.lock().unwrap() = now;
+                    } else {
+                        // Exponential backoff (10s → 20s → 40s → max 60s)
+                        backoff_multiplier = (backoff_multiplier * 2).min(6);
+                    }
+                } else {
+                    // Exponential backoff when no activity (10s → 20s → 40s → max 60s)
+                    backoff_multiplier = (backoff_multiplier * 2).min(6);
+                }
+            }
         });
     }
 
@@ -405,8 +497,34 @@ impl P2PNode {
         let encoded = bincode::serialize(message)
             .map_err(|e| GoudChainError::SerializationError(e.to_string()))?;
 
-        let mut stream = TcpStream::connect(peer)
-            .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
+        // Resolve peer address (handles both DNS names like "node1:9000" and IPs)
+        let addrs: Vec<_> = peer
+            .to_socket_addrs()
+            .map_err(|e| {
+                GoudChainError::PeerConnectionFailed(format!(
+                    "Failed to resolve peer address {}: {}",
+                    peer, e
+                ))
+            })?
+            .collect();
+
+        let first_addr = addrs.first().ok_or_else(|| {
+            GoudChainError::PeerConnectionFailed(format!("No addresses found for peer {}", peer))
+        })?;
+
+        let mut stream = TcpStream::connect_timeout(
+            first_addr,
+            Duration::from_secs(P2P_CONNECT_TIMEOUT_SECONDS),
+        )
+        .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
+
+        // Set read/write timeouts to prevent hung connections
+        stream
+            .set_read_timeout(Some(Duration::from_secs(P2P_READ_TIMEOUT_SECONDS)))
+            .map_err(GoudChainError::IoError)?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(P2P_WRITE_TIMEOUT_SECONDS)))
+            .map_err(GoudChainError::IoError)?;
 
         // Write length-prefixed message: [4 bytes length][N bytes payload]
         let len = encoded.len() as u32;
@@ -425,8 +543,34 @@ impl P2PNode {
         let encoded = bincode::serialize(message)
             .map_err(|e| GoudChainError::SerializationError(e.to_string()))?;
 
-        let mut stream = TcpStream::connect(peer)
-            .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
+        // Resolve peer address (handles both DNS names like "node1:9000" and IPs)
+        let addrs: Vec<_> = peer
+            .to_socket_addrs()
+            .map_err(|e| {
+                GoudChainError::PeerConnectionFailed(format!(
+                    "Failed to resolve peer address {}: {}",
+                    peer, e
+                ))
+            })?
+            .collect();
+
+        let first_addr = addrs.first().ok_or_else(|| {
+            GoudChainError::PeerConnectionFailed(format!("No addresses found for peer {}", peer))
+        })?;
+
+        let mut stream = TcpStream::connect_timeout(
+            first_addr,
+            Duration::from_secs(P2P_CONNECT_TIMEOUT_SECONDS),
+        )
+        .map_err(|e| GoudChainError::PeerConnectionFailed(e.to_string()))?;
+
+        // Set read/write timeouts to prevent hung connections
+        stream
+            .set_read_timeout(Some(Duration::from_secs(P2P_READ_TIMEOUT_SECONDS)))
+            .map_err(GoudChainError::IoError)?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(P2P_WRITE_TIMEOUT_SECONDS)))
+            .map_err(GoudChainError::IoError)?;
 
         // Write length-prefixed message: [4 bytes length][N bytes payload]
         let len = encoded.len() as u32;
