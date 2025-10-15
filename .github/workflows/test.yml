@@ -42,6 +42,7 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.6
+        continue-on-error: true  # Don't fail if sccache setup fails
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -50,10 +51,17 @@ jobs:
           shared-key: "build"
 
       - name: Build all targets
-        run: cargo build --all-targets --all-features
+        run: |
+          # If sccache failed to initialize, unset RUSTC_WRAPPER
+          if ! sccache --version &>/dev/null; then
+            echo "⚠️ sccache unavailable, falling back to direct compilation"
+            unset RUSTC_WRAPPER
+          fi
+          cargo build --all-targets --all-features
 
       - name: Show sccache stats
-        run: sccache --show-stats
+        if: success()
+        run: sccache --show-stats || echo "sccache not available"
 
   # Parallel linting check - uses build artifacts
   rust-clippy:
@@ -69,6 +77,7 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.6
+        continue-on-error: true
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -77,10 +86,16 @@ jobs:
           shared-key: "build"
 
       - name: Run cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          if ! sccache --version &>/dev/null; then
+            echo "⚠️ sccache unavailable, falling back to direct compilation"
+            unset RUSTC_WRAPPER
+          fi
+          cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Show sccache stats
-        run: sccache --show-stats
+        if: success()
+        run: sccache --show-stats || echo "sccache not available"
 
   # Parallel test execution - uses build artifacts
   rust-test:
@@ -97,6 +112,7 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.6
+        continue-on-error: true
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -110,10 +126,16 @@ jobs:
           tool: cargo-nextest
 
       - name: Run tests with nextest
-        run: cargo nextest run --all-targets --all-features --verbose
+        run: |
+          if ! sccache --version &>/dev/null; then
+            echo "⚠️ sccache unavailable, falling back to direct compilation"
+            unset RUSTC_WRAPPER
+          fi
+          cargo nextest run --all-targets --all-features --verbose
 
       - name: Show sccache stats
-        run: sccache --show-stats
+        if: success()
+        run: sccache --show-stats || echo "sccache not available"
 
   # Docker build test (multi-arch)
   docker-build:
