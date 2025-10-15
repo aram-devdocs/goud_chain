@@ -126,12 +126,6 @@ pub struct MessageResponse {
     pub message: String,
 }
 
-/// Generic error response
-#[derive(Debug, Clone, Serialize)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
 // ============ Analytics & Statistics ============
 
 /// Chain statistics response
