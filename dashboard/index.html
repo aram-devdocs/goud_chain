@@ -411,7 +411,7 @@
             </div>
         </section>
 
-        <!-- PHASE 2: Advanced Collections Management -->
+        <!-- Advanced Collections Management -->
         <section x-show="activeTab === 'collections'" class="container mx-auto px-6 py-8">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold">My Encrypted Collections</h2>
@@ -725,7 +725,7 @@
             </div>
         </section>
 
-        <!-- PHASE 5: Analytics Dashboard -->
+        <!-- Analytics Dashboard -->
         <section x-show="activeTab === 'analytics'" class="container mx-auto px-6 py-8">
             <h2 class="text-2xl font-bold mb-6">Analytics & Statistics</h2>
 
@@ -789,8 +789,7 @@
             </div>
         </section>
 
-        <!-- Debug Tools Tab -->
-        <!-- Audit Logs Tab (Phase 4 - Operational Security) -->
+        <!-- Audit Logs Tab -->
         <section x-show="activeTab === 'audit'" class="container mx-auto px-6 py-8">
             <h2 class="text-2xl font-bold mb-6">Audit Logs</h2>
             <p class="text-zinc-500 text-sm mb-6">
@@ -899,7 +898,7 @@
             </div>
         </section>
 
-        <!-- Metrics Tab (Phase 4 - Operational Security) -->
+        <!-- System Metrics Tab -->
         <section x-show="activeTab === 'metrics'" class="container mx-auto px-6 py-8">
             <h2 class="text-2xl font-bold mb-6">System Metrics</h2>
             <p class="text-zinc-500 text-sm mb-6">
@@ -1065,7 +1064,7 @@
                 formFields: [],
                 selectedCollections: [],
 
-                // Audit Logs (Phase 4)
+                // Audit Logs
                 auditLogs: [],
                 auditFilter: {
                     eventType: '',
@@ -1077,24 +1076,24 @@
                 auditTotalPages: 0,
                 isLoadingAudit: false,
 
-                // Metrics (Phase 4)
+                // Metrics
                 metrics: {},
 
-                // WebSocket (Phase 5 - Real-time Updates)
+                // WebSocket - Real-time Updates
                 ws: null,
                 wsConnected: false,
                 wsReconnectAttempts: 0,
                 wsMaxReconnectDelay: 30000,
 
-                // Toast Notifications (Phase 1)
+                // Toast Notifications
                 toasts: [],
                 nextToastId: 1,
 
-                // Activity Feed (Phase 1)
+                // Activity Feed
                 activityFeed: [],
                 maxActivityFeedItems: 50,
 
-                // Audit Log Counter (Phase 5)
+                // Audit Log Counter
                 newAuditLogsCount: 0,
 
                 // Last Updated Timestamps
@@ -1472,7 +1471,7 @@
                     return `${days}d ago`;
                 },
 
-                // Generate request signature (P3-003 - Replay Attack Prevention)
+                // Generate request signature - Replay Attack Prevention
                 // Format: X-Signature: ts={timestamp},nonce={nonce},sig={hex}
                 // Signature = HMAC-SHA256(api_key, timestamp || nonce || SHA256(body))
                 async signRequest(body) {
@@ -1646,7 +1645,7 @@
                         // Prepare request body
                         const body = JSON.stringify(this.form);
 
-                        // Generate request signature (P3-003 - Replay Attack Prevention)
+                        // Generate request signature - Replay Attack Prevention
                         const signature = await this.signRequest(body);
                         console.log('Generated signature:', signature);
 
@@ -1808,7 +1807,7 @@
                     }
                 },
 
-                // ==================== PHASE 3: Blockchain Explorer ====================
+                // ==================== Blockchain Explorer ====================
 
                 async loadChain() {
                     try {
@@ -1897,7 +1896,7 @@
                     return dist;
                 },
 
-                // ==================== PHASE 4: Network Status ====================
+                // ==================== Network Status ====================
 
                 async loadNetworkInfo() {
                     try {
@@ -1920,7 +1919,7 @@
                     }
                 },
 
-                // ==================== PHASE 5: Analytics ====================
+                // ==================== Analytics ====================
 
                 renderCharts() {
                     // Destroy existing charts before creating new ones
@@ -1998,7 +1997,7 @@
                     }
                 },
 
-                // ==================== PHASE 7: Debug Tools ====================
+                // ==================== Debug Tools ====================
 
                 async testEndpoint() {
                     try {
@@ -2035,7 +2034,7 @@ Peers: ${this.networkInfo.peers?.length || 0}
                     this.copyToClipboard(info);
                 },
 
-                // ==================== PHASE 4: Audit Logging & Metrics ====================
+                // ==================== Audit Logging & Metrics ====================
 
                 async fetchAuditLogs() {
                     this.isLoadingAudit = true;

@@ -1,4 +1,4 @@
-/// Integration test for Phase 5 P5-001: Per-User Salts Prevent Cross-Block Correlation
+/// Integration test for per-user salts preventing cross-block correlation
 use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection};
 
@@ -7,7 +7,7 @@ use test_helpers::test_validator_config;
 
 #[test]
 fn test_phase5_per_user_salt_prevents_cross_block_correlation() {
-    println!("\n=== Phase 5 P5-001: Cross-Block Correlation Prevention ===\n");
+    println!("\n=== Cross-Block Correlation Prevention ===\n");
 
     // Simulate an attacker who knows their own API key and can observe the blockchain
     let attacker_api_key = generate_api_key();
@@ -163,14 +163,14 @@ fn test_phase5_per_user_salt_prevents_cross_block_correlation() {
     println!("  ❌ Finds matches by comparing with block's blind_indexes array");
     println!("  ❌ Can identify all blocks containing their collections");
     println!();
-    println!("With per-user salts (Phase 5):");
+    println!("With per-user salts:");
     println!("  ✅ Attacker cannot compute correct blind index (missing user_salt)");
     println!("  ✅ user_salt is stored encrypted in collection envelope");
     println!("  ✅ Attacker must decrypt entire collection to get user_salt");
     println!("  ✅ Zero correlation possible without full decryption");
     println!();
 
-    println!("🎉 Phase 5 P5-001 verification complete!");
+    println!("🎉 Cross-block correlation prevention verification complete!");
     println!("   - Per-user salts prevent cross-block correlation");
     println!("   - Blind indexes are unique per collection");
     println!("   - Attackers cannot track their own data without decryption");

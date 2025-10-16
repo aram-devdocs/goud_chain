@@ -1,4 +1,4 @@
-/// Integration test to verify Phase 5 P5-002: Daily timestamp granularity with jitter
+/// Integration test to verify daily timestamp granularity with jitter
 use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection};
 
@@ -15,7 +15,7 @@ fn test_timestamp_jitter_prevents_pattern_analysis() {
     let signing_key = generate_signing_key();
     let api_key_hash = hash_api_key_hex(&api_key);
 
-    println!("\n=== Phase 5 P5-002: Timestamp Jitter Verification ===\n");
+    println!("\n=== Timestamp Jitter Verification ===\n");
 
     let mut timestamps = Vec::new();
 
@@ -128,7 +128,7 @@ fn test_timestamp_jitter_prevents_pattern_analysis() {
         println!("Block #{}: {} ({} from min)", i + 1, ts, ts - min_ts);
     }
 
-    println!("\n🎉 Phase 5 P5-002 verification complete!");
+    println!("\n🎉 Timestamp jitter verification complete!");
     println!("   - Daily granularity hides exact timing and timezone");
     println!("   - Random jitter (±4 hours) prevents pattern analysis");
     println!("   - Bulk submissions appear as separate time periods");
@@ -141,7 +141,7 @@ fn test_timestamp_granularity_is_daily() {
     // Verify that granularity is set to 1 day (86400 seconds)
     assert_eq!(
         TIMESTAMP_GRANULARITY_SECONDS, 86400,
-        "Timestamp granularity should be 1 day (86400 seconds) for Phase 5"
+        "Timestamp granularity should be 1 day (86400 seconds)"
     );
 
     println!("✅ Timestamp granularity confirmed: 1 day (86400 seconds)");
@@ -154,7 +154,7 @@ fn test_timestamp_jitter_constant() {
     // Verify that jitter is set to ±4 hours (14400 seconds)
     assert_eq!(
         TIMESTAMP_JITTER_SECONDS, 14400,
-        "Timestamp jitter should be ±4 hours (14400 seconds) for Phase 5"
+        "Timestamp jitter should be ±4 hours (14400 seconds)"
     );
 
     println!("✅ Timestamp jitter confirmed: ±4 hours (14400 seconds)");

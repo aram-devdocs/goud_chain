@@ -140,7 +140,7 @@ http {
 
 {{ACCOUNT_OPERATIONS_ROUTING}}
 
-        # AUDIT API - Authenticated read operations (Phase 4 - Operational Security)
+        # AUDIT API - Authenticated read operations (Operational Security)
         # Query audit logs for authenticated user
         location /api/audit {
             # Handle CORS preflight (OPTIONS) requests
@@ -177,7 +177,7 @@ http {
             add_header Cache-Control "private, no-store, no-cache, must-revalidate" always;
         }
 
-        # Public metrics endpoint (Phase 4 - Operational Security)
+        # Public metrics endpoint (Operational Security)
         # Provides dashboard-friendly metrics with CORS support
         location /api/metrics {
             # Handle CORS preflight (OPTIONS) requests
