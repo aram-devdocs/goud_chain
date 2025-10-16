@@ -263,7 +263,7 @@ mod tests {
 
         // Verify cache contains the nonce
         let cache = store.cache.lock().unwrap();
-        assert!(cache.len() > 0);
+        assert!(!cache.is_empty());
     }
 
     #[test]
