@@ -191,6 +191,21 @@ src/api/
 
 # AI Coding Standards
 
+## Quality Control Rules
+
+**Mandatory Requirements:**
+- NEVER use `--no-verify` flag - all commits MUST pass tests
+- NO unused code - delete legacy/dead code immediately
+- NO `#[allow(dead_code)]` annotations - fix or remove
+- ALL pre-commit hooks MUST pass before committing
+- Code must compile with `cargo clippy -- -D warnings` (zero tolerance)
+
+**Code Hygiene:**
+- Remove commented-out code blocks
+- Delete unused imports and dependencies
+- Clean up test/debug code before committing
+- No placeholder or TODO comments in production code
+
 ## Communication Protocol
 
 Prohibited: emojis, AI filler phrases, legacy code references, speculative features, conversational error messages.

@@ -169,6 +169,7 @@ async fn main() {
         .nest("/account", api::routes::account::router())
         .nest("/data", api::routes::data::router())
         .nest("/api/audit", api::routes::audit::router())
+        .nest("/test", api::routes::test::router())
         .merge(api::routes::health::router())
         .merge(api::routes::metrics::router())
         // Shared state via Extension middleware

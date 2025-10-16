@@ -27,7 +27,6 @@ const NONCE_CACHE_SIZE: usize = 100_000;
 /// In-memory nonce cache entry
 #[derive(Debug, Clone)]
 struct NonceEntry {
-    #[allow(dead_code)] // Used for cache validation
     expiry_timestamp: i64,
 }
 
@@ -54,7 +53,6 @@ impl NonceStore {
     }
 
     /// Check if a nonce has been used (and is still valid)
-    #[allow(dead_code)] // Used by SignedRequest validation (not yet integrated into endpoints)
     pub fn is_nonce_used(&self, nonce: &str) -> Result<bool> {
         let now = Utc::now().timestamp();
 
@@ -110,7 +108,6 @@ impl NonceStore {
     }
 
     /// Record a nonce as used (with expiration)
-    #[allow(dead_code)] // Used by SignedRequest validation (not yet integrated into endpoints)
     pub fn record_nonce(&self, nonce: &str) -> Result<()> {
         let now = Utc::now().timestamp();
         let expiry_timestamp = now + NONCE_EXPIRATION_SECONDS;
@@ -171,13 +168,6 @@ impl NonceStore {
         }
 
         Ok(deleted_count)
-    }
-
-    /// Get cache statistics
-    #[allow(dead_code)]
-    pub fn cache_stats(&self) -> (usize, usize) {
-        let cache = self.cache.lock().unwrap();
-        (cache.len(), NONCE_CACHE_SIZE)
     }
 }
 
@@ -272,8 +262,8 @@ mod tests {
         assert!(store.is_nonce_used(nonce).unwrap());
 
         // Verify cache contains the nonce
-        let (cache_size, _) = store.cache_stats();
-        assert!(cache_size > 0);
+        let cache = store.cache.lock().unwrap();
+        assert!(cache.len() > 0);
     }
 
     #[test]
