@@ -99,6 +99,9 @@ pub enum GoudChainError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    #[error("Authentication failed")]
+    AuthenticationFailed, // Generic error for all auth failures (prevents info leakage)
+
     // Rate limiting errors - DoS Protection
     #[error(
         "Rate limit exceeded: {retry_after} seconds until reset (violation #{violation_count})"
@@ -172,6 +175,7 @@ impl GoudChainError {
             | Self::InvalidJson(_)
             | Self::JsonTooDeep { .. } => 400,
             Self::Unauthorized(_)
+            | Self::AuthenticationFailed
             | Self::DecryptionFailed
             | Self::InvalidRequestSignature(_)
             | Self::NonceReused

@@ -5,6 +5,7 @@ pub mod hkdf;
 pub mod key_cache;
 pub mod mac;
 pub mod signature;
+pub mod timing_safe;
 
 // Re-export commonly used functions
 pub use api_key::{decode_api_key, encode_api_key, generate_api_key, validate_api_key};
@@ -16,3 +17,4 @@ pub use hkdf::{
 pub use key_cache::global_key_cache;
 pub use mac::{compute_mac, verify_mac};
 pub use signature::{generate_signing_key, get_public_key_hex, sign_message, verify_signature};
+pub use timing_safe::{dummy_constant_time_compare, dummy_hash_for_timing};

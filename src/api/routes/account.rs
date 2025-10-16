@@ -353,79 +353,86 @@ async fn login(
 ) -> Result<Json<LoginResponse>> {
     let audit_logger = &state.audit_logger;
 
-    // Decode API key
-    match crate::crypto::decode_api_key(&request.api_key) {
-        Ok(api_key) => {
-            // Hash API key ONCE (expensive: 100k iterations)
-            let api_key_hash_hex = hash_api_key_hex(&api_key);
-
-            // Find account
-            let blockchain_guard = blockchain.read().await;
-            match blockchain_guard.find_account_with_hash(&api_key, Some(api_key_hash_hex.clone()))
-            {
-                Some(account) => {
-                    // Verify API key hash matches (constant-time comparison)
-                    match crate::api::auth::verify_api_key_hash_precomputed(
-                        Some(&api_key_hash_hex),
-                        &api_key,
-                        &account.api_key_hash,
-                    ) {
-                        Ok(_) => {
-                            // Generate session token with encrypted API key
-                            let api_key_hash = api_key_hash_hex;
-                            match crate::api::auth::generate_session_token(
-                                account.account_id.clone(),
-                                &api_key,
-                                api_key_hash,
-                                &config,
-                            ) {
-                                Ok(token) => {
-                                    let response = LoginResponse {
-                                        session_token: token,
-                                        expires_in: SESSION_EXPIRY_SECONDS,
-                                        account_id: account.account_id.clone(),
-                                    };
-
-                                    // Drop blockchain lock before audit logging
-                                    drop(blockchain_guard);
-
-                                    // Audit log: Account login
-                                    let client_ip = extract_client_ip(&headers);
-                                    if let Err(e) = audit_logger.log(
-                                        &api_key,
-                                        AuditEventType::AccountLogin,
-                                        None,
-                                        &client_ip,
-                                        serde_json::json!({"account_id": account.account_id}),
-                                    ) {
-                                        error!(error = %e, "Failed to log login audit event");
-                                    }
-
-                                    info!("User logged in");
-                                    Ok(Json(response))
-                                }
-                                Err(e) => {
-                                    error!(error = %e, "Failed to generate token");
-                                    Err(e)
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            info!("Invalid API key attempt");
-                            Err(e)
-                        }
-                    }
-                }
-                None => {
-                    info!("Account not found");
-                    Err(GoudChainError::Unauthorized(
-                        "Account not found".to_string(),
-                    ))
-                }
-            }
+    // Decode API key (fast operation, minimal timing leak)
+    let api_key = match crate::crypto::decode_api_key(&request.api_key) {
+        Ok(key) => key,
+        Err(_) => {
+            // Still perform expensive hash on dummy data for timing consistency
+            crate::crypto::dummy_hash_for_timing(b"invalid_api_key_format_dummy_32b");
+            crate::crypto::dummy_constant_time_compare();
+            return Err(GoudChainError::AuthenticationFailed);
         }
-        Err(_) => Err(GoudChainError::Unauthorized(
-            "Invalid API key format".to_string(),
-        )),
+    };
+
+    // ALWAYS hash API key (expensive: 100k iterations) - prevents timing leak
+    let api_key_hash_hex = hash_api_key_hex(&api_key);
+
+    // Find account
+    let blockchain_guard = blockchain.read().await;
+    let account_option =
+        blockchain_guard.find_account_with_hash(&api_key, Some(api_key_hash_hex.clone()));
+
+    // Always perform constant-time comparison (even if account doesn't exist)
+    let auth_success = match &account_option {
+        Some(account) => {
+            // Real comparison against stored hash
+            crate::api::auth::verify_api_key_hash_precomputed(
+                Some(&api_key_hash_hex),
+                &api_key,
+                &account.api_key_hash,
+            )
+            .is_ok()
+        }
+        None => {
+            // Dummy comparison to maintain timing (always returns false)
+            crate::crypto::dummy_constant_time_compare();
+            false
+        }
+    };
+
+    if !auth_success {
+        drop(blockchain_guard);
+        info!("Authentication failed");
+        return Err(GoudChainError::AuthenticationFailed); // Generic error
+    }
+
+    // Authentication succeeded - proceed with token generation
+    let account = account_option.unwrap(); // Safe: verified auth_success
+    let api_key_hash = api_key_hash_hex;
+
+    match crate::api::auth::generate_session_token(
+        account.account_id.clone(),
+        &api_key,
+        api_key_hash,
+        &config,
+    ) {
+        Ok(token) => {
+            let response = LoginResponse {
+                session_token: token,
+                expires_in: SESSION_EXPIRY_SECONDS,
+                account_id: account.account_id.clone(),
+            };
+
+            drop(blockchain_guard);
+
+            // Audit log: Account login
+            let client_ip = extract_client_ip(&headers);
+            if let Err(e) = audit_logger.log(
+                &api_key,
+                AuditEventType::AccountLogin,
+                None,
+                &client_ip,
+                serde_json::json!({"account_id": account.account_id}),
+            ) {
+                error!(error = %e, "Failed to log login audit event");
+            }
+
+            info!("User logged in");
+            Ok(Json(response))
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to generate token");
+            Err(e)
+        }
     }
 }
