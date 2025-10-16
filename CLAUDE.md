@@ -109,6 +109,34 @@ Proof-of-concept priorities: Clarity over cleverness, simplicity over features, 
 
 Template-based system eliminates duplication and prevents environment drift. Base constants with environment-specific overrides, variable substitution in templates, pre-commit hook auto-regeneration. Never edit generated nginx/docker-compose files directly (marked with warnings). Single source of truth prevents configuration sprawl and merge conflicts.
 
+## Issue and PR Templates
+
+Professional templates enforce structured, architecture-focused documentation for Linear issues, GitHub issues, and pull requests. Templates are located in `.claude/templates/` and `.github/` directories.
+
+**Linear Templates:**
+- `.claude/templates/linear/issue-template.md` - Issue format with architecture layers, testing strategy, acceptance criteria
+- `.claude/templates/linear/project-template.md` - Project format with work breakdown, risk assessment, success metrics
+- Templates integrated into `.claude/agents/linear-ticket-scoper.md` for automated enforcement
+
+**GitHub Templates:**
+- `.github/ISSUE_TEMPLATE/bug_report.md` - Bug reports with environment, reproduction, impact analysis
+- `.github/ISSUE_TEMPLATE/feature_request.md` - Feature requests with technical considerations, integration points
+- `.github/ISSUE_TEMPLATE/performance.md` - Performance issues with profiling data, hot path analysis
+- `.github/ISSUE_TEMPLATE/security.md` - Security vulnerabilities with severity classification, remediation strategy
+- `.github/PULL_REQUEST_TEMPLATE.md` - PR format with testing performed, code quality checks, deployment considerations
+
+**Git Commit Conventions:**
+- `.claude/templates/git/commit-message-guide.md` - Commit message standards, format rules, examples
+- `.claude/templates/git/commit-types.md` - Type taxonomy (feat, fix, refactor, perf, test, docs, chore, security, style, ci, build, revert)
+
+**Template Principles:**
+- Architecture-focused: Reference 6-layer system, not specific files
+- System-aware: Account for blockchain/PoA, cryptography, RocksDB, infrastructure
+- Professional tone: No emojis, no filler, technical precision
+- Enforcement: GitHub templates via UI, Linear templates via agent, git commits via optional hook
+
+See `.claude/templates/README.md` for comprehensive template documentation.
+
 ## Operational Security & Observability
 
 **Audit Logging:** Blockchain-native storage (encrypted collections), privacy-preserving (per-user encryption, IP hashing), batched for efficiency (10s or 50 events), immutable and tamper-proof, non-blocking (fail-open design). Events: account creation/login, data submit/decrypt/list. Query performance: O(n) scan with pagination.
@@ -174,6 +202,47 @@ Examples:
 - Correct: "Add feature X. Implements Y protocol for Z use case."
 - Incorrect: "Oops! Something went wrong."
 - Correct: "Request failed: Invalid authentication token"
+
+## Git Commit Standards
+
+Follow conventions in `.claude/templates/git/commit-message-guide.md`:
+
+**Format:**
+```
+<type>: <subject>
+
+<body>
+```
+
+**Types:** feat, fix, refactor, perf, test, docs, chore, security, style, ci, build, revert
+
+**Subject Rules:**
+- Start with lowercase (except proper nouns)
+- Maximum 72 characters
+- No period at end
+- Imperative mood: "add" not "added", "fix" not "fixed"
+
+**Body Rules (optional):**
+- Separate from subject with blank line
+- Wrap at 72 characters
+- Explain what and why, not how
+- Use bullet points for multiple changes
+- Include breaking changes, migration steps, notable impacts
+
+**Examples:**
+```
+feat: implement blind index queries for encrypted collections
+
+- Add HMAC-based searchable encryption using per-user and per-block salts
+- Enable O(n) collection lookups without exposing API key hashes
+- Prevent cross-block correlation attacks
+```
+
+```
+fix: resolve P2P deadlock during chain synchronization
+```
+
+See `.claude/templates/git/commit-types.md` for detailed type taxonomy and decision tree.
 
 ## Visual Design
 
