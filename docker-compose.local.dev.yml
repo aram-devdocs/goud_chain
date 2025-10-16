@@ -1,4 +1,6 @@
 # Development override for hot reload
+# SPACE OPTIMIZATION: Shares target/ and cargo cache across all nodes via bind mounts
+# This eliminates 3x duplication (saves ~15GB) while maintaining hot reload functionality
 services:
   dashboard:
     build:
@@ -17,8 +19,8 @@ services:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
       - ./Cargo.lock:/app/Cargo.lock
-      - node1_cargo_cache:/usr/local/cargo/registry
-      - node1_target_cache:/app/target
+      - shared_cargo_cache:/usr/local/cargo/registry
+      - ./target:/app/target
 
   node2:
     build:
@@ -28,8 +30,8 @@ services:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
       - ./Cargo.lock:/app/Cargo.lock
-      - node2_cargo_cache:/usr/local/cargo/registry
-      - node2_target_cache:/app/target
+      - shared_cargo_cache:/usr/local/cargo/registry
+      - ./target:/app/target
 
   node3:
     build:
@@ -39,8 +41,8 @@ services:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
       - ./Cargo.lock:/app/Cargo.lock
-      - node3_cargo_cache:/usr/local/cargo/registry
-      - node3_target_cache:/app/target
+      - shared_cargo_cache:/usr/local/cargo/registry
+      - ./target:/app/target
 
   jupyter:
     volumes:
@@ -48,9 +50,4 @@ services:
       - ./python/notebooks:/home/jovyan/work/notebooks:rw
 
 volumes:
-  node1_cargo_cache:
-  node1_target_cache:
-  node2_cargo_cache:
-  node2_target_cache:
-  node3_cargo_cache:
-  node3_target_cache:
+  shared_cargo_cache:

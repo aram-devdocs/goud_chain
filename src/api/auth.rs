@@ -9,17 +9,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::constants::{NONCE_SIZE_BYTES, SESSION_EXPIRY_SECONDS};
-use crate::crypto::{constant_time_compare_bytes, decode_api_key, hash_api_key, validate_api_key};
+use crate::crypto::{
+    constant_time_compare_bytes, decode_api_key, derive_session_encryption_key, hash_api_key,
+    validate_api_key,
+};
 use crate::types::{GoudChainError, Result};
 
 /// Encrypt API key with session secret for storage in JWT
 fn encrypt_api_key_for_jwt(api_key: &[u8], config: &Config) -> Result<String> {
     let session_secret = &config.session_secret;
 
-    // Derive a 32-byte key from session secret (handle variable length secrets)
-    let mut key_bytes = [0u8; 32];
-    let len = session_secret.len().min(32);
-    key_bytes[..len].copy_from_slice(&session_secret[..len]);
+    // Derive AES-256 key from session secret using HKDF (domain separation)
+    let key_bytes = derive_session_encryption_key(session_secret);
 
     let cipher = Aes256Gcm::new(&key_bytes.into());
 
@@ -42,10 +43,8 @@ fn encrypt_api_key_for_jwt(api_key: &[u8], config: &Config) -> Result<String> {
 pub fn decrypt_api_key_from_jwt(encrypted_api_key: &str, config: &Config) -> Result<Vec<u8>> {
     let session_secret = &config.session_secret;
 
-    // Derive a 32-byte key from session secret (handle variable length secrets)
-    let mut key_bytes = [0u8; 32];
-    let len = session_secret.len().min(32);
-    key_bytes[..len].copy_from_slice(&session_secret[..len]);
+    // Derive AES-256 key from session secret using HKDF (domain separation)
+    let key_bytes = derive_session_encryption_key(session_secret);
 
     let cipher = Aes256Gcm::new(&key_bytes.into());
 
@@ -290,5 +289,58 @@ mod tests {
 
         assert!(verify_api_key_hash_precomputed(None, api_key, &correct_hash).is_ok());
         assert!(verify_api_key_hash_precomputed(None, api_key, "wrong_hash").is_err());
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip_with_hkdf() {
+        let config = test_config();
+        let api_key = b"test_api_key_32_bytes_exactly_ok";
+
+        let encrypted = encrypt_api_key_for_jwt(api_key, &config).unwrap();
+        let decrypted = decrypt_api_key_from_jwt(&encrypted, &config).unwrap();
+
+        assert_eq!(
+            decrypted, api_key,
+            "Roundtrip encryption/decryption must preserve API key"
+        );
+    }
+
+    #[test]
+    fn test_different_session_secrets_produce_different_ciphertexts() {
+        let api_key = b"test_api_key_32_bytes_exactly_ok";
+
+        let config1 = test_config();
+        let mut config2 = config1.clone();
+        config2.session_secret = b"different_session_secret_32bytes".to_vec();
+
+        let encrypted1 = encrypt_api_key_for_jwt(api_key, &config1).unwrap();
+        let encrypted2 = encrypt_api_key_for_jwt(api_key, &config2).unwrap();
+
+        assert_ne!(
+            encrypted1, encrypted2,
+            "Different session secrets must produce different ciphertexts"
+        );
+
+        assert!(decrypt_api_key_from_jwt(&encrypted1, &config1).is_ok());
+        assert!(decrypt_api_key_from_jwt(&encrypted2, &config2).is_ok());
+        assert!(decrypt_api_key_from_jwt(&encrypted1, &config2).is_err());
+        assert!(decrypt_api_key_from_jwt(&encrypted2, &config1).is_err());
+    }
+
+    #[test]
+    fn test_session_secret_rotation_invalidates_tokens() {
+        let config_old = test_config();
+        let api_key = b"test_api_key_32_bytes_exactly_ok";
+
+        let encrypted = encrypt_api_key_for_jwt(api_key, &config_old).unwrap();
+
+        let mut config_new = config_old.clone();
+        config_new.session_secret = b"rotated_session_secret_32bytes!".to_vec();
+
+        let result = decrypt_api_key_from_jwt(&encrypted, &config_new);
+        assert!(
+            result.is_err(),
+            "Token encrypted with old secret must fail after rotation"
+        );
     }
 }

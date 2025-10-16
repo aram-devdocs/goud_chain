@@ -32,6 +32,9 @@ pub const HKDF_FAST_ITERATIONS: u32 = 1_000;
 pub const HKDF_CONTEXT_ENCRYPTION: &[u8] = b"goud_chain_encryption_v2";
 pub const HKDF_CONTEXT_MAC: &[u8] = b"goud_chain_mac_v2";
 
+// Session secret contexts (for JWT token encryption)
+pub const HKDF_CONTEXT_SESSION_ENCRYPTION: &[u8] = b"goud_chain_session_aes_v1";
+
 // JWT/Session
 pub const SESSION_EXPIRY_SECONDS: i64 = 3600; // 1 hour
 

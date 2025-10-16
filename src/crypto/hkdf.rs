@@ -3,7 +3,7 @@ use subtle::ConstantTimeEq;
 
 use crate::constants::{
     AES_KEY_SIZE_BYTES, ENCRYPTION_SALT, HKDF_CONTEXT_ENCRYPTION, HKDF_CONTEXT_MAC,
-    HKDF_FAST_ITERATIONS, HKDF_ITERATIONS,
+    HKDF_CONTEXT_SESSION_ENCRYPTION, HKDF_FAST_ITERATIONS, HKDF_ITERATIONS,
 };
 
 /// HKDF-Extract: Extract a pseudorandom key from input keying material
@@ -81,6 +81,24 @@ pub fn derive_encryption_key(api_key: &[u8], salt: &[u8]) -> [u8; AES_KEY_SIZE_B
 /// See derive_encryption_key() documentation for security rationale.
 pub fn derive_mac_key(api_key: &[u8], salt: &[u8]) -> [u8; AES_KEY_SIZE_BYTES] {
     hkdf_with_iterations(api_key, salt, HKDF_CONTEXT_MAC, HKDF_FAST_ITERATIONS)
+}
+
+/// Derive an AES-256 key from SESSION_SECRET for encrypting API keys in JWT tokens
+///
+/// **Security Note:** This function uses 1,000 iterations for performance.
+/// Session secret is already cryptographically random (generated via openssl rand),
+/// so we only need domain separation, not brute-force resistance.
+///
+/// **Purpose:** Prevents cross-context attacks where SESSION_SECRET is used for
+/// both JWT signing (via jsonwebtoken crate) and AES encryption (via aes-gcm crate).
+/// HKDF ensures the two derived keys are independent.
+pub fn derive_session_encryption_key(session_secret: &[u8]) -> [u8; AES_KEY_SIZE_BYTES] {
+    hkdf_with_iterations(
+        session_secret,
+        ENCRYPTION_SALT,
+        HKDF_CONTEXT_SESSION_ENCRYPTION,
+        HKDF_FAST_ITERATIONS,
+    )
 }
 
 /// Hash an API key for storage and comparison (SLOW - 100k iterations)
@@ -202,5 +220,53 @@ mod tests {
             !constant_time_compare_bytes(&hash1, &hash3),
             "Different API keys should produce different hashes"
         );
+    }
+
+    #[test]
+    fn test_session_key_derivation_deterministic() {
+        let session_secret = b"test_session_secret_32_bytes_min";
+
+        let key1 = derive_session_encryption_key(session_secret);
+        let key2 = derive_session_encryption_key(session_secret);
+
+        assert_eq!(key1, key2, "Session key derivation must be deterministic");
+        assert_eq!(key1.len(), 32, "Must produce 32-byte key for AES-256");
+    }
+
+    #[test]
+    fn test_session_key_different_from_api_key() {
+        let secret = b"shared_secret_material_32_bytes";
+
+        let session_key = derive_session_encryption_key(secret);
+        let api_enc_key = derive_encryption_key(secret, ENCRYPTION_SALT);
+        let api_mac_key = derive_mac_key(secret, ENCRYPTION_SALT);
+
+        assert_ne!(
+            session_key, api_enc_key,
+            "Session and API encryption keys must differ"
+        );
+        assert_ne!(
+            session_key, api_mac_key,
+            "Session and API MAC keys must differ"
+        );
+    }
+
+    #[test]
+    fn test_session_key_handles_variable_length_secrets() {
+        let short_secret = b"short";
+        let medium_secret = b"medium_length_secret_here";
+        let long_secret = b"this_is_a_very_long_secret_that_exceeds_32_bytes_significantly";
+
+        let key1 = derive_session_encryption_key(short_secret);
+        let key2 = derive_session_encryption_key(medium_secret);
+        let key3 = derive_session_encryption_key(long_secret);
+
+        assert_eq!(key1.len(), 32);
+        assert_eq!(key2.len(), 32);
+        assert_eq!(key3.len(), 32);
+
+        assert_ne!(key1, key2);
+        assert_ne!(key2, key3);
+        assert_ne!(key1, key3);
     }
 }
