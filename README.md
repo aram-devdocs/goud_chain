@@ -341,6 +341,22 @@ RATE_LIMIT_BYPASS_KEYS=api_key_1,api_key_2,api_key_3
 
 See [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) for comprehensive testing strategy including isolated environment setup to avoid self-banning during development.
 
+## API Documentation
+
+**Interactive API Documentation:** [http://localhost:8080/rapidoc](http://localhost:8080/rapidoc) (local) or [https://dev-api.goudchain.com/rapidoc](https://dev-api.goudchain.com/rapidoc) (production)
+
+Goud Chain provides comprehensive OpenAPI 3.1 documentation with interactive testing via RapiDoc UI:
+
+- **Auto-generated schemas** - All request/response types derived from Rust code (single source of truth)
+- **Live testing** - Try API endpoints directly from the browser
+- **Authentication support** - Test with API keys and JWT session tokens
+- **WebSocket documentation** - Real-time event streaming guide
+- **Example requests** - Copy-paste ready curl commands
+
+**OpenAPI Specification:** [http://localhost:8080/api-docs/openapi.json](http://localhost:8080/api-docs/openapi.json)
+
+Compatible with Swagger UI, Postman, OpenAPI Generator, and other OpenAPI 3.1 tools. Use the JSON spec to generate client SDKs for any language.
+
 ## API Reference
 
 ### Create Account
@@ -625,11 +641,19 @@ goud_chain/
 │   │   ├── user_account.rs         # User account model
 │   │   └── encrypted_collection.rs # Encrypted data collection
 │   ├── api/
-│   │   ├── handlers.rs             # Main router
-│   │   ├── account_handlers.rs     # Account creation & login
-│   │   ├── data_handlers.rs        # Data submission & retrieval
+│   │   ├── mod.rs                  # OpenAPI documentation definition
+│   │   ├── handlers.rs             # Legacy handlers (kept for reference)
+│   │   ├── routes/                 # OpenAPI route modules (organized by domain)
+│   │   │   ├── account.rs          # Account creation & login endpoints
+│   │   │   ├── data.rs             # Data submission & retrieval endpoints
+│   │   │   ├── health.rs           # Health check & blockchain status endpoints
+│   │   │   ├── metrics.rs          # System metrics & statistics endpoints
+│   │   │   └── audit.rs            # Audit log query endpoint
+│   │   ├── schemas.rs              # OpenAPI request/response schemas (single source of truth)
 │   │   ├── auth.rs                 # JWT authentication middleware
-│   │   └── middleware.rs           # CORS & request handling
+│   │   ├── rate_limiter.rs         # Rate limiting & DoS protection
+│   │   ├── websocket.rs            # WebSocket real-time event streaming
+│   │   └── internal_client.rs      # Inter-node HTTP client
 │   ├── p2p/
 │   │   └── mod.rs                  # Peer-to-peer networking & validator selection
 │   ├── storage/
@@ -707,6 +731,7 @@ goud_chain/
 - **Base64** - API key encoding (base64)
 - **JSON** - Serialization (serde_json)
 - **HTTP** - Async API server (axum + tokio)
+- **OpenAPI 3.1** - Auto-generated API documentation (utoipa + utoipa-axum)
 - **subtle** - Constant-time comparisons (timing attack prevention)
 - **zeroize** - Automatic memory clearing for sensitive data
 - **lru** - LRU cache with TTL for key derivation optimization

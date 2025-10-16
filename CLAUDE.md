@@ -61,6 +61,7 @@ Strict 6-layer unidirectional dependency hierarchy enforces separation of concer
 - Template-based configuration prevents environment drift (pre-commit hook enforces regeneration)
 - Atomic blockchain state changes (add block + clear pending data together)
 - Module dependency graph auto-generates on commit (visual architecture validation)
+- OpenAPI documentation auto-generated from Rust types (single source of truth, compile-time validation)
 
 ### Blockchain-Specific Principles
 
@@ -115,6 +116,50 @@ Template-based system eliminates duplication and prevents environment drift. Bas
 **System Metrics:** Real-time monitoring via API endpoint. Metrics: chain statistics (length, latest block), network health (peer count), performance (cache hit rates, operations total). Prometheus-compatible for Grafana dashboards.
 
 **WebSocket Real-time Updates:** Bidirectional communication for live event streaming. Event types: blockchain updates, collection creation, peer changes, audit logs, metrics. Sticky session routing via nginx hash-based load balancing. Client auto-reconnect with exponential backoff, graceful degradation to polling.
+
+## API Documentation Architecture
+
+**OpenAPI 3.1 Integration:** Type-safe, auto-generated API documentation using utoipa and utoipa-axum crates.
+
+**Design Principles:**
+- **Single Source of Truth:** API schemas derive directly from Rust types via `#[derive(ToSchema)]`
+- **Compile-time Validation:** Invalid schemas cause build failures (impossible to deploy broken docs)
+- **Route Organization:** Domain-driven modules (account, data, health, metrics, audit) for clean separation
+- **Type Safety:** `OpenApiRouter` enforces schema consistency between handlers and documentation
+- **Zero Runtime Overhead:** All OpenAPI generation happens at compile time
+
+**Documentation Stack:**
+- **utoipa 5.4** - Rust → OpenAPI schema derivation with procedural macros
+- **utoipa-axum 0.2** - Axum framework integration with `routes!()` macro
+- **RapiDoc UI** - Embedded documentation viewer (CDN-hosted, zero build dependencies)
+- **OpenAPI JSON** - Standard spec export for SDK generation and tooling integration
+
+**Route Architecture:**
+```
+src/api/
+├── mod.rs           # OpenAPI info, servers, security schemes, tags
+├── schemas.rs       # All request/response types with ToSchema derives
+└── routes/          # Domain-organized route modules
+    ├── account.rs   # POST /account/create, /account/login
+    ├── data.rs      # POST /data/submit, GET /data/list, POST /data/decrypt/{id}
+    ├── health.rs    # GET /health, /chain, /peers, /sync, /validator/current
+    ├── metrics.rs   # GET /stats, /metrics, /metrics/prometheus
+    └── audit.rs     # GET /api/audit (with query filters)
+```
+
+**Documentation Standards:**
+- All endpoints have example requests/responses with realistic data
+- Security requirements explicitly defined per endpoint (api_key vs bearer_token)
+- Rate limit headers documented in response specifications
+- WebSocket protocol documented in API info description
+- Session token expiry: 1 hour (constants.rs enforces consistency)
+- Server URLs environment-aware (localhost:8080-8083 for local, production URLs for GCP)
+
+**Adding New Endpoints:**
+1. Define request/response types in `schemas.rs` with `#[derive(ToSchema)]`
+2. Create handler function with `#[utoipa::path]` annotation
+3. Add to appropriate route module with `routes!(handler_name)`
+4. Documentation automatically updates on next build
 
 # AI Coding Standards
 

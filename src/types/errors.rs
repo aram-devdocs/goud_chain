@@ -1,3 +1,9 @@
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response as AxumResponse},
+    Json,
+};
+use serde::Serialize;
 use thiserror::Error;
 
 /// All possible errors in the Goud Chain system
@@ -185,5 +191,23 @@ impl GoudChainError {
             | Self::IpAddressBanned { .. } => 429,
             _ => 500,
         }
+    }
+}
+
+/// Error response wrapper for axum
+#[derive(Serialize)]
+struct ApiError {
+    error: String,
+}
+
+/// Implement IntoResponse for GoudChainError to return HTTP responses
+impl IntoResponse for GoudChainError {
+    fn into_response(self) -> AxumResponse {
+        let status =
+            StatusCode::from_u16(self.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let body = Json(ApiError {
+            error: self.to_string(),
+        });
+        (status, body).into_response()
     }
 }

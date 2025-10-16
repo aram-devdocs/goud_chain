@@ -338,7 +338,7 @@ async fn handle_socket(
                 }
             };
 
-            if sender.send(Message::Text(json)).await.is_err() {
+            if sender.send(Message::Text(json.into())).await.is_err() {
                 error!(
                     connection_id = %connection_id_clone,
                     "Failed to send message, connection likely closed"

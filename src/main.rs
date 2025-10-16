@@ -8,14 +8,17 @@ mod storage;
 mod types;
 
 use axum::{
-    routing::{get, post},
-    Extension, Router,
+    response::{Html, IntoResponse},
+    routing::get,
+    Extension, Json, Router,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info};
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
 
-use api::{RateLimiter, WebSocketBroadcaster};
+use api::{ApiDoc, RateLimiter, WebSocketBroadcaster};
 use config::Config;
 use domain::Block;
 use network::P2PNode;
@@ -128,76 +131,105 @@ async fn main() {
     info!("Audit logger initialized with background flush task and real-time WebSocket updates");
 
     // Create shared state for handlers
-    let submit_data_state = api::handlers::SubmitDataState {
+    let submit_data_state = api::schemas::SubmitDataState {
         audit_logger: Arc::clone(&audit_logger),
         ws_broadcaster: Arc::clone(&ws_broadcaster),
     };
 
-    // Build HTTP router with all endpoints
-    let app = Router::new()
-        // Account Management
-        .route(
-            "/account/create",
-            post(api::handlers::handle_create_account),
-        )
-        .route("/account/login", post(api::handlers::handle_login))
-        // Data Operations
-        .route("/data/submit", post(api::handlers::handle_submit_data))
-        .route("/data/list", get(api::handlers::handle_list_data))
-        .route(
-            "/data/decrypt/:collection_id",
-            post(api::handlers::handle_decrypt_data),
-        )
-        // Blockchain Explorer
-        .route("/chain", get(api::handlers::handle_get_chain))
-        .route("/peers", get(api::handlers::handle_get_peers))
-        .route("/sync", get(api::handlers::handle_sync))
-        // Health & Metrics
-        .route("/health", get(api::handlers::handle_health))
-        .route("/stats", get(api::handlers::handle_get_stats))
-        .route("/metrics", get(api::handlers::handle_get_metrics))
-        .route(
-            "/metrics/prometheus",
-            get(api::handlers::handle_get_prometheus_metrics),
-        )
-        // Validator Info (for load balancer routing)
-        .route(
-            "/validator/current",
-            get(api::handlers::handle_get_current_validator),
-        )
-        // Audit Logging
-        .route("/api/audit", get(api::handlers::handle_get_audit_logs))
-        // WebSocket - Real-time event streaming
-        .route("/ws", get(api::websocket::handle_websocket_upgrade))
+    // Build OpenAPI router with all routes organized by module
+    let (api_router, api_spec) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .nest("/account", api::routes::account::router())
+        .nest("/data", api::routes::data::router())
+        .nest("/api/audit", api::routes::audit::router())
+        .merge(api::routes::health::router())
+        .merge(api::routes::metrics::router())
         // Shared state via Extension middleware
         .layer(Extension(blockchain))
         .layer(Extension(p2p_node))
         .layer(Extension(config.clone()))
         .layer(Extension(rate_limiter))
         .layer(Extension(submit_data_state))
-        .layer(Extension(ws_broadcaster));
+        .layer(Extension(Arc::clone(&ws_broadcaster)))
+        .split_for_parts();
+
+    // Convert OpenApiRouter to standard Router
+    let api_router = api_router;
+
+    // Create OpenAPI JSON endpoint
+    let openapi_spec_clone = api_spec.clone();
+    let openapi_route = Router::new().route(
+        "/api-docs/openapi.json",
+        get(move || async move { Json(openapi_spec_clone.clone()).into_response() }),
+    );
+
+    // Create simple HTML page with embedded RapiDoc
+    let rapidoc_html = Html(
+        r###"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Goud Chain API Documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
+</head>
+<body>
+    <rapi-doc
+        spec-url="/api-docs/openapi.json"
+        theme="dark"
+        bg-color="#1a1a1a"
+        text-color="#ffffff"
+        header-color="#111111"
+        primary-color="#4a9eff"
+        render-style="read"
+        show-header="true"
+        show-info="true"
+        allow-authentication="true"
+        allow-server-selection="true"
+        allow-api-list-style-selection="true"
+    > </rapi-doc>
+</body>
+</html>
+"###,
+    );
+
+    let rapidoc_route = Router::new().route("/rapidoc", get(move || async move { rapidoc_html }));
+
+    // WebSocket route with required extensions
+    let ws_route = Router::new()
+        .route("/ws", get(api::websocket::handle_websocket_upgrade))
+        .layer(Extension(Arc::clone(&ws_broadcaster)))
+        .layer(Extension(config.clone()));
+
+    // Merge all routes
+    let app = api_router
+        .merge(openapi_route)
+        .merge(rapidoc_route)
+        .merge(ws_route);
 
     // NOTE: CORS handled by nginx reverse proxy (see nginx/cors.conf)
     // Removed CorsLayer to prevent duplicate Access-Control-Allow-Origin headers
 
     let bind_addr = config.http_bind_addr();
 
-    info!("\nGoud Chain - Encrypted Blockchain (Async-First Architecture)");
+    info!("\nGoud Chain - Encrypted Blockchain (OpenAPI-Enabled)");
     info!("   Node ID: {}", config.node_id);
     info!("   HTTP API: http://{}", bind_addr);
     info!("   P2P Port: {}", config.p2p_port);
     info!("   Storage: RocksDB (high-performance embedded database)");
-    info!("\nEndpoints:");
-    info!("   POST /account/create   - Create new account");
-    info!("   POST /account/login    - Login to existing account");
-    info!("   POST /data/submit      - Submit encrypted JSON data");
-    info!("   GET  /data/list        - List all encrypted data");
-    info!("   POST /data/decrypt/:id - Decrypt specific data with API key");
-    info!("   GET  /chain            - View full blockchain");
-    info!("   GET  /peers            - View P2P peers");
-    info!("   GET  /sync             - Manual sync with peers");
-    info!("   GET  /health           - Health check");
-    info!("   GET  /metrics          - Prometheus metrics\n");
+    info!("\nAPI Documentation:");
+    info!("   RapiDoc UI:   http://{}/rapidoc", bind_addr);
+    info!(
+        "   OpenAPI Spec: http://{}/api-docs/openapi.json",
+        bind_addr
+    );
+    info!("\nEndpoint Groups:");
+    info!("   Account Management - /account/*");
+    info!("   Data Operations    - /data/*");
+    info!("   Health & Status    - /health, /chain, /peers, /sync");
+    info!("   Metrics & Stats    - /metrics, /stats");
+    info!("   Audit Logs         - /api/audit");
+    info!("   WebSocket          - /ws\n");
 
     // Start async HTTP server
     let listener = match tokio::net::TcpListener::bind(&bind_addr).await {

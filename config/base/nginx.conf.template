@@ -213,6 +213,41 @@ http {
             add_header Cache-Control "public, max-age=5" always;
         }
 
+        # RapiDoc - OpenAPI Documentation (publicly accessible)
+        location ~ ^/(rapidoc|api-docs) {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
+            proxy_pass http://blockchain_readers;
+
+            # Proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Connection reuse
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # Timeouts
+            proxy_connect_timeout {{NGINX_PROXY_CONNECT_TIMEOUT_READ}};
+            proxy_send_timeout {{NGINX_PROXY_SEND_TIMEOUT_READ}};
+            proxy_read_timeout {{NGINX_PROXY_READ_TIMEOUT_READ}};
+
+            # CORS headers
+            include /etc/nginx/cors.conf;
+
+            # Cache static RapiDoc assets (1 hour)
+            add_header Cache-Control "public, max-age=3600" always;
+        }
+
         # Internal metrics endpoint - Monitoring only (block external access)
         location = /metrics {
             # Allow only internal Docker network

@@ -2,9 +2,10 @@
 //! Layer 0: Foundation - Pure data types for audit trails
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Audit event types (stored as u8 enum for size optimization)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[repr(u8)]
 pub enum AuditEventType {
     /// Account created (POST /account/create)
@@ -33,7 +34,7 @@ impl std::fmt::Display for AuditEventType {
 
 /// Individual audit log entry (optimized for size)
 /// Stored encrypted in blockchain as part of EncryptedCollection
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuditLogEntry {
     /// Event type (1 byte enum)
     pub event_type: AuditEventType,
@@ -85,7 +86,7 @@ impl AuditLogBatch {
 }
 
 /// API response for audit log queries (GET /api/audit)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuditLogResponse {
     /// Paginated audit log entries
     pub logs: Vec<AuditLogEntry>,
