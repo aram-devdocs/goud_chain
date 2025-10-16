@@ -8,16 +8,25 @@ cargo fmt -- --check || {
 }
 
 echo "Running Clippy (warnings as errors)..."
-cargo clippy --all-targets -- -D warnings || {
-    echo "Error: Clippy found issues. Run 'cargo clippy --all-targets -- -D warnings' to see them."
+cargo clippy --all-targets --all-features -- -D warnings || {
+    echo "Error: Clippy found issues. Run 'cargo clippy --all-targets --all-features -- -D warnings' to see them."
     exit 1
 }
 
 echo "Running Rust tests (including circular dependency checks)..."
-cargo test || {
-    echo "Error: Tests failed."
-    exit 1
-}
+# Use cargo-nextest if available (matches CI/CD), fallback to cargo test
+if command -v cargo-nextest >/dev/null 2>&1; then
+    cargo nextest run --all-targets --all-features || {
+        echo "Error: Tests failed."
+        exit 1
+    }
+else
+    echo "cargo-nextest not found, using cargo test (install nextest for CI/CD parity: cargo install cargo-nextest)"
+    cargo test --all-targets --all-features || {
+        echo "Error: Tests failed."
+        exit 1
+    }
+fi
 
 echo "Running cargo audit (security vulnerabilities)..."
 if ! command -v cargo-audit >/dev/null 2>&1; then
