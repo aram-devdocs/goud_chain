@@ -51,7 +51,11 @@ async fn main() {
     };
 
     // Load or create blockchain from RocksDB
-    let blockchain = match load_blockchain(config.node_id.clone(), &blockchain_store) {
+    let blockchain = match load_blockchain(
+        config.node_id.clone(),
+        config.validator_config.clone(),
+        &blockchain_store,
+    ) {
         Ok(bc) => Arc::new(RwLock::new(bc)), // Changed from Mutex to RwLock for concurrent reads
         Err(e) => {
             error!(error = %e, "Failed to load blockchain");
@@ -160,7 +164,6 @@ async fn main() {
         .layer(Extension(config.clone()))
         .layer(Extension(rate_limiter))
         .layer(Extension(submit_data_state))
-        .layer(Extension(audit_logger))
         .layer(Extension(ws_broadcaster));
 
     // NOTE: CORS handled by nginx reverse proxy (see nginx/cors.conf)

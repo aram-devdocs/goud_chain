@@ -42,14 +42,14 @@ pub async fn forward_request_with_headers(
     };
 
     // Retry logic for connection with exponential backoff
-    const MAX_RETRIES: u32 = 3;
-    const INITIAL_BACKOFF_MS: u64 = 50;
+    use crate::constants::{HTTP_INITIAL_BACKOFF_MS, HTTP_MAX_BACKOFF_MS, HTTP_MAX_RETRIES};
 
     let mut last_error = None;
 
-    for attempt in 0..MAX_RETRIES {
+    for attempt in 0..HTTP_MAX_RETRIES {
         if attempt > 0 {
-            let backoff = INITIAL_BACKOFF_MS * 2_u64.pow(attempt - 1);
+            let backoff =
+                (HTTP_INITIAL_BACKOFF_MS * 2_u64.pow(attempt - 1)).min(HTTP_MAX_BACKOFF_MS);
             warn!(
                 attempt = attempt + 1,
                 backoff_ms = backoff,
@@ -94,7 +94,7 @@ pub async fn forward_request_with_headers(
     Err(GoudChainError::PeerConnectionFailed(format!(
         "Failed to connect to {} after {} retries: {}",
         target_addr,
-        MAX_RETRIES,
+        HTTP_MAX_RETRIES,
         last_error.unwrap()
     )))
 }
@@ -194,25 +194,6 @@ fn parse_http_response(response: &str) -> Result<(u16, String)> {
     Ok((status_code, body))
 }
 
-/// Get the HTTP address for a validator node
-/// Maps validator names (Validator_1, Validator_2) to node addresses
-/// Tries environment variable first, then defaults to local service name
-pub fn get_validator_node_address(validator_name: &str) -> Result<String> {
-    let node_addr = match validator_name {
-        "Validator_1" => std::env::var("NODE1_ADDR").unwrap_or_else(|_| "node1:8080".to_string()),
-        "Validator_2" => std::env::var("NODE2_ADDR").unwrap_or_else(|_| "node2:8080".to_string()),
-        "Validator_3" => std::env::var("NODE3_ADDR").unwrap_or_else(|_| "node3:8080".to_string()),
-        _ => {
-            return Err(GoudChainError::Internal(format!(
-                "Unknown validator: {}",
-                validator_name
-            )));
-        }
-    };
-
-    Ok(node_addr)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,18 +220,5 @@ mod tests {
         let (status, body) = parse_http_response(response).unwrap();
         assert_eq!(status, 422);
         assert_eq!(body, "{\"error\":\"Not authorized\"}");
-    }
-
-    #[test]
-    fn test_get_validator_node_address() {
-        assert_eq!(
-            get_validator_node_address("Validator_1").unwrap(),
-            "node1:8080"
-        );
-        assert_eq!(
-            get_validator_node_address("Validator_2").unwrap(),
-            "node2:8080"
-        );
-        assert!(get_validator_node_address("Unknown").is_err());
     }
 }

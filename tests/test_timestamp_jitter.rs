@@ -2,10 +2,13 @@
 use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection};
 
+mod test_helpers;
+use test_helpers::test_validator_config;
+
 #[test]
 fn test_timestamp_jitter_prevents_pattern_analysis() {
     // Create blockchain (use node2 which is Validator_2 for block #1)
-    let mut blockchain = Blockchain::new("node2".to_string()).unwrap();
+    let mut blockchain = Blockchain::new("node2".to_string(), test_validator_config()).unwrap();
 
     // Create 100 collections in bulk submission
     let api_key = generate_api_key();

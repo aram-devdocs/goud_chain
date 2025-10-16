@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Request to create a new user account
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateAccountRequest {
-    pub metadata: Option<String>, // Optional encrypted metadata (e.g., email, username)
+    pub metadata: Option<serde_json::Value>, // Optional metadata (any JSON structure)
 }
 
 /// Response after creating an account
@@ -47,7 +47,7 @@ impl SubmitDataRequest {
         use crate::types::validation::{validate_json_structure, validate_label};
         use crate::types::GoudChainError;
 
-        // Inline constants to avoid circular dependency
+        // Validation constants (inlined to maintain layer 0 independence)
         const MAX_COLLECTION_SIZE_BYTES: usize = 10_000_000; // 10MB
         const MAX_LABEL_LENGTH: usize = 100;
 

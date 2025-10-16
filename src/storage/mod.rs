@@ -17,7 +17,11 @@ pub use self::rate_limit_store::{BanLevel, RateLimitStore};
 
 /// Load the blockchain from RocksDB or create a new one
 /// Handles schema versioning automatically
-pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Blockchain> {
+pub fn load_blockchain(
+    node_id: String,
+    validator_config: crate::config::ValidatorConfig,
+    store: &BlockchainStore,
+) -> Result<Blockchain> {
     // Check if RocksDB has data
     if !store.is_empty() {
         info!("Loading blockchain from RocksDB");
@@ -33,7 +37,7 @@ pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Block
             );
             store.clear_all()?;
             info!("Creating new blockchain with schema {}", SCHEMA_VERSION);
-            let blockchain = Blockchain::new(node_id.clone())?;
+            let blockchain = Blockchain::new(node_id.clone(), validator_config.clone())?;
 
             // Save genesis block to RocksDB
             if let Some(genesis) = blockchain.chain.first() {
@@ -65,11 +69,12 @@ pub fn load_blockchain(node_id: String, store: &BlockchainStore) -> Result<Block
             pending_accounts_with_keys: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: Some(generate_signing_key()),
+            validator_config,
         })
     } else {
         // RocksDB is empty - create new blockchain
         info!("No existing blockchain found, creating new one");
-        let blockchain = Blockchain::new(node_id.clone())?;
+        let blockchain = Blockchain::new(node_id.clone(), validator_config)?;
 
         // Save genesis block to RocksDB
         if let Some(genesis) = blockchain.chain.first() {

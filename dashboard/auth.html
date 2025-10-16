@@ -184,12 +184,18 @@
                             body: JSON.stringify({ api_key: this.loginForm.apiKey })
                         });
 
-                        const data = await response.json();
-
-                        if (data.error) {
-                            this.loginError = data.error;
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            try {
+                                const errorJson = JSON.parse(errorText);
+                                this.loginError = errorJson.error || `Request failed: ${response.status}`;
+                            } catch {
+                                this.loginError = errorText || `Request failed: ${response.status}`;
+                            }
                             return;
                         }
+
+                        const data = await response.json();
 
                         // Store session token and API key
                         localStorage.setItem('goud_session', data.session_token);
@@ -214,13 +220,18 @@
                             body: JSON.stringify({ metadata: null })
                         });
 
-                        const data = await response.json();
-
-                        if (data.error) {
-                            this.signupError = data.error;
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            try {
+                                const errorJson = JSON.parse(errorText);
+                                this.signupError = errorJson.error || `Request failed: ${response.status}`;
+                            } catch {
+                                this.signupError = errorText || `Request failed: ${response.status}`;
+                            }
                             return;
                         }
 
+                        const data = await response.json();
                         this.newAccount = data;
                     } catch (error) {
                         this.signupError = `Error: ${error.message}`;

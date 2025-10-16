@@ -21,17 +21,24 @@ pub struct UserAccount {
 
 impl UserAccount {
     /// Create a new user account with an API key
-    pub fn new(api_key: &[u8], signing_key: &SigningKey, metadata: Option<String>) -> Result<Self> {
+    /// Metadata can be any JSON value and will be serialized + encrypted
+    pub fn new(
+        api_key: &[u8],
+        signing_key: &SigningKey,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<Self> {
         let account_id = Uuid::new_v4().to_string();
         let api_key_hash = hash_api_key_hex(api_key);
         let public_key = get_public_key_hex(signing_key);
         let created_at = Utc::now().timestamp();
 
-        // Encrypt metadata if provided
+        // Encrypt metadata if provided (serialize JSON to string first)
         let metadata_encrypted = if let Some(meta) = metadata {
+            let meta_string = serde_json::to_string(&meta)
+                .map_err(|e| crate::types::GoudChainError::Internal(e.to_string()))?;
             let key_cache = global_key_cache();
             let encryption_key = key_cache.get_encryption_key(api_key, ENCRYPTION_SALT);
-            let (encrypted, _nonce) = encrypt_data_with_key(&meta, &encryption_key)?;
+            let (encrypted, _nonce) = encrypt_data_with_key(&meta_string, &encryption_key)?;
             Some(encrypted)
         } else {
             None
@@ -80,7 +87,7 @@ mod tests {
     fn test_create_account_with_metadata() {
         let api_key = b"test_api_key_12345678901234567890";
         let signing_key = generate_signing_key();
-        let metadata = r#"{"email": "user@example.com"}"#.to_string();
+        let metadata = serde_json::json!({"email": "user@example.com"});
 
         let account = UserAccount::new(api_key, &signing_key, Some(metadata)).unwrap();
 

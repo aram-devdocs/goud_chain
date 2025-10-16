@@ -17,30 +17,20 @@ use crate::crypto::{
 use crate::types::{GoudChainError, Result};
 
 /// Get the current validator for a given block number (round-robin)
-pub fn get_current_validator(block_number: u64) -> String {
-    let validators = crate::constants::VALIDATORS;
+/// Uses ValidatorConfig from the blockchain instance
+pub fn get_current_validator(validators: &[String], block_number: u64) -> String {
     let index = (block_number % validators.len() as u64) as usize;
-    validators[index].to_string()
+    validators[index].clone()
 }
 
 /// Check if a node is authorized to be a validator for a given block
-/// In PoA, we map node IDs to validator names deterministically
-pub fn is_authorized_validator(node_id: &str, block_number: u64) -> bool {
-    let expected_validator = get_current_validator(block_number);
-
-    // Map node IDs to validator names
-    // node1 -> Validator_1, node2 -> Validator_2, etc.
-    let node_validator = match node_id {
-        "node1" => "Validator_1",
-        "node2" => "Validator_2",
-        "node3" => "Validator_3",
-        _ => {
-            // For unknown node IDs, check if node_id matches validator name directly
-            return node_id == expected_validator;
-        }
-    };
-
-    node_validator == expected_validator
+/// Uses ValidatorConfig for node-to-validator mapping (no hardcoded deployment names)
+pub fn is_authorized_validator(
+    node_id: &str,
+    block_number: u64,
+    validator_config: &crate::config::ValidatorConfig,
+) -> bool {
+    validator_config.is_node_authorized(node_id, block_number)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,11 +45,13 @@ pub struct Blockchain {
     pub pending_collections: Vec<EncryptedCollection>,
     #[serde(skip)]
     pub node_signing_key: Option<SigningKey>,
+    #[serde(skip)]
+    pub validator_config: crate::config::ValidatorConfig,
 }
 
 impl Blockchain {
     /// Create a new zero-knowledge blockchain with genesis block
-    pub fn new(node_id: String) -> Result<Self> {
+    pub fn new(node_id: String, validator_config: crate::config::ValidatorConfig) -> Result<Self> {
         info!(
             node_id = %node_id,
             schema = %SCHEMA_VERSION,
@@ -67,7 +59,7 @@ impl Blockchain {
         );
 
         let signing_key = generate_signing_key();
-        let validator = get_current_validator(0);
+        let validator = get_current_validator(&validator_config.validators, 0);
 
         let genesis = Block::new(BlockConfig {
             index: 0,
@@ -93,6 +85,7 @@ impl Blockchain {
             pending_accounts_with_keys: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: Some(signing_key),
+            validator_config,
         })
     }
 
@@ -124,10 +117,10 @@ impl Blockchain {
 
         let previous_block = self.get_latest_block()?;
         let block_number = previous_block.index + 1;
-        let validator = get_current_validator(block_number);
+        let validator = get_current_validator(&self.validator_config.validators, block_number);
 
         // Proof of Authority: Only the designated validator can create this block
-        if !is_authorized_validator(&self.node_id, block_number) {
+        if !is_authorized_validator(&self.node_id, block_number, &self.validator_config) {
             warn!(
                 node_id = %self.node_id,
                 block_number = block_number,
@@ -144,21 +137,20 @@ impl Blockchain {
         // Generate random salt for this block
         let block_salt = generate_block_salt();
 
-        // Encrypt accounts into envelopes
-        let mut account_envelopes = Vec::new();
+        // Encrypt accounts into envelopes (pre-allocate for performance)
+        let mut account_envelopes = Vec::with_capacity(self.pending_accounts_with_keys.len());
         for (account, api_key) in &self.pending_accounts_with_keys {
             let envelope = encrypt_account_envelope(account, api_key, &block_salt)?;
             account_envelopes.push(envelope);
         }
 
-        // Wrap collections in envelopes (collections already encrypted with user's API key)
-        let collection_envelopes: Vec<CollectionEnvelope> = self
-            .pending_collections
-            .iter()
-            .map(|c| CollectionEnvelope {
+        // Wrap collections in envelopes (pre-allocate for performance)
+        let mut collection_envelopes = Vec::with_capacity(self.pending_collections.len());
+        for c in &self.pending_collections {
+            collection_envelopes.push(CollectionEnvelope {
                 collection: c.clone(),
-            })
-            .collect();
+            });
+        }
 
         // Lazy blind index generation (defer HMAC until search time)
         let blind_indexes = Vec::new();
@@ -235,7 +227,8 @@ impl Blockchain {
             current.verify_data()?;
 
             // Validate validator authorization (plaintext field)
-            let expected_validator = get_current_validator(current.index);
+            let expected_validator =
+                get_current_validator(&self.validator_config.validators, current.index);
             if current.validator != expected_validator {
                 return Err(GoudChainError::InvalidValidator {
                     index: i as u64,
@@ -269,6 +262,7 @@ impl Blockchain {
             pending_accounts_with_keys: Vec::new(),
             pending_collections: Vec::new(),
             node_signing_key: None,
+            validator_config: self.validator_config.clone(),
         };
 
         // Chain selection logic with tie-breaking
@@ -303,7 +297,8 @@ impl Blockchain {
                 let their_last = &new_chain[new_chain.len() - 1];
 
                 // Check validator authorization (plaintext field - no decryption needed)
-                let expected_validator = get_current_validator(our_last.index);
+                let expected_validator =
+                    get_current_validator(&self.validator_config.validators, our_last.index);
 
                 let our_is_valid = our_last.validator == expected_validator;
                 let their_is_valid = their_last.validator == expected_validator;
@@ -433,17 +428,34 @@ impl Blockchain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    fn test_validator_config() -> crate::config::ValidatorConfig {
+        let mut node_to_validator = HashMap::new();
+        node_to_validator.insert("test-node".to_string(), "Validator_1".to_string());
+        node_to_validator.insert("node2".to_string(), "Validator_2".to_string());
+
+        let mut validator_to_address = HashMap::new();
+        validator_to_address.insert("Validator_1".to_string(), "node1:8080".to_string());
+        validator_to_address.insert("Validator_2".to_string(), "node2:8080".to_string());
+
+        crate::config::ValidatorConfig {
+            validators: vec!["Validator_1".to_string(), "Validator_2".to_string()],
+            node_to_validator,
+            validator_to_address,
+        }
+    }
 
     #[test]
     fn test_blockchain_creation() {
-        let blockchain = Blockchain::new("test-node".to_string()).unwrap();
+        let blockchain = Blockchain::new("test-node".to_string(), test_validator_config()).unwrap();
         assert_eq!(blockchain.chain.len(), 1);
         assert!(blockchain.is_valid().is_ok());
     }
 
     #[test]
     fn test_add_block() {
-        let blockchain = Blockchain::new("test-node".to_string()).unwrap();
+        let blockchain = Blockchain::new("test-node".to_string(), test_validator_config()).unwrap();
         assert_eq!(blockchain.chain.len(), 1); // Genesis block
         assert!(blockchain.is_valid().is_ok());
     }

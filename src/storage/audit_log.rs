@@ -219,8 +219,11 @@ impl AuditLogger {
 
             // Check if this node is the validator for the next block
             let next_block_number = bc.chain.len() as u64 + 1;
-            let is_validator =
-                crate::domain::blockchain::is_authorized_validator(&bc.node_id, next_block_number);
+            let is_validator = crate::domain::blockchain::is_authorized_validator(
+                &bc.node_id,
+                next_block_number,
+                &bc.validator_config,
+            );
 
             if is_validator {
                 // Only create block if this node is the current validator

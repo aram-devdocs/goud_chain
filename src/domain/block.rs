@@ -110,7 +110,9 @@ impl Block {
             return EMPTY_MERKLE_ROOT.to_string();
         }
 
-        let mut hashes: Vec<String> = Vec::new();
+        // Pre-allocate with capacity to avoid reallocations
+        let initial_capacity = 1 + blind_indexes.len();
+        let mut hashes: Vec<String> = Vec::with_capacity(initial_capacity);
 
         let hash = blake3::hash(encrypted_data.as_bytes());
         hashes.push(hash.to_hex().to_string());
@@ -120,22 +122,27 @@ impl Block {
             hashes.push(hash.to_hex().to_string());
         }
 
-        // Build Merkle tree
+        // Build Merkle tree (optimized for free-tier CPUs)
         while hashes.len() > 1 {
-            let mut next_level = Vec::new();
+            let next_level_capacity = hashes.len().div_ceil(2);
+            let mut next_level = Vec::with_capacity(next_level_capacity);
+
             for chunk in hashes.chunks(2) {
-                let combined = if chunk.len() == 2 {
-                    format!("{}{}", chunk[0], chunk[1])
+                let hash = if chunk.len() == 2 {
+                    // Optimize: reuse buffer for combined string
+                    let mut combined = String::with_capacity(chunk[0].len() + chunk[1].len());
+                    combined.push_str(&chunk[0]);
+                    combined.push_str(&chunk[1]);
+                    blake3::hash(combined.as_bytes())
                 } else {
-                    chunk[0].clone()
+                    blake3::hash(chunk[0].as_bytes())
                 };
-                let hash = blake3::hash(combined.as_bytes());
                 next_level.push(hash.to_hex().to_string());
             }
             hashes = next_level;
         }
 
-        hashes[0].clone()
+        hashes.into_iter().next().unwrap()
     }
 
     pub fn calculate_hash(&self) -> String {

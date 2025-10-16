@@ -32,8 +32,10 @@ pub fn encrypt_data_with_nonce(
         .encrypt(nonce, data.as_bytes())
         .map_err(|e| GoudChainError::EncryptionFailed(e.to_string()))?;
 
-    // Combine nonce + ciphertext and encode as base64
-    let mut combined = nonce_bytes.to_vec();
+    // Optimize: Pre-allocate combined buffer (nonce + ciphertext)
+    let combined_size = NONCE_SIZE_BYTES + ciphertext.len();
+    let mut combined = Vec::with_capacity(combined_size);
+    combined.extend_from_slice(nonce_bytes);
     combined.extend_from_slice(&ciphertext);
     let encrypted_payload = general_purpose::STANDARD.encode(combined);
 

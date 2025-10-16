@@ -21,9 +21,7 @@ use crate::types::*;
 use super::auth::{
     decrypt_api_key_from_jwt, extract_auth_from_headers, generate_session_token, AuthMethod,
 };
-use super::internal_client::{
-    forward_request_to_node, forward_request_with_headers, get_validator_node_address,
-};
+use super::internal_client::{forward_request_to_node, forward_request_with_headers};
 use super::{RateLimitResult, RateLimiter, WebSocketBroadcaster};
 
 // ========== HELPER TYPES ==========
@@ -300,21 +298,21 @@ pub async fn handle_get_current_validator(
     let chain = blockchain.read().await;
     let latest_block = chain.chain.last();
     let next_block_number = latest_block.map(|b| b.index + 1).unwrap_or(1);
-    let expected_validator = get_current_validator(next_block_number);
-    let is_this_node = is_authorized_validator(&chain.node_id, next_block_number);
+    let expected_validator =
+        get_current_validator(&chain.validator_config.validators, next_block_number);
+    let is_this_node =
+        is_authorized_validator(&chain.node_id, next_block_number, &chain.validator_config);
 
-    // Map validator to node name for routing
-    let validator_node = match expected_validator.as_str() {
-        "Validator_1" => "node1",
-        "Validator_2" => "node2",
-        "Validator_3" => "node3",
-        _ => "unknown",
-    };
+    // Get validator address from config
+    let validator_address = chain
+        .validator_config
+        .get_validator_address(&expected_validator)
+        .unwrap_or_else(|| "unknown".to_string());
 
     let response = serde_json::json!({
         "next_block_number": next_block_number,
         "expected_validator": expected_validator,
-        "validator_node": validator_node,
+        "validator_address": validator_address,
         "is_this_node_validator": is_this_node,
         "current_node_id": chain.node_id,
     });
@@ -329,11 +327,12 @@ pub async fn handle_create_account(
     Extension(blockchain): Extension<Arc<RwLock<Blockchain>>>,
     Extension(p2p): Extension<Arc<P2PNode>>,
     Extension(rate_limiter): Extension<Arc<RateLimiter>>,
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
-    Extension(ws_broadcaster): Extension<Arc<WebSocketBroadcaster>>,
+    Extension(state): Extension<SubmitDataState>,
     headers: HeaderMap,
     Json(request): Json<CreateAccountRequest>,
 ) -> Result<AxumResponse> {
+    let audit_logger = &state.audit_logger;
+    let ws_broadcaster = &state.ws_broadcaster;
     // Extract client IP for rate limiting (no API key yet for new accounts)
     let client_ip = extract_client_ip(&headers);
 
@@ -400,13 +399,19 @@ pub async fn handle_create_account(
         .last()
         .map(|b| b.index + 1)
         .unwrap_or(1);
-    let is_validator = is_authorized_validator(&blockchain_guard.node_id, next_block_number);
+    let is_validator = is_authorized_validator(
+        &blockchain_guard.node_id,
+        next_block_number,
+        &blockchain_guard.validator_config,
+    );
     let node_id = blockchain_guard.node_id.clone();
+    let validator_config = blockchain_guard.validator_config.clone();
     drop(blockchain_guard);
 
     if !is_validator {
         // This node is NOT the validator - forward request to the correct validator
-        let expected_validator = get_current_validator(next_block_number);
+        let expected_validator =
+            get_current_validator(&validator_config.validators, next_block_number);
         warn!(
             current_node = %node_id,
             expected_validator = %expected_validator,
@@ -414,8 +419,8 @@ pub async fn handle_create_account(
             "Forwarding account creation to validator node"
         );
 
-        match get_validator_node_address(&expected_validator) {
-            Ok(validator_addr) => {
+        match validator_config.get_validator_address(&expected_validator) {
+            Some(validator_addr) => {
                 let body = serde_json::to_string(&request).map_err(|e| {
                     GoudChainError::Internal(format!("Serialization failed: {}", e))
                 })?;
@@ -451,9 +456,12 @@ pub async fn handle_create_account(
                     }
                 }
             }
-            Err(e) => {
-                error!(error = %e, "Failed to get validator address");
-                return Err(e);
+            None => {
+                error!(validator = %expected_validator, "Unknown validator address");
+                return Err(GoudChainError::Internal(format!(
+                    "Unknown validator: {}",
+                    expected_validator
+                )));
             }
         }
     }
@@ -516,16 +524,20 @@ pub async fn handle_create_account(
                             let rate_headers = rate_limiter.create_headers(&rate_limit_result);
                             let response_obj = Json(response).into_response();
 
+                            // Optimize: Share block via Arc for broadcasts (reduces one clone)
+                            let block_arc = Arc::new(block);
+
                             // Broadcast block in background (don't block response)
                             let p2p_clone = Arc::clone(&p2p);
-                            let block_clone = block.clone();
+                            let block_ref = Arc::clone(&block_arc);
                             tokio::spawn(async move {
-                                p2p_clone.broadcast_block(&block_clone).await;
+                                // P2P will clone internally for serialization - unavoidable
+                                p2p_clone.broadcast_block(&block_ref).await;
                             });
 
                             // Broadcast WebSocket blockchain update event
-                            let ws_clone = Arc::clone(&ws_broadcaster);
-                            let bhash = block.hash.clone();
+                            let ws_clone = Arc::clone(ws_broadcaster);
+                            let bhash = block_arc.hash.clone();
                             tokio::spawn(async move {
                                 ws_clone
                                     .broadcast_blockchain_update(block_index, bhash)
@@ -557,10 +569,11 @@ pub async fn handle_create_account(
 pub async fn handle_login(
     Extension(blockchain): Extension<Arc<RwLock<Blockchain>>>,
     Extension(config): Extension<Arc<Config>>,
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    Extension(state): Extension<SubmitDataState>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>> {
+    let audit_logger = &state.audit_logger;
     // Decode API key
     match crate::crypto::decode_api_key(&request.api_key) {
         Ok(api_key) => {
@@ -671,8 +684,10 @@ pub async fn handle_submit_data(
     let auth = extract_auth_from_headers(&headers, &config)?;
 
     // Get API key and hash based on auth method
+    // OPTIMIZATION: Compute hash ONCE and reuse for rate limiting and account lookup
     let (api_key, api_key_hash) = match auth {
         AuthMethod::ApiKey(key) => {
+            // Hash computed once (100k iterations - expensive!)
             let hash = hash_api_key_hex(&key);
             (key, hash)
         }
@@ -687,7 +702,7 @@ pub async fn handle_submit_data(
     // Extract client IP for rate limiting
     let client_ip = extract_client_ip(&headers);
 
-    // Check rate limit (write operation)
+    // Check rate limit (write operation) - reuse pre-computed hash
     let rate_limit_result = match rate_limiter.check_limit(&api_key_hash, &client_ip, true) {
         Ok(result) => result,
         Err(e) => {
@@ -744,7 +759,7 @@ pub async fn handle_submit_data(
         }
     }
 
-    // Verify account exists (use cached hash to avoid re-hashing)
+    // Verify account exists - reuse pre-computed hash (avoids 100k iterations!)
     let blockchain_guard = blockchain.read().await;
     if blockchain_guard
         .find_account_with_hash(&api_key, Some(api_key_hash.clone()))
@@ -767,13 +782,19 @@ pub async fn handle_submit_data(
         .last()
         .map(|b| b.index + 1)
         .unwrap_or(1);
-    let is_validator = is_authorized_validator(&blockchain_guard.node_id, next_block_number);
+    let is_validator = is_authorized_validator(
+        &blockchain_guard.node_id,
+        next_block_number,
+        &blockchain_guard.validator_config,
+    );
     let node_id = blockchain_guard.node_id.clone();
+    let validator_config = blockchain_guard.validator_config.clone();
     drop(blockchain_guard);
 
     if !is_validator {
         // This node is NOT the validator - forward request to the correct validator
-        let expected_validator = get_current_validator(next_block_number);
+        let expected_validator =
+            get_current_validator(&validator_config.validators, next_block_number);
         warn!(
             current_node = %node_id,
             expected_validator = %expected_validator,
@@ -781,8 +802,8 @@ pub async fn handle_submit_data(
             "Forwarding data submission to validator node"
         );
 
-        match get_validator_node_address(&expected_validator) {
-            Ok(validator_addr) => {
+        match validator_config.get_validator_address(&expected_validator) {
+            Some(validator_addr) => {
                 let body = serde_json::to_string(&request).map_err(|e| {
                     GoudChainError::Internal(format!("Serialization failed: {}", e))
                 })?;
@@ -823,9 +844,12 @@ pub async fn handle_submit_data(
                     }
                 }
             }
-            Err(e) => {
-                error!(error = %e, "Failed to get validator address");
-                return Err(e);
+            None => {
+                error!(validator = %expected_validator, "Unknown validator address");
+                return Err(GoudChainError::Internal(format!(
+                    "Unknown validator: {}",
+                    expected_validator
+                )));
             }
         }
     }
@@ -839,12 +863,12 @@ pub async fn handle_submit_data(
 
     match signing_key {
         Some(key) => {
-            // Create encrypted collection
+            // Create encrypted collection - pass pre-computed hash to avoid re-hashing
             match EncryptedCollection::new(
                 request.label.clone(),
                 request.data,
                 &api_key,
-                api_key_hash.clone(),
+                api_key_hash.clone(), // Reuse hash from auth check
                 &key,
             ) {
                 Ok(collection) => {
@@ -900,17 +924,21 @@ pub async fn handle_submit_data(
                                         rate_limiter.create_headers(&rate_limit_result);
                                     let response_obj = Json(response).into_response();
 
+                                    // Optimize: Share block via Arc for broadcasts (reduces one clone)
+                                    let block_arc = Arc::new(block);
+
                                     // Broadcast block in background (don't block response)
                                     let p2p_clone = Arc::clone(&p2p);
-                                    let block_clone = block.clone();
+                                    let block_ref = Arc::clone(&block_arc);
                                     tokio::spawn(async move {
-                                        p2p_clone.broadcast_block(&block_clone).await;
+                                        // P2P will clone internally for serialization - unavoidable
+                                        p2p_clone.broadcast_block(&block_ref).await;
                                     });
 
                                     // Broadcast WebSocket events for real-time updates
                                     let ws_clone = Arc::clone(&state.ws_broadcaster);
                                     let cid = collection_id.clone();
-                                    let bhash = block.hash.clone();
+                                    let bhash = block_arc.hash.clone();
                                     tokio::spawn(async move {
                                         ws_clone
                                             .broadcast_collection_update(cid, block_index)
@@ -951,31 +979,37 @@ pub async fn handle_list_data(
     Extension(blockchain): Extension<Arc<RwLock<Blockchain>>>,
     Extension(config): Extension<Arc<Config>>,
     Extension(rate_limiter): Extension<Arc<RateLimiter>>,
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    Extension(state): Extension<SubmitDataState>,
     headers: HeaderMap,
 ) -> Result<AxumResponse> {
+    let audit_logger = &state.audit_logger;
     // Extract authentication
     let auth = extract_auth_from_headers(&headers, &config)?;
 
     // Support both API keys and session tokens
-    let api_key = match auth {
-        AuthMethod::ApiKey(key) => key,
+    // OPTIMIZATION: Compute hash ONCE and reuse for rate limiting
+    let (api_key, api_key_hash) = match auth {
+        AuthMethod::ApiKey(key) => {
+            // Hash computed once (100k iterations - expensive!)
+            let hash = hash_api_key_hex(&key);
+            (key, hash)
+        }
         AuthMethod::SessionToken(claims) => {
             // Decrypt API key from JWT's encrypted_api_key field
-            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
-                Ok(key) => key,
+            let key = match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(k) => k,
                 Err(e) => {
                     return Err(GoudChainError::Unauthorized(format!(
                         "Failed to decrypt API key from session token: {}",
                         e
                     )));
                 }
-            }
+            };
+            // Reuse hash from JWT claims (already computed during login)
+            let hash = claims.api_key_hash;
+            (key, hash)
         }
     };
-
-    // Get API key hash for rate limiting
-    let api_key_hash = hash_api_key_hex(&api_key);
 
     // Extract client IP for rate limiting
     let client_ip = extract_client_ip(&headers);
@@ -1097,31 +1131,37 @@ pub async fn handle_decrypt_data(
     Extension(blockchain): Extension<Arc<RwLock<Blockchain>>>,
     Extension(config): Extension<Arc<Config>>,
     Extension(rate_limiter): Extension<Arc<RateLimiter>>,
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    Extension(state): Extension<SubmitDataState>,
     headers: HeaderMap,
 ) -> Result<AxumResponse> {
+    let audit_logger = &state.audit_logger;
     // Extract authentication - must be API key for decryption
     let auth = extract_auth_from_headers(&headers, &config)?;
 
     // Support both API keys and session tokens
-    let api_key = match auth {
-        AuthMethod::ApiKey(key) => key,
+    // OPTIMIZATION: Compute hash ONCE and reuse for rate limiting
+    let (api_key, api_key_hash) = match auth {
+        AuthMethod::ApiKey(key) => {
+            // Hash computed once (100k iterations - expensive!)
+            let hash = hash_api_key_hex(&key);
+            (key, hash)
+        }
         AuthMethod::SessionToken(claims) => {
             // Decrypt API key from JWT's encrypted_api_key field
-            match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
-                Ok(key) => key,
+            let key = match decrypt_api_key_from_jwt(&claims.encrypted_api_key, &config) {
+                Ok(k) => k,
                 Err(e) => {
                     return Err(GoudChainError::Unauthorized(format!(
                         "Failed to decrypt API key from session token: {}",
                         e
                     )));
                 }
-            }
+            };
+            // Reuse hash from JWT claims (already computed during login)
+            let hash = claims.api_key_hash;
+            (key, hash)
         }
     };
-
-    // Get API key hash for rate limiting
-    let api_key_hash = hash_api_key_hex(&api_key);
 
     // Extract client IP for rate limiting
     let client_ip = extract_client_ip(&headers);
@@ -1229,11 +1269,12 @@ pub async fn handle_decrypt_data(
 /// Returns paginated audit logs for authenticated user
 /// Query params: start_ts, end_ts, event_type, page, page_size
 pub async fn handle_get_audit_logs(
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    Extension(state): Extension<SubmitDataState>,
     Extension(config): Extension<Arc<Config>>,
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<AuditLogResponse>> {
+    let audit_logger = &state.audit_logger;
     // Extract authentication
     let auth = extract_auth_from_headers(&headers, &config)?;
 

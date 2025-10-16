@@ -1,5 +1,5 @@
 //! Input validation module for Injection Prevention
-//! Layer 5: Presentation - Validates user input before processing
+//! Layer 0: Foundation - Validates user input before processing
 //!
 //! **Validations:**
 //! - Label: Max 100 chars, no control characters (regex-based)
@@ -11,7 +11,7 @@ use regex::Regex;
 
 use crate::types::{GoudChainError, Result};
 
-// Inline constants to avoid circular dependency with constants module
+// Validation constants (inlined to maintain layer 0 independence)
 const LABEL_REGEX: &str = r"^[a-zA-Z0-9 \-_.,!?()]+$";
 const MAX_JSON_DEPTH: usize = 10;
 

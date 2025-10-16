@@ -2,6 +2,9 @@
 use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection};
 
+mod test_helpers;
+use test_helpers::test_validator_config;
+
 #[test]
 fn test_phase5_per_user_salt_prevents_cross_block_correlation() {
     println!("\n=== Phase 5 P5-001: Cross-Block Correlation Prevention ===\n");
@@ -12,7 +15,7 @@ fn test_phase5_per_user_salt_prevents_cross_block_correlation() {
     let attacker_key_hash = hash_api_key_hex(&attacker_api_key);
 
     // Create blockchain with multiple nodes
-    let mut blockchain = Blockchain::new("node2".to_string()).unwrap();
+    let mut blockchain = Blockchain::new("node2".to_string(), test_validator_config()).unwrap();
 
     // Attacker creates multiple collections across different blocks
     println!("Attacker creating collections across 5 blocks...");

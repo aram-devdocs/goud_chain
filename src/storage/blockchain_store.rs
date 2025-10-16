@@ -29,22 +29,39 @@ pub struct BlockchainStore {
 
 impl BlockchainStore {
     /// Initialize RocksDB at the configured path with optimized settings
+    /// Tuned for free-tier cloud environments (slow disks, limited IOPS)
     pub fn new() -> Result<Self> {
         info!(path = %ROCKSDB_PATH, "Opening RocksDB for blockchain storage");
 
         let mut opts = rocksdb::Options::default();
         opts.create_if_missing(true);
+
+        // Memory buffers (64MB for free-tier RAM constraints)
         opts.set_write_buffer_size(64 * 1024 * 1024);
         opts.set_max_write_buffer_number(3);
         opts.set_min_write_buffer_number_to_merge(1);
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+        // Compression (Snappy is faster than LZ4 on slow CPUs)
+        opts.set_compression_type(rocksdb::DBCompressionType::Snappy);
+
+        // WAL optimization for slow disks
         opts.set_manual_wal_flush(true);
+
+        // Reduce write amplification (critical for free-tier IOPS limits)
         opts.set_level_compaction_dynamic_level_bytes(true);
+        opts.set_max_background_jobs(2); // Limit for free-tier CPUs
+
+        // Optimize for sequential writes (blockchain is append-only)
+        opts.set_allow_mmap_reads(false); // More reliable on cloud storage
+        opts.set_allow_mmap_writes(false);
+
+        // Free-tier friendly: reduce fsync frequency (batch writes)
+        opts.set_use_fsync(false); // Use fdatasync instead (faster)
 
         let db = DB::open(&opts, ROCKSDB_PATH)
             .map_err(|e| GoudChainError::RocksDbError(e.to_string()))?;
 
-        info!("BlockchainStore initialized with optimized settings");
+        info!("BlockchainStore initialized with free-tier optimized settings");
 
         Ok(Self { db: Arc::new(db) })
     }
@@ -65,8 +82,15 @@ impl BlockchainStore {
 
         let chain_length = block.index + 1;
         batch.put(b"metadata:chain_length", chain_length.to_le_bytes());
+
+        // Optimized write: disable sync for non-critical writes (blockchain is append-only)
+        // If node crashes, P2P sync will recover missing blocks
+        let mut write_opts = rocksdb::WriteOptions::default();
+        write_opts.set_sync(false); // Don't fsync immediately (10x faster on slow disks)
+        write_opts.disable_wal(false); // Keep WAL for durability
+
         self.db
-            .write(batch)
+            .write_opt(batch, &write_opts)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
         info!(block_index = block.index, "Block saved to RocksDB");

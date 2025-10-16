@@ -207,8 +207,15 @@ pub fn verify_api_key_hash_precomputed(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn test_config() -> Config {
+        let mut node_to_validator = HashMap::new();
+        node_to_validator.insert("test-node".to_string(), "Validator_1".to_string());
+
+        let mut validator_to_address = HashMap::new();
+        validator_to_address.insert("Validator_1".to_string(), "localhost:8080".to_string());
+
         Config {
             node_id: "test-node".to_string(),
             http_port: "8080".to_string(),
@@ -216,6 +223,11 @@ mod tests {
             peers: vec![],
             jwt_secret: b"test_jwt_secret_min_32_bytes_long_123456".to_vec(),
             session_secret: b"test_session_secret_min_32_bytes_long".to_vec(),
+            validator_config: crate::config::ValidatorConfig {
+                validators: vec!["Validator_1".to_string()],
+                node_to_validator,
+                validator_to_address,
+            },
         }
     }
 

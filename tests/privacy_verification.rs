@@ -2,16 +2,20 @@
 use goud_chain::crypto::{generate_api_key, generate_signing_key, hash_api_key_hex};
 use goud_chain::domain::{Blockchain, EncryptedCollection, UserAccount};
 
+mod test_helpers;
+use test_helpers::test_validator_config;
+
 #[test]
 fn test_envelope_encryption_privacy() {
     // Create a blockchain
     // Use node2 which maps to Validator_2 (authorized for block #1)
-    let mut blockchain = Blockchain::new("node2".to_string()).unwrap();
+    let mut blockchain = Blockchain::new("node2".to_string(), test_validator_config()).unwrap();
 
     // Create an account
     let api_key = generate_api_key();
     let signing_key = generate_signing_key();
-    let account = UserAccount::new(&api_key, &signing_key, Some("Test User".to_string())).unwrap();
+    let account =
+        UserAccount::new(&api_key, &signing_key, Some(serde_json::json!("Test User"))).unwrap();
     let account_id = account.account_id.clone();
 
     // Add account to blockchain WITH API key for envelope encryption

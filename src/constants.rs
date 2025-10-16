@@ -50,10 +50,6 @@ pub const DEFAULT_P2P_PORT: &str = "9000";
 pub const REPUTATION_REWARD_VALID_BLOCK: i32 = 1;
 pub const REPUTATION_PENALTY_INVALID_BLOCK: i32 = -5;
 
-// Proof of Authority validators
-// Reduced to 2 validators for single-VM GCP deployment (optimized for e2-micro 1GB RAM)
-pub const VALIDATORS: [&str; 2] = ["Validator_1", "Validator_2"];
-
 // P2P Network Security
 pub const MIN_REPUTATION_THRESHOLD: i32 = -10; // Block peers below this reputation
 pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
@@ -62,6 +58,11 @@ pub const MAX_MESSAGES_PER_MINUTE: u32 = 100;
 pub const P2P_CONNECT_TIMEOUT_SECONDS: u64 = 5;
 pub const P2P_READ_TIMEOUT_SECONDS: u64 = 10;
 pub const P2P_WRITE_TIMEOUT_SECONDS: u64 = 5;
+
+// HTTP Client Retry Settings (for internal node-to-node communication)
+pub const HTTP_MAX_RETRIES: u32 = 3;
+pub const HTTP_INITIAL_BACKOFF_MS: u64 = 50;
+pub const HTTP_MAX_BACKOFF_MS: u64 = 500;
 
 // Rate Limiting - DoS Protection
 // Request limits per API key
