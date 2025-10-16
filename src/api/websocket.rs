@@ -240,6 +240,28 @@ impl WebSocketBroadcaster {
         debug!(peer_count = %peer_count, "Broadcasted peer update");
     }
 
+    /// Broadcast an audit log update event
+    /// Called immediately when audit events are logged (before blockchain flush)
+    /// Provides instant feedback to users while batching continues in background
+    pub async fn broadcast_audit_log_update(
+        &self,
+        event_type: crate::types::AuditEventType,
+        timestamp: i64,
+        collection_id: Option<String>,
+        metadata: serde_json::Value,
+    ) {
+        let data = serde_json::json!({
+            "event_type": event_type.to_string(),
+            "timestamp": timestamp,
+            "collection_id": collection_id,
+            "metadata": metadata,
+            "confirmed": false, // Not yet committed to blockchain
+        });
+
+        self.broadcast(EventType::AuditLogUpdate, data).await;
+        debug!(event_type = %event_type, "Broadcasted audit log update");
+    }
+
     /// Get current connection count
     #[allow(dead_code)]
     pub async fn connection_count(&self) -> usize {

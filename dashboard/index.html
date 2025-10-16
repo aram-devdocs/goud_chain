@@ -843,8 +843,14 @@
                         </thead>
                         <tbody>
                             <template x-for="log in auditLogs" :key="log.timestamp">
-                                <tr class="border-b border-zinc-800 hover:bg-zinc-900 transition">
-                                    <td class="px-4 py-3 text-zinc-300" x-text="formatTimestamp(log.timestamp)"></td>
+                                <tr class="border-b border-zinc-800 hover:bg-zinc-900 transition"
+                                    :class="{'bg-zinc-900/50': log.confirmed === false}">
+                                    <td class="px-4 py-3 text-zinc-300">
+                                        <span x-text="formatTimestamp(log.timestamp)"></span>
+                                        <span x-show="log.confirmed === false"
+                                              class="ml-2 px-1.5 py-0.5 text-xs bg-yellow-900/30 border border-yellow-700/50 text-yellow-400"
+                                              title="Pending blockchain confirmation">Pending</span>
+                                    </td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-1 text-xs border border-zinc-700"
                                               :class="{
@@ -1195,6 +1201,7 @@
                             this.wsSubscribe('blockchain_update');
                             this.wsSubscribe('collection_update');
                             this.wsSubscribe('peer_update');
+                            this.wsSubscribe('audit_log_update');
                         };
 
                         this.ws.onmessage = (event) => {
@@ -1310,16 +1317,37 @@
                                 // Refresh data
                                 this.loadNetworkInfo();
 
-                            } else if (msg.event === 'audit_log_created') {
-                                // Increment counter
+                            } else if (msg.event === 'audit_log_update') {
+                                // Real-time audit log notification
                                 this.newAuditLogsCount++;
 
-                                // Activity feed
-                                this.addActivity('audit', `Security event logged`, {
-                                    event_type: msg.event_type
+                                // Activity feed with event type
+                                const eventTypeName = msg.event_type || 'Unknown';
+                                this.addActivity('audit', `${eventTypeName} event logged`, {
+                                    event_type: eventTypeName,
+                                    timestamp: msg.timestamp,
+                                    confirmed: msg.confirmed || false
                                 });
 
-                                // Don't auto-refresh audit logs (user must click)
+                                // Always update audit logs array (regardless of active tab)
+                                // This ensures logs are visible when user switches to audit tab
+                                const auditEntry = {
+                                    event_type: eventTypeName,
+                                    timestamp: msg.timestamp,
+                                    collection_id: msg.collection_id || null,
+                                    ip_hash: '(pending)', // Will be set when blockchain confirms
+                                    metadata: msg.metadata || {},
+                                    invalidated: false,
+                                    confirmed: msg.confirmed || false
+                                };
+
+                                // Prepend to audit logs (newest first)
+                                this.auditLogs.unshift(auditEntry);
+
+                                // Limit to 50 entries to prevent memory issues
+                                if (this.auditLogs.length > 50) {
+                                    this.auditLogs = this.auditLogs.slice(0, 50);
+                                }
                             } else if (msg.event === 'metrics_update') {
                                 // Update metrics without toast (silent update)
                                 this.metrics = msg.metrics || this.metrics;

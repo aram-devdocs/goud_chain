@@ -33,11 +33,22 @@ use crate::types::{
 /// This allows AuditLogger to remain independent of the network layer (Layer 3 doesn't depend on Layer 4)
 pub type BroadcastCallback = Arc<dyn Fn(&Block) + Send + Sync>;
 
+/// Callback function type for audit log event broadcasting (WebSocket)
+/// This allows AuditLogger to remain independent of the presentation layer (Layer 3 doesn't depend on Layer 5)
+/// Parameters: event_type, timestamp, collection_id, metadata
+pub type AuditEventCallback =
+    Arc<dyn Fn(AuditEventType, i64, Option<String>, serde_json::Value) + Send + Sync>;
+
 /// Audit logger - manages audit log batching and storage on blockchain
 pub struct AuditLogger {
     blockchain: Arc<RwLock<Blockchain>>,
     blockchain_store: Arc<BlockchainStore>,
     broadcast_callback: Option<BroadcastCallback>,
+
+    /// Callback for real-time audit log event notifications (WebSocket)
+    /// Allows immediate UI updates while batching for blockchain efficiency
+    /// Layer 3 doesn't depend on Layer 5 (presentation) - uses callback pattern
+    audit_event_callback: Option<AuditEventCallback>,
 
     /// Batching buffer: account_hash → Vec<AuditLogEntry>
     /// Events accumulate here until flush (10s or 50 events)
@@ -61,15 +72,18 @@ impl AuditLogger {
     /// * `blockchain` - Shared blockchain state
     /// * `blockchain_store` - RocksDB storage for blocks
     /// * `broadcast_callback` - Optional callback for broadcasting blocks to P2P network
+    /// * `audit_event_callback` - Optional callback for real-time audit log notifications (WebSocket)
     pub fn new(
         blockchain: Arc<RwLock<Blockchain>>,
         blockchain_store: Arc<BlockchainStore>,
         broadcast_callback: Option<BroadcastCallback>,
+        audit_event_callback: Option<AuditEventCallback>,
     ) -> Arc<Self> {
         let logger = Arc::new(Self {
             blockchain,
             blockchain_store,
             broadcast_callback,
+            audit_event_callback,
             pending_logs: Arc::new(StdMutex::new(HashMap::new())),
             flush_task: None,
             api_key_cache: Arc::new(StdMutex::new(HashMap::new())),
@@ -103,15 +117,15 @@ impl AuditLogger {
         let entry = AuditLogEntry {
             event_type,
             timestamp: Utc::now().timestamp_millis(),
-            collection_id,
+            collection_id: collection_id.clone(),
             ip_hash: hash_ip_truncated(client_ip),
-            metadata,
+            metadata: metadata.clone(),
             invalidated: false,
         };
 
         let mut pending = self.pending_logs.lock().unwrap();
         let logs = pending.entry(account_hash.clone()).or_default();
-        logs.push(entry);
+        logs.push(entry.clone());
 
         // Check if batch is ready (50 events threshold)
         if logs.len() >= AUDIT_BATCH_SIZE {
@@ -122,6 +136,23 @@ impl AuditLogger {
                 "Audit log batch threshold reached, triggering immediate flush"
             );
             // Note: Actual flush happens in background task
+        } else {
+            drop(pending); // Release lock before async broadcast
+        }
+
+        // Broadcast audit log event immediately via callback (non-blocking)
+        // This provides instant UI feedback while blockchain batching continues in background
+        if let Some(ref callback) = self.audit_event_callback {
+            let callback = Arc::clone(callback);
+            let event_type = entry.event_type;
+            let timestamp = entry.timestamp;
+            let collection_id = entry.collection_id.clone();
+            let metadata = entry.metadata.clone();
+
+            // Execute callback in background (non-blocking)
+            tokio::spawn(async move {
+                callback(event_type, timestamp, collection_id, metadata);
+            });
         }
 
         Ok(())

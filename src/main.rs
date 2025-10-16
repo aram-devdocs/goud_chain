@@ -105,16 +105,27 @@ async fn main() {
         });
     });
 
+    // Initialize WebSocket broadcaster for real-time updates
+    let ws_broadcaster = Arc::new(WebSocketBroadcaster::new());
+    info!("WebSocket broadcaster initialized");
+
+    // Create audit event callback for real-time notifications (avoids layer violation)
+    let ws_for_audit = Arc::clone(&ws_broadcaster);
+    let audit_event_callback = Arc::new(move |event_type, timestamp, collection_id, metadata| {
+        let ws = Arc::clone(&ws_for_audit);
+        tokio::spawn(async move {
+            ws.broadcast_audit_log_update(event_type, timestamp, collection_id, metadata)
+                .await;
+        });
+    });
+
     let audit_logger = Arc::new(AuditLogger::new(
         Arc::clone(&blockchain),
         Arc::clone(&blockchain_store),
         Some(broadcast_callback),
+        Some(audit_event_callback),
     ));
-    info!("Audit logger initialized with background flush task");
-
-    // Initialize WebSocket broadcaster for real-time updates
-    let ws_broadcaster = Arc::new(WebSocketBroadcaster::new());
-    info!("WebSocket broadcaster initialized");
+    info!("Audit logger initialized with background flush task and real-time WebSocket updates");
 
     // Create shared state for handlers
     let submit_data_state = api::handlers::SubmitDataState {

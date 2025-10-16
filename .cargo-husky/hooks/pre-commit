@@ -1,11 +1,19 @@
 #!/bin/sh
 
 # Rust checks
-echo "Running Rust formatting check..."
-cargo fmt -- --check || {
-    echo "Error: Code is not formatted. Run 'cargo fmt' to fix."
-    exit 1
-}
+echo "Running Rust formatting..."
+# Format all Rust code
+cargo fmt
+
+# Detect which Rust files were modified by formatting
+formatted_files=$(git diff --name-only | grep '\.rs$' || true)
+if [ -n "$formatted_files" ]; then
+    echo "Formatted files: $formatted_files"
+    echo "$formatted_files" | xargs git add
+    echo "Formatted files have been added to staging."
+else
+    echo "Code is already properly formatted."
+fi
 
 echo "Running Clippy (warnings as errors)..."
 cargo clippy --all-targets --all-features -- -D warnings || {
