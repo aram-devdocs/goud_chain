@@ -20,9 +20,12 @@ use utoipa_axum::router::OpenApiRouter;
 
 use api::{ApiDoc, RateLimiter, WebSocketBroadcaster};
 use config::Config;
+use constants::NONCE_CLEANUP_INTERVAL_SECONDS;
 use domain::Block;
 use network::P2PNode;
-use storage::{init_data_directory, load_blockchain, AuditLogger, BlockchainStore, RateLimitStore};
+use storage::{
+    init_data_directory, load_blockchain, AuditLogger, BlockchainStore, NonceStore, RateLimitStore,
+};
 
 #[tokio::main]
 async fn main() {
@@ -83,6 +86,31 @@ async fn main() {
     );
 
     let rate_limiter = Arc::new(RateLimiter::new(rate_limit_store, bypass_keys));
+
+    // Initialize nonce store for replay protection (reuses same RocksDB instance)
+    let nonce_store = Arc::new(NonceStore::new(blockchain_store.get_db()));
+    info!("Nonce store initialized for replay attack prevention");
+
+    // Start background task for periodic nonce cleanup
+    let nonce_store_cleanup = Arc::clone(&nonce_store);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            NONCE_CLEANUP_INTERVAL_SECONDS,
+        ));
+        loop {
+            interval.tick().await;
+            match nonce_store_cleanup.cleanup_expired_nonces() {
+                Ok(deleted) => {
+                    if deleted > 0 {
+                        info!("Nonce cleanup: removed {} expired entries", deleted);
+                    }
+                }
+                Err(e) => {
+                    error!("Nonce cleanup failed: {}", e);
+                }
+            }
+        }
+    });
 
     // Start P2P node (async-first)
     let p2p_node = Arc::new(P2PNode::new(
@@ -148,6 +176,7 @@ async fn main() {
         .layer(Extension(p2p_node))
         .layer(Extension(config.clone()))
         .layer(Extension(rate_limiter))
+        .layer(Extension(nonce_store))
         .layer(Extension(submit_data_state))
         .layer(Extension(Arc::clone(&ws_broadcaster)))
         .split_for_parts();

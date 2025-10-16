@@ -4,12 +4,14 @@ use utoipa::{Modify, OpenApi};
 pub mod auth;
 pub mod internal_client;
 pub mod rate_limiter;
+pub mod request_signature;
 pub mod routes;
 pub mod schemas;
 pub mod websocket;
 
 // Re-export commonly used functions
 pub use rate_limiter::{RateLimitResult, RateLimiter};
+pub use request_signature::{validate_request_timestamp, SignedRequest};
 pub use websocket::WebSocketBroadcaster;
 
 // OpenAPI tags for route grouping

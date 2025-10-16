@@ -1,5 +1,6 @@
 pub mod audit_log;
 pub mod blockchain_store;
+pub mod nonce_store;
 pub mod rate_limit_store;
 
 use std::fs;
@@ -13,6 +14,7 @@ use crate::types::{GoudChainError, Result};
 // Re-export storage modules
 pub use self::audit_log::AuditLogger;
 pub use self::blockchain_store::BlockchainStore;
+pub use self::nonce_store::NonceStore;
 pub use self::rate_limit_store::{BanLevel, RateLimitStore};
 
 /// Load the blockchain from RocksDB or create a new one
