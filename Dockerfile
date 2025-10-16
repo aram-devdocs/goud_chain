@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 ENV ROCKSDB_LIB_DIR=/usr/lib
 ENV SNAPPY_LIB_DIR=/usr/lib
 
-# Install cargo-chef for dependency caching
-RUN cargo install cargo-chef
+# Install cargo-chef for dependency caching (pinned version for Rust 1.83 compatibility)
+RUN cargo install cargo-chef --version 0.1.67 --locked
 
 # Copy manifests first to cache dependency compilation
 COPY Cargo.toml Cargo.lock* ./
