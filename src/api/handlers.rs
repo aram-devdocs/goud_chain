@@ -24,7 +24,7 @@ use super::auth::{
 use super::internal_client::{
     forward_request_to_node, forward_request_with_headers, get_validator_node_address,
 };
-use super::{RateLimitResult, RateLimiter};
+use super::{RateLimitResult, RateLimiter, WebSocketBroadcaster};
 
 // ========== HELPER TYPES ==========
 
@@ -330,6 +330,7 @@ pub async fn handle_create_account(
     Extension(p2p): Extension<Arc<P2PNode>>,
     Extension(rate_limiter): Extension<Arc<RateLimiter>>,
     Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    Extension(ws_broadcaster): Extension<Arc<WebSocketBroadcaster>>,
     headers: HeaderMap,
     Json(request): Json<CreateAccountRequest>,
 ) -> Result<AxumResponse> {
@@ -522,6 +523,15 @@ pub async fn handle_create_account(
                                 p2p_clone.broadcast_block(&block_clone).await;
                             });
 
+                            // Broadcast WebSocket blockchain update event
+                            let ws_clone = Arc::clone(&ws_broadcaster);
+                            let bhash = block.hash.clone();
+                            tokio::spawn(async move {
+                                ws_clone
+                                    .broadcast_blockchain_update(block_index, bhash)
+                                    .await;
+                            });
+
                             Ok(add_rate_limit_headers(response_obj, rate_headers))
                         }
                         Err(e) => {
@@ -633,16 +643,27 @@ pub async fn handle_login(
 
 // ========== DATA HANDLERS ==========
 
+/// Shared state for data submission handler
+#[derive(Clone)]
+pub struct SubmitDataState {
+    pub audit_logger: Arc<AuditLogger>,
+    pub ws_broadcaster: Arc<WebSocketBroadcaster>,
+}
+
 /// Handle POST /data/submit - Submit encrypted data (requires API key auth)
 pub async fn handle_submit_data(
-    Extension(blockchain): Extension<Arc<RwLock<Blockchain>>>,
-    Extension(p2p): Extension<Arc<P2PNode>>,
-    Extension(config): Extension<Arc<Config>>,
-    Extension(rate_limiter): Extension<Arc<RateLimiter>>,
-    Extension(audit_logger): Extension<Arc<AuditLogger>>,
+    blockchain: Extension<Arc<RwLock<Blockchain>>>,
+    p2p: Extension<Arc<P2PNode>>,
+    config: Extension<Arc<Config>>,
+    rate_limiter: Extension<Arc<RateLimiter>>,
+    Extension(state): Extension<SubmitDataState>,
     headers: HeaderMap,
     Json(request): Json<SubmitDataRequest>,
 ) -> Result<AxumResponse> {
+    let Extension(blockchain) = blockchain;
+    let Extension(p2p) = p2p;
+    let Extension(config) = config;
+    let Extension(rate_limiter) = rate_limiter;
     // Extract Authorization header (needed for forwarding)
     let auth_header_value = extract_auth_header(&headers);
 
@@ -864,7 +885,7 @@ pub async fn handle_submit_data(
                                     };
 
                                     // Audit log: Data submitted (batched and flushed every 10s)
-                                    if let Err(e) = audit_logger.log(
+                                    if let Err(e) = state.audit_logger.log(
                                         &api_key,
                                         AuditEventType::DataSubmitted,
                                         Some(collection_id.clone()),
@@ -884,6 +905,19 @@ pub async fn handle_submit_data(
                                     let block_clone = block.clone();
                                     tokio::spawn(async move {
                                         p2p_clone.broadcast_block(&block_clone).await;
+                                    });
+
+                                    // Broadcast WebSocket events for real-time updates
+                                    let ws_clone = Arc::clone(&state.ws_broadcaster);
+                                    let cid = collection_id.clone();
+                                    let bhash = block.hash.clone();
+                                    tokio::spawn(async move {
+                                        ws_clone
+                                            .broadcast_collection_update(cid, block_index)
+                                            .await;
+                                        ws_clone
+                                            .broadcast_blockchain_update(block_index, bhash)
+                                            .await;
                                     });
 
                                     Ok(add_rate_limit_headers(response_obj, rate_headers))

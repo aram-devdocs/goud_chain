@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 
-use api::RateLimiter;
+use api::{RateLimiter, WebSocketBroadcaster};
 use config::Config;
 use domain::Block;
 use network::P2PNode;
@@ -101,12 +101,22 @@ async fn main() {
         });
     });
 
-    let audit_logger = AuditLogger::new(
+    let audit_logger = Arc::new(AuditLogger::new(
         Arc::clone(&blockchain),
         Arc::clone(&blockchain_store),
         Some(broadcast_callback),
-    );
+    ));
     info!("Audit logger initialized with background flush task");
+
+    // Initialize WebSocket broadcaster for real-time updates
+    let ws_broadcaster = Arc::new(WebSocketBroadcaster::new());
+    info!("WebSocket broadcaster initialized");
+
+    // Create shared state for handlers
+    let submit_data_state = api::handlers::SubmitDataState {
+        audit_logger: Arc::clone(&audit_logger),
+        ws_broadcaster: Arc::clone(&ws_broadcaster),
+    };
 
     // Build HTTP router with all endpoints
     let app = Router::new()
@@ -142,24 +152,28 @@ async fn main() {
         )
         // Audit Logging
         .route("/api/audit", get(api::handlers::handle_get_audit_logs))
+        // WebSocket - Real-time event streaming
+        .route("/ws", get(api::websocket::handle_websocket_upgrade))
         // Shared state via Extension middleware
         .layer(Extension(blockchain))
         .layer(Extension(p2p_node))
         .layer(Extension(config.clone()))
         .layer(Extension(rate_limiter))
-        .layer(Extension(audit_logger));
+        .layer(Extension(submit_data_state))
+        .layer(Extension(audit_logger))
+        .layer(Extension(ws_broadcaster));
 
     // NOTE: CORS handled by nginx reverse proxy (see nginx/cors.conf)
     // Removed CorsLayer to prevent duplicate Access-Control-Allow-Origin headers
 
     let bind_addr = config.http_bind_addr();
 
-    info!("\n🔗 Goud Chain - Encrypted Blockchain (Async-First Architecture)");
+    info!("\nGoud Chain - Encrypted Blockchain (Async-First Architecture)");
     info!("   Node ID: {}", config.node_id);
     info!("   HTTP API: http://{}", bind_addr);
     info!("   P2P Port: {}", config.p2p_port);
     info!("   Storage: RocksDB (high-performance embedded database)");
-    info!("\n📊 Endpoints:");
+    info!("\nEndpoints:");
     info!("   POST /account/create   - Create new account");
     info!("   POST /account/login    - Login to existing account");
     info!("   POST /data/submit      - Submit encrypted JSON data");

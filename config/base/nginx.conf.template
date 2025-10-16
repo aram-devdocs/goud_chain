@@ -100,6 +100,44 @@ http {
             access_log off;
         }
 
+        # WebSocket endpoint - Real-time event streaming with sticky sessions
+        # Requires persistent connection to same node (hash-based routing)
+        location /ws {
+            # Handle CORS preflight (OPTIONS) requests
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Protocol" always;
+                add_header Content-Length 0;
+                return 204;
+            }
+
+            # Hash-based routing ensures sticky sessions (WebSocket requires same node)
+            proxy_pass http://blockchain_nodes;
+
+            # WebSocket upgrade headers
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            # Proxy standard headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Extended timeouts for long-lived WebSocket connections (7 days)
+            proxy_connect_timeout 7d;
+            proxy_send_timeout 7d;
+            proxy_read_timeout 7d;
+
+            # Disable buffering for real-time WebSocket communication
+            proxy_buffering off;
+
+            # CORS headers for browser WebSocket connections
+            include /etc/nginx/cors.conf;
+        }
+
 {{ACCOUNT_OPERATIONS_ROUTING}}
 
         # AUDIT API - Authenticated read operations (Phase 4 - Operational Security)

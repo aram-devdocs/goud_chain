@@ -5,6 +5,7 @@ Cargo.lock
 *.pdb
 
 cs-audit.md
+docs/ZERO_KNOWLEDGE_ENHANCEMENT_REPORT.md
 
 # IDE
 .idea/

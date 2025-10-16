@@ -7,17 +7,17 @@ shift || true
 
 case "$COMMAND" in
   start)
-    echo "🚀 Starting Goud Chain network (production mode)..."
+    echo "[START] Starting Goud Chain network (production mode)..."
     echo ""
-    echo "📋 Generating latest configs from templates..."
+    echo "[CONFIG] Generating latest configs from templates..."
     ./config/scripts/generate-configs.sh local
     echo ""
-    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "[API] LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
-    echo "🌐 Dashboard: http://localhost:3000"
+    echo "[WEB] Dashboard: http://localhost:3000"
     echo ""
-    echo "📡 Individual Nodes (for debugging):"
+    echo "[DEBUG] Individual Nodes (for debugging):"
     echo "   Node 1: http://localhost:8081"
     echo "   Node 2: http://localhost:8082"
     echo "   Node 3: http://localhost:8083"
@@ -26,123 +26,123 @@ case "$COMMAND" in
     ;;
 
   dev)
-    echo "🔥 Starting Goud Chain network (development mode with hot reload)..."
+    echo "[HOT] Starting Goud Chain network (development mode with hot reload)..."
     echo ""
-    echo "📋 Generating latest configs from templates..."
+    echo "[CONFIG] Generating latest configs from templates..."
     ./config/scripts/generate-configs.sh local
     echo ""
-    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "[API] LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
-    echo "🌐 Dashboard: http://localhost:3000"
+    echo "[WEB] Dashboard: http://localhost:3000"
     echo ""
-    echo "📓 Jupyter Lab: http://localhost:8888"
+    echo "[JUPYTER] Jupyter Lab: http://localhost:8888"
     echo "   └─ API testing notebooks and experiments"
     echo ""
-    echo "📡 Individual Nodes (for debugging):"
+    echo "[DEBUG] Individual Nodes (for debugging):"
     echo "   Node 1: http://localhost:8081"
     echo "   Node 2: http://localhost:8082"
     echo "   Node 3: http://localhost:8083"
     echo ""
-    echo "✨ Hot reload enabled (DEBUG MODE):"
+    echo "[DEV] Hot reload enabled (DEBUG MODE):"
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
     echo "   - Nodes: Changes to src/ will auto-recompile and restart (~5-10s)"
     echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
-    echo "   ⚠️  Debug builds are 10-100x slower (use './run dev-perf' for production speed)"
+    echo "   [WARN]  Debug builds are 10-100x slower (use './run dev-perf' for production speed)"
     echo ""
     docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml up --build
     ;;
 
   dev-perf)
-    echo "🚀 Starting Goud Chain network (development mode with RELEASE builds)..."
+    echo "[START] Starting Goud Chain network (development mode with RELEASE builds)..."
     echo ""
-    echo "📋 Generating latest configs from templates..."
+    echo "[CONFIG] Generating latest configs from templates..."
     ./config/scripts/generate-configs.sh local
     echo ""
-    echo "⚡ LOAD BALANCER (Primary API): http://localhost:8080"
+    echo "[API] LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
-    echo "🌐 Dashboard: http://localhost:3000"
+    echo "[WEB] Dashboard: http://localhost:3000"
     echo ""
-    echo "📓 Jupyter Lab: http://localhost:8888"
+    echo "[JUPYTER] Jupyter Lab: http://localhost:8888"
     echo "   └─ API testing notebooks and experiments"
     echo ""
-    echo "📡 Individual Nodes (for debugging):"
+    echo "[DEBUG] Individual Nodes (for debugging):"
     echo "   Node 1: http://localhost:8081"
     echo "   Node 2: http://localhost:8082"
     echo "   Node 3: http://localhost:8083"
     echo ""
-    echo "✨ Hot reload enabled (RELEASE MODE):"
+    echo "[DEV] Hot reload enabled (RELEASE MODE):"
     echo "   - Dashboard: Changes to dashboard/ will auto-reload"
     echo "   - Nodes: Changes to src/ will auto-recompile (~30-60s) with optimizations"
     echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
-    echo "   ⚡ Release builds match production performance (~20-50ms block creation)"
+    echo "   [API] Release builds match production performance (~20-50ms block creation)"
     echo ""
     docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-perf.yml up --build
     ;;
 
   build)
-    echo "🔨 Building Docker images..."
+    echo "[BUILD] Building Docker images..."
     docker compose -f docker-compose.local.yml build
     ;;
 
   down|stop)
-    echo "🛑 Stopping Goud Chain network..."
+    echo "[STOP] Stopping Goud Chain network..."
     docker compose -f docker-compose.local.yml down
     ;;
 
   clean)
-    echo "🧹 Cleaning up containers, images, and volumes..."
+    echo "[CLEAN] Cleaning up containers, images, and volumes..."
     docker compose -f docker-compose.local.yml down --rmi all --volumes --remove-orphans
     ;;
 
   logs)
     NODE=${1:-}
     if [ -z "$NODE" ]; then
-      echo "📋 Showing logs from all nodes..."
+      echo "[CONFIG] Showing logs from all nodes..."
       docker compose -f docker-compose.local.yml logs -f
     else
-      echo "📋 Showing logs from $NODE..."
+      echo "[CONFIG] Showing logs from $NODE..."
       docker compose -f docker-compose.local.yml logs -f "$NODE"
     fi
     ;;
 
   status)
-    echo "📊 Network Status"
+    echo "[STATUS] Network Status"
     echo "================="
     echo ""
 
     # Check load balancer
-    echo "⚡ Load Balancer (http://localhost:8080)"
+    echo "[API] Load Balancer (http://localhost:8080)"
     if curl -s "http://localhost:8080/lb/health" > /dev/null 2>&1; then
       LB_INFO=$(curl -s "http://localhost:8080/lb/health")
-      echo "   ✅ Online"
+      echo "   [OK] Online"
       echo "   $(echo $LB_INFO | jq -r '.service')"
     else
-      echo "   ❌ Offline"
+      echo "   [ERR] Offline"
     fi
     echo ""
 
     # Check individual nodes
     for node in node1 node2 node3; do
       port=$((8080 + ${node:4}))
-      echo "🔗 $node (http://localhost:$port)"
+      echo "[NODE] $node (http://localhost:$port)"
 
       if curl -s "http://localhost:$port/health" > /dev/null 2>&1; then
         HEALTH=$(curl -s "http://localhost:$port/health")
         CHAIN_LENGTH=$(echo $HEALTH | jq -r '.chain_length')
         PEERS=$(echo $HEALTH | jq -r '.peer_count')
         NODE_ID=$(echo $HEALTH | jq -r '.node_id')
-        echo "   ✅ Online | Chain Length: $CHAIN_LENGTH | Peers: $PEERS | ID: $NODE_ID"
+        echo "   [OK] Online | Chain Length: $CHAIN_LENGTH | Peers: $PEERS | ID: $NODE_ID"
       else
-        echo "   ❌ Offline"
+        echo "   [ERR] Offline"
       fi
       echo ""
     done
     ;;
 
   lb-status)
-    echo "⚡ Load Balancer Status"
+    echo "[API] Load Balancer Status"
     echo "======================"
     echo ""
 
@@ -153,7 +153,7 @@ case "$COMMAND" in
       echo "NGINX Stats:"
       curl -s "http://localhost:8080/lb/status"
     else
-      echo "❌ Load balancer is offline"
+      echo "[ERR] Load balancer is offline"
       exit 1
     fi
     ;;
@@ -167,10 +167,10 @@ case "$COMMAND" in
       node1) PORT=8081 ;;
       node2) PORT=8082 ;;
       node3) PORT=8083 ;;
-      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+      *) echo "[ERR] Invalid node. Use: node1, node2, or node3"; exit 1 ;;
     esac
 
-    echo "⛏️  Mining block on $NODE with data: \"$DATA\""
+    echo "Mining block on $NODE with data: \"$DATA\""
     curl -X POST "http://localhost:$PORT/mine" \
       -H "Content-Type: application/json" \
       -d "{\"data\": \"$DATA\"}" | jq .
@@ -184,10 +184,10 @@ case "$COMMAND" in
       node1) PORT=8081 ;;
       node2) PORT=8082 ;;
       node3) PORT=8083 ;;
-      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+      *) echo "[ERR] Invalid node. Use: node1, node2, or node3"; exit 1 ;;
     esac
 
-    echo "📊 Blockchain from $NODE:"
+    echo "Blockchain from $NODE:"
     curl -s "http://localhost:$PORT/chain" | jq .
     ;;
 
@@ -199,10 +199,10 @@ case "$COMMAND" in
       node1) PORT=8081 ;;
       node2) PORT=8082 ;;
       node3) PORT=8083 ;;
-      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+      *) echo "[ERR] Invalid node. Use: node1, node2, or node3"; exit 1 ;;
     esac
 
-    echo "🔄 Syncing $NODE with peers..."
+    echo "Syncing $NODE with peers..."
     curl -s "http://localhost:$PORT/sync" | jq .
     ;;
 
@@ -214,10 +214,10 @@ case "$COMMAND" in
       node1) PORT=8081 ;;
       node2) PORT=8082 ;;
       node3) PORT=8083 ;;
-      *) echo "❌ Invalid node. Use: node1, node2, or node3"; exit 1 ;;
+      *) echo "[ERR] Invalid node. Use: node1, node2, or node3"; exit 1 ;;
     esac
 
-    echo "🌐 Peers of $NODE:"
+    echo "Peers of $NODE:"
     curl -s "http://localhost:$PORT/peers" | jq .
     ;;
 
@@ -227,47 +227,47 @@ case "$COMMAND" in
     ;;
 
   run)
-    echo "▶️  Running single node locally (without Docker)..."
+    echo "Running single node locally (without Docker)..."
     cargo run
     ;;
 
   check)
-    echo "✅ Checking code..."
+    echo "Checking code..."
     cargo check
     ;;
 
   fmt)
-    echo "🎨 Formatting code..."
+    echo "[FMT] Formatting code..."
     cargo fmt
     ;;
 
   demo)
-    echo "🎬 Running demo scenario..."
+    echo "[DEMO] Running demo scenario..."
     echo ""
 
-    echo "1️⃣  Mining block on node1..."
+    echo "[1/4] Mining block on node1..."
     curl -X POST "http://localhost:8081/mine" \
       -H "Content-Type: application/json" \
       -d '{"data": "Alice sends 10 coins to Bob"}' 2>/dev/null | jq .
 
     echo ""
-    echo "2️⃣  Waiting for propagation..."
+    echo "[2/4] Waiting for propagation..."
     sleep 2
 
     echo ""
-    echo "3️⃣  Mining block on node2..."
+    echo "[3/4] Mining block on node2..."
     curl -X POST "http://localhost:8082/mine" \
       -H "Content-Type: application/json" \
       -d '{"data": "Bob sends 5 coins to Charlie"}' 2>/dev/null | jq .
 
     echo ""
-    echo "4️⃣  Checking all node chains..."
+    echo "[4/4] Checking all node chains..."
     sleep 2
 
     for node in node1 node2 node3; do
       port=$((8080 + ${node:4}))
       echo ""
-      echo "📊 $node chain length:"
+      echo "$node chain length:"
       curl -s "http://localhost:$port/chain" | jq '.chain | length'
     done
     ;;
@@ -277,7 +277,7 @@ case "$COMMAND" in
     echo ""
     echo "Usage: ./run [command] [args]"
     echo ""
-    echo "🚀 PRIMARY API ENDPOINT: http://localhost:8080 (NGINX Load Balancer)"
+    echo "[START] PRIMARY API ENDPOINT: http://localhost:8080 (NGINX Load Balancer)"
     echo ""
     echo "Network Commands:"
     echo "  (no args)           Start the 3-node network (production)"
@@ -321,7 +321,7 @@ case "$COMMAND" in
     ;;
 
   *)
-    echo "❌ Unknown command: $COMMAND"
+    echo "[ERR] Unknown command: $COMMAND"
     echo "Run './run help' for available commands"
     exit 1
     ;;

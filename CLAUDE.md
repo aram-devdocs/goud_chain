@@ -113,3 +113,45 @@ Template-based system eliminates duplication and prevents environment drift. Bas
 **Audit Logging:** Blockchain-native storage (encrypted collections), privacy-preserving (per-user encryption, IP hashing), batched for efficiency (10s or 50 events), immutable and tamper-proof, non-blocking (fail-open design). Events: account creation/login, data submit/decrypt/list. Query performance: O(n) scan with pagination.
 
 **System Metrics:** Real-time monitoring via API endpoint. Metrics: chain statistics (length, latest block), network health (peer count), performance (cache hit rates, operations total). Prometheus-compatible for Grafana dashboards.
+
+**WebSocket Real-time Updates:** Bidirectional communication for live event streaming. Event types: blockchain updates, collection creation, peer changes, audit logs, metrics. Sticky session routing via nginx hash-based load balancing. Client auto-reconnect with exponential backoff, graceful degradation to polling.
+
+# AI Coding Standards
+
+## Communication Protocol
+
+Prohibited: emojis, AI filler phrases, legacy code references, speculative features, conversational error messages.
+
+Required: technical precision, declarative statements, professional tone, concise rationale.
+
+Examples:
+- Incorrect: "Great! Let's add a new feature."
+- Correct: "Add feature X. Implements Y protocol for Z use case."
+- Incorrect: "Oops! Something went wrong."
+- Correct: "Request failed: Invalid authentication token"
+
+## Visual Design
+
+Minimalist aesthetic with high information density and purposeful whitespace.
+
+Colors: zinc-950 to zinc-100 grayscale. Semantic accents: blue-500 (primary), green-500 (success), red-500 (error), yellow-500 (warning). Functional gradients only.
+
+Typography: clear hierarchy with large bold headers, medium subheaders, small body text. Monospace for technical data.
+
+Components: `rounded-lg border border-zinc-800 bg-zinc-950` (cards), white/zinc-800/semantic (buttons), `bg-zinc-900 border-zinc-700 focus:border-white` (inputs), zebra striping (tables). Borders only, no shadows.
+
+Interactions: immediate feedback, skeleton loaders, actionable empty states, progressive disclosure, functional transitions only.
+
+Hierarchy: critical information large and top-left, supporting details muted and contextual, metadata small monospace.
+
+Accessibility: high contrast (zinc-100 on zinc-950), keyboard navigation, clear focus indicators, descriptive errors.
+
+## Dashboard Standards
+
+Real-time: toast notifications (3s dismiss), activity feed (last 50 items), live metrics with timestamps, visible WebSocket status.
+
+Data: metrics show label/value/context/timestamp, tables show essential columns with expand, charts show trends without decoration, lists show recent first with pagination.
+
+Navigation: tabs for sections, breadcrumbs for depth, quick actions for workflows, search for datasets.
+
+Performance: skeleton loaders, optimistic updates, debounced search, virtualized lists.

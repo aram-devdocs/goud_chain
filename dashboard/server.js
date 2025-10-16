@@ -32,5 +32,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`🌐 Goud Chain Dashboard running at http://localhost:${PORT}`);
+    console.log(`Goud Chain Dashboard running at http://localhost:${PORT}`);
 });
