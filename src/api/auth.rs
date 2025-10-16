@@ -48,28 +48,26 @@ pub fn decrypt_api_key_from_jwt(encrypted_api_key: &str, config: &Config) -> Res
 
     let cipher = Aes256Gcm::new(&key_bytes.into());
 
-    // Decode base64
+    // Decode base64 - use generic error for all failures
     let combined = general_purpose::STANDARD
         .decode(encrypted_api_key)
-        .map_err(|e| GoudChainError::Internal(format!("Base64 decode failed: {}", e)))?;
+        .map_err(|_| GoudChainError::AuthenticationFailed)?;
 
     if combined.len() < NONCE_SIZE_BYTES {
-        return Err(GoudChainError::Internal(
-            "Invalid encrypted API key format".to_string(),
-        ));
+        return Err(GoudChainError::AuthenticationFailed);
     }
 
     // Split nonce and ciphertext
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_SIZE_BYTES);
     let nonce_array: &[u8; NONCE_SIZE_BYTES] = nonce_bytes
         .try_into()
-        .map_err(|_| GoudChainError::Internal("Invalid nonce size".to_string()))?;
+        .map_err(|_| GoudChainError::AuthenticationFailed)?;
     let nonce = (*nonce_array).into();
 
-    // Decrypt
+    // Decrypt - use generic error
     let plaintext = cipher
         .decrypt(&nonce, ciphertext)
-        .map_err(|_| GoudChainError::Unauthorized("Invalid session token".to_string()))?;
+        .map_err(|_| GoudChainError::AuthenticationFailed)?;
 
     Ok(plaintext)
 }
