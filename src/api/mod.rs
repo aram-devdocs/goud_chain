@@ -11,8 +11,11 @@ pub mod websocket;
 
 // Re-export commonly used functions
 pub use rate_limiter::{RateLimitResult, RateLimiter};
-pub use request_signature::{validate_request_timestamp, SignedRequest};
 pub use websocket::WebSocketBroadcaster;
+
+// Request signature validation (exported for future endpoint integration)
+#[allow(unused_imports)]
+pub use request_signature::{validate_request_timestamp, SignedRequest};
 
 // OpenAPI tags for route grouping
 use routes::{ACCOUNT_TAG, AUDIT_TAG, DATA_TAG, HEALTH_TAG, METRICS_TAG};

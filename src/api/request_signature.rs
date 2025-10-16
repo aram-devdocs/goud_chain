@@ -43,6 +43,7 @@ pub struct SignedRequest<T> {
 impl<T: Serialize> SignedRequest<T> {
     /// Construct the canonical message for signature verification
     /// Format: {payload_json}{nonce}{timestamp}
+    #[allow(dead_code)] // Used internally by validate() method
     fn canonical_message(&self) -> Result<String> {
         // Serialize payload to canonical JSON (deterministic)
         let payload_json = serde_json::to_string(&self.payload).map_err(|e| {
@@ -54,6 +55,7 @@ impl<T: Serialize> SignedRequest<T> {
     }
 
     /// Validate request signature with nonce and timestamp checks
+    #[allow(dead_code)] // Public API for endpoint integration (not yet used)
     pub fn validate(&self, nonce_store: &NonceStore) -> Result<()> {
         // 1. Validate timestamp (request freshness)
         validate_request_timestamp(self.timestamp)?;
@@ -81,6 +83,7 @@ impl<T: Serialize> SignedRequest<T> {
 }
 
 /// Validate request timestamp is within acceptable window
+#[allow(dead_code)] // Public API for endpoint integration (not yet used)
 pub fn validate_request_timestamp(timestamp: i64) -> Result<()> {
     let now = Utc::now().timestamp();
     let age = now - timestamp;

@@ -27,6 +27,7 @@ const NONCE_CACHE_SIZE: usize = 100_000;
 /// In-memory nonce cache entry
 #[derive(Debug, Clone)]
 struct NonceEntry {
+    #[allow(dead_code)] // Used for cache validation
     expiry_timestamp: i64,
 }
 
@@ -53,6 +54,7 @@ impl NonceStore {
     }
 
     /// Check if a nonce has been used (and is still valid)
+    #[allow(dead_code)] // Used by SignedRequest validation (not yet integrated into endpoints)
     pub fn is_nonce_used(&self, nonce: &str) -> Result<bool> {
         let now = Utc::now().timestamp();
 
@@ -108,6 +110,7 @@ impl NonceStore {
     }
 
     /// Record a nonce as used (with expiration)
+    #[allow(dead_code)] // Used by SignedRequest validation (not yet integrated into endpoints)
     pub fn record_nonce(&self, nonce: &str) -> Result<()> {
         let now = Utc::now().timestamp();
         let expiry_timestamp = now + NONCE_EXPIRATION_SECONDS;
@@ -115,7 +118,7 @@ impl NonceStore {
         // Store in RocksDB
         let key = format!("nonce:{}", nonce);
         self.db
-            .put(key.as_bytes(), &expiry_timestamp.to_be_bytes())
+            .put(key.as_bytes(), expiry_timestamp.to_be_bytes())
             .map_err(|e| GoudChainError::RocksDbError(format!("Failed to record nonce: {}", e)))?;
 
         // Add to cache
@@ -248,7 +251,7 @@ mod tests {
         let key = format!("nonce:{}", nonce);
         store
             .db
-            .put(key.as_bytes(), &past_timestamp.to_be_bytes())
+            .put(key.as_bytes(), past_timestamp.to_be_bytes())
             .unwrap();
 
         // Should return false (expired)
@@ -284,7 +287,7 @@ mod tests {
         let key = format!("nonce:{}", expired_nonce);
         store
             .db
-            .put(key.as_bytes(), &past_timestamp.to_be_bytes())
+            .put(key.as_bytes(), past_timestamp.to_be_bytes())
             .unwrap();
 
         // Add valid nonce
