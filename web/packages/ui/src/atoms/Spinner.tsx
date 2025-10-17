@@ -9,7 +9,7 @@ export interface SpinnerProps {
 export function Spinner({
   size = SpinnerSize.Medium,
   className,
-}: SpinnerProps): JSX.Element {
+}: SpinnerProps) {
   return (
     <div
       className={clsx(

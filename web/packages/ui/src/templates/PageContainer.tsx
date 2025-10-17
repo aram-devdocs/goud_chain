@@ -10,7 +10,7 @@ export function PageContainer({
   title,
   description,
   children,
-}: PageContainerProps): JSX.Element {
+}: PageContainerProps) {
   return (
     <div className="space-y-6">
       <div>

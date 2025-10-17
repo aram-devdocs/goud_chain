@@ -10,7 +10,7 @@ export function DashboardLayout({
   children,
   header,
   navigation,
-}: DashboardLayoutProps): JSX.Element {
+}: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-black">
       {header}

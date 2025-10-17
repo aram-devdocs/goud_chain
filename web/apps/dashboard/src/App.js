@@ -1,8 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useAuth, useToast } from '@workspace/hooks';
-import { Header, Navigation, Toast } from '@workspace/ui';
+import { useAuth, useToast } from '@goudchain/hooks';
+import { Header, Navigation, Toast } from '@goudchain/ui';
 import AuthPage from './pages/auth';
 import DashboardPage from './pages/dashboard';
 import SubmitPage from './pages/submit';

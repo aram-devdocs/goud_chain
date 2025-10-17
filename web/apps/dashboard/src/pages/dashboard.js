@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useChainInfo, useMetrics, useListCollections } from '@workspace/hooks';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@workspace/ui';
-import { formatNumber, formatRelativeTime } from '@workspace/utils';
+import { useChainInfo, useMetrics, useListCollections } from '@goudchain/hooks';
+import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui';
+import { formatNumber, formatRelativeTime } from '@goudchain/utils';
 export default function DashboardPage() {
     const { data: chainInfo, isLoading: chainLoading } = useChainInfo();
     const { data: metrics, isLoading: metricsLoading } = useMetrics();

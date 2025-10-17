@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useChainInfo } from '@workspace/hooks';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@workspace/ui';
-import { formatHash, formatRelativeTime } from '@workspace/utils';
+import { useChainInfo } from '@goudchain/hooks';
+import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui';
+import { formatHash, formatRelativeTime } from '@goudchain/utils';
 export default function ExplorerPage() {
     const { data: chainInfo, isLoading } = useChainInfo();
     if (isLoading) {

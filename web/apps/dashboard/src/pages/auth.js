@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
-import { useAuth, useCreateAccount, useLogin, useToast } from '@workspace/hooks';
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@workspace/ui';
+import { useAuth, useCreateAccount, useLogin, useToast } from '@goudchain/hooks';
+import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui';
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
     const [username, setUsername] = useState('');

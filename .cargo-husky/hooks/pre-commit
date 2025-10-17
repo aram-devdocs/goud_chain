@@ -77,12 +77,40 @@ if git diff --cached --name-only | grep -qE "^config/(base|environments)/"; then
     echo "✅ Generated configs staged for commit"
 fi
 
-# Dashboard checks
-echo "Running dashboard tests..."
-./dashboard/test.sh || {
-    echo "Error: Dashboard tests failed."
-    exit 1
-}
+# Frontend checks (if web/ directory exists and has changes)
+if [ -d "web" ] && git diff --cached --name-only | grep -q "^web/"; then
+    echo "Running frontend validation..."
+    cd web
+    
+    # Check if node_modules exists
+    if [ ! -d "node_modules" ]; then
+        echo "Installing frontend dependencies..."
+        pnpm install --frozen-lockfile
+    fi
+    
+    echo "Checking code formatting..."
+    pnpm format:check || {
+        echo "Error: Frontend code is not formatted. Run 'cd web && pnpm format' to fix."
+        cd ..
+        exit 1
+    }
+    
+    echo "Running ESLint..."
+    pnpm lint || {
+        echo "Error: ESLint found issues. Run 'cd web && pnpm lint:fix' to attempt auto-fix."
+        cd ..
+        exit 1
+    }
+    
+    echo "Type checking..."
+    pnpm type-check || {
+        echo "Error: TypeScript type check failed."
+        cd ..
+        exit 1
+    }
+    
+    cd ..
+fi
 
 # Terraform checks
 if [ -d "terraform" ]; then

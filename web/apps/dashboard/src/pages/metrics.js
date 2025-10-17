@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useMetrics } from '@workspace/hooks';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@workspace/ui';
-import { formatNumber, formatDate } from '@workspace/utils';
+import { useMetrics } from '@goudchain/hooks';
+import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui';
+import { formatNumber, formatDate } from '@goudchain/utils';
 export default function MetricsPage() {
     const { data, isLoading } = useMetrics();
     if (isLoading) {

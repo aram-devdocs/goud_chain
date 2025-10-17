@@ -7,7 +7,7 @@ export interface ToastProps {
   onDismiss: () => void
 }
 
-export function Toast({ type, message, onDismiss }: ToastProps): JSX.Element {
+export function Toast({ type, message, onDismiss }: ToastProps) {
   return (
     <div
       onClick={onDismiss}
