@@ -197,13 +197,31 @@ generate_dashboard_server_block() {
         listen ${NGINX_API_PORT};
         server_name ${DASHBOARD_SERVER_NAME};
 
+        # Static files (React app)
         location / {
-            proxy_pass http://${DASHBOARD_HOSTNAME}:${HTTP_PORT};
+            proxy_pass http://${DASHBOARD_HOSTNAME}:80;
 
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto \$scheme;
+
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # CORS
+            include /etc/nginx/cors.conf;
+        }
+
+        # Proxy API requests to backend nodes
+        location /api/ {
+            proxy_pass http://blockchain_nodes;
+
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_set_header Authorization \$http_authorization;
 
             proxy_http_version 1.1;
             proxy_set_header Connection "";

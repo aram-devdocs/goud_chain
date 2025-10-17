@@ -1,6 +1,6 @@
 # Docker Compose for Goud Chain - Local Development (3-node setup)
 # Generated from template - DO NOT EDIT MANUALLY
-# Generated: 2025-10-10 16:19:05 UTC
+# Generated: 2025-10-17 02:55:35 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.local.yml up -d
@@ -45,13 +45,15 @@ x-nginx-base: &nginx-base
 
 x-dashboard-base: &dashboard-base
   image: goud-chain-dashboard:latest
-  build: ./dashboard
+  build:
+    context: ./web
+    dockerfile: Dockerfile
   networks:
     - goud_network
   restart: unless-stopped
   logging: *default-logging
   healthcheck:
-    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
     interval: 30s
     timeout: 10s
     retries: 3
@@ -77,12 +79,12 @@ services:
           cpus: '0.10'
           memory: 32M
 
-  # Dashboard - Web UI
+  # Dashboard - Web UI (React + Nginx)
   dashboard:
     <<: *dashboard-base
     container_name: dashboard
     ports:
-      - "3000:8080"
+      - "3000:80"
     deploy:
       resources:
         limits:
