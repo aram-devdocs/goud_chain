@@ -34,7 +34,8 @@ case "$COMMAND" in
     echo "[API] LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
-    echo "[WEB] Dashboard: http://localhost:3000"
+    echo "[WEB] React Dashboard: http://localhost:3001"
+    echo "   └─ Run 'cd web && pnpm dev' in separate terminal"
     echo ""
     echo "[JUPYTER] Jupyter Lab: http://localhost:8888"
     echo "   └─ API testing notebooks and experiments"
@@ -45,12 +46,12 @@ case "$COMMAND" in
     echo "   Node 3: http://localhost:8083"
     echo ""
     echo "[DEV] Hot reload enabled (DEBUG MODE):"
-    echo "   - Dashboard: Changes to dashboard/ will auto-reload"
+    echo "   - Dashboard: Start manually with 'cd web && pnpm dev' (:3001)"
     echo "   - Nodes: Changes to src/ will auto-recompile and restart (~5-10s)"
     echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
     echo "   [WARN]  Debug builds are 10-100x slower (use './run dev-perf' for production speed)"
     echo ""
-    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml up --build
+    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-react.yml up --build
     ;;
 
   dev-perf)
@@ -62,7 +63,8 @@ case "$COMMAND" in
     echo "[API] LOAD BALANCER (Primary API): http://localhost:8080"
     echo "   └─ Use this endpoint for all blockchain operations"
     echo ""
-    echo "[WEB] Dashboard: http://localhost:3000"
+    echo "[WEB] React Dashboard: http://localhost:3001"
+    echo "   └─ Run 'cd web && pnpm dev' in separate terminal"
     echo ""
     echo "[JUPYTER] Jupyter Lab: http://localhost:8888"
     echo "   └─ API testing notebooks and experiments"
@@ -73,12 +75,12 @@ case "$COMMAND" in
     echo "   Node 3: http://localhost:8083"
     echo ""
     echo "[DEV] Hot reload enabled (RELEASE MODE):"
-    echo "   - Dashboard: Changes to dashboard/ will auto-reload"
+    echo "   - Dashboard: Start manually with 'cd web && pnpm dev' (:3001)"
     echo "   - Nodes: Changes to src/ will auto-recompile (~30-60s) with optimizations"
     echo "   - Notebooks: Edit in VS Code, run in Jupyter browser"
     echo "   [API] Release builds match production performance (~20-50ms block creation)"
     echo ""
-    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-perf.yml up --build
+    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-perf.yml -f docker-compose.local.dev-react.yml up --build
     ;;
 
   build)
@@ -88,7 +90,7 @@ case "$COMMAND" in
 
   down|stop)
     echo "[STOP] Stopping Goud Chain network..."
-    docker compose -f docker-compose.local.yml down
+    docker compose -f docker-compose.local.yml -f docker-compose.local.dev.yml -f docker-compose.local.dev-perf.yml -f docker-compose.local.dev-react.yml down 2>/dev/null || docker compose -f docker-compose.local.yml down
     ;;
 
   clean)
