@@ -7,6 +7,7 @@
 **Problem:** Backend login response structure didn't match frontend types.
 
 **Backend returns:**
+
 ```json
 {
   "session_token": "eyJ0eXAi...",
@@ -16,15 +17,17 @@
 ```
 
 **Frontend expected:**
+
 ```typescript
 {
   session_token: string
-  user_id: string      // ❌ Wrong field name
-  expires_at: number   // ❌ Wrong field name
+  user_id: string // ❌ Wrong field name
+  expires_at: number // ❌ Wrong field name
 }
 ```
 
 **Fix:**
+
 - Updated `LoginResponse` in `web/packages/types/src/api.ts`
 - Changed `user_id` → `account_id`
 - Changed `expires_at` → `expires_in`
@@ -35,6 +38,7 @@
 **Problem:** Dashboard accessed `metrics?.network.peer_count` before data loaded.
 
 **Error:**
+
 ```
 Uncaught TypeError: Cannot read properties of undefined (reading 'peer_count')
 at DashboardPage (dashboard.tsx:64:38)
@@ -43,6 +47,7 @@ at DashboardPage (dashboard.tsx:64:38)
 **Cause:** API queries returned undefined (possibly 401 errors due to missing auth headers).
 
 **Fix:**
+
 - Added error states to all `useQuery` hooks
 - Added null checks: `if (!chainInfo || !metrics || !collections) return <Spinner />`
 - Show error message if queries fail
@@ -55,6 +60,7 @@ at DashboardPage (dashboard.tsx:64:38)
 **Original behavior:** `index.html` sent `Bearer ${this.sessionToken || this.apiKey}` for ALL requests.
 
 **Fix:**
+
 - Added `Authorization: Bearer ${token}` headers to `useMetrics()`
 - Added `Authorization: Bearer ${token}` headers to `useChainInfo()`
 - Matches original behavior
@@ -66,20 +72,23 @@ at DashboardPage (dashboard.tsx:64:38)
 **Solution:** Removed proxy, use direct calls to `http://localhost:8080` (matches `auth.html`).
 
 **Configuration:**
+
 ```typescript
 // web/packages/hooks/src/config.ts
 export const API_BASE =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:8080'  // Direct call in development
-    : window.location.origin    // Production (nginx proxies)
+    ? 'http://localhost:8080' // Direct call in development
+    : window.location.origin // Production (nginx proxies)
 ```
 
 **All API hooks now use:**
+
 ```typescript
 fetch(`${API_BASE}/account/create`, ...)
 ```
 
 Instead of:
+
 ```typescript
 fetch('/api/account/create', ...)  // ❌ Required proxy
 ```
@@ -87,6 +96,7 @@ fetch('/api/account/create', ...)  // ❌ Required proxy
 ## User Flow - Now Working
 
 ### 1. Create Account
+
 - Click "Create Account" tab
 - Click "Generate API Key" button (no username!)
 - API call: `POST http://localhost:8080/account/create`
@@ -94,6 +104,7 @@ fetch('/api/account/create', ...)  // ❌ Required proxy
 - Shows generated API key with copy button ✅
 
 ### 2. Confirm & Login
+
 - Check "I have saved my API key" checkbox
 - Click "Continue to Dashboard"
 - API call: `POST http://localhost:8080/account/login`
@@ -105,17 +116,19 @@ fetch('/api/account/create', ...)  // ❌ Required proxy
 - Updates React state: `isAuthenticated = true` ✅
 
 ### 3. Dashboard Renders
+
 - `AppContent` sees `isAuthenticated: true`
 - Renders `<DashboardPage />` ✅
 - Dashboard makes authenticated API calls:
   - `GET /chain` with `Bearer` token
-  - `GET /stats` with `Bearer` token  
+  - `GET /stats` with `Bearer` token
   - `GET /data/list` with `Bearer` token
 - Shows blockchain stats, collections, peers ✅
 
 ## Testing Instructions
 
 **1. Start backend:**
+
 ```bash
 cd /workspace
 git pull  # Get latest changes
@@ -123,12 +136,14 @@ git pull  # Get latest changes
 ```
 
 **2. Start frontend:**
+
 ```bash
 cd /workspace/web
 pnpm dev
 ```
 
 **3. Test flow:**
+
 - Open http://localhost:3000
 - Generate API key
 - Check confirmation box
@@ -153,6 +168,7 @@ Console logging is currently enabled to help verify the flow:
 ```
 
 **To remove debug logs later:** Delete `console.log` statements from:
+
 - `web/packages/hooks/src/useAuth.ts`
 - `web/apps/dashboard/src/App.tsx`
 - `web/apps/dashboard/src/pages/auth.tsx`

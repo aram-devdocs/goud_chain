@@ -9,11 +9,11 @@ export function useMetrics() {
     queryFn: async () => {
       const token = localStorage.getItem('session_token')
       const headers: Record<string, string> = {}
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
       }
-      
+
       const response = await fetch(`${API_BASE}/stats`, { headers })
       if (!response.ok) {
         await handleApiError(response)
