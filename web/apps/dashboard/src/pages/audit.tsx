@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useAuditLogs } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Spinner,
+} from '@goudchain/ui'
 import { formatDate, formatHash } from '@goudchain/utils'
+import { SpinnerSize } from '@goudchain/types'
 
 export default function AuditPage() {
   const [limit] = useState(50)
@@ -10,7 +17,7 @@ export default function AuditPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+        <Spinner size={SpinnerSize.Large} />
       </div>
     )
   }
@@ -34,19 +41,31 @@ export default function AuditPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-800">
-                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">Event Type</th>
-                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">Timestamp</th>
-                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">IP Hash</th>
-                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">Event ID</th>
+                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">
+                      Event Type
+                    </th>
+                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">
+                      Timestamp
+                    </th>
+                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">
+                      IP Hash
+                    </th>
+                    <th className="text-left py-3 px-4 text-zinc-400 font-medium">
+                      Event ID
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {data?.logs.map((log, index) => (
                     <tr
                       key={log.event_id}
-                      className={index % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900/50'}
+                      className={
+                        index % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900/50'
+                      }
                     >
-                      <td className="py-3 px-4 font-mono text-white">{log.event_type}</td>
+                      <td className="py-3 px-4 font-mono text-white">
+                        {log.event_type}
+                      </td>
                       <td className="py-3 px-4 font-mono text-zinc-400 text-xs">
                         {formatDate(log.timestamp)}
                       </td>

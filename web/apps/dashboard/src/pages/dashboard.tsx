@@ -1,16 +1,24 @@
 import { useChainInfo, useMetrics, useListCollections } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Spinner,
+} from '@goudchain/ui'
 import { formatNumber, formatRelativeTime } from '@goudchain/utils'
+import { SpinnerSize } from '@goudchain/types'
 
 export default function DashboardPage() {
   const { data: chainInfo, isLoading: chainLoading } = useChainInfo()
   const { data: metrics, isLoading: metricsLoading } = useMetrics()
-  const { data: collections, isLoading: collectionsLoading } = useListCollections()
+  const { data: collections, isLoading: collectionsLoading } =
+    useListCollections()
 
   if (chainLoading || metricsLoading || collectionsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+        <Spinner size={SpinnerSize.Large} />
       </div>
     )
   }
@@ -25,7 +33,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm text-zinc-400">Chain Length</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">
+              Chain Length
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white">
@@ -66,7 +76,9 @@ export default function DashboardPage() {
             <div className="space-y-2 font-mono text-sm">
               <div className="flex justify-between">
                 <span className="text-zinc-400">Block Number:</span>
-                <span className="text-white">{chainInfo.latest_block.block_number}</span>
+                <span className="text-white">
+                  {chainInfo.latest_block.block_number}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Timestamp:</span>
@@ -76,7 +88,9 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Data Count:</span>
-                <span className="text-white">{chainInfo.latest_block.data_count}</span>
+                <span className="text-white">
+                  {chainInfo.latest_block.data_count}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Validator:</span>

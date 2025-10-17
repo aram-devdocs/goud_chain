@@ -13,7 +13,9 @@ export default function NetworkPage() {
           <CardTitle>Network Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-zinc-500">Network information will be displayed here</p>
+          <p className="text-zinc-500">
+            Network information will be displayed here
+          </p>
         </CardContent>
       </Card>
     </div>

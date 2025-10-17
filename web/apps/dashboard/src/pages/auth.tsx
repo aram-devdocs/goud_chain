@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useAuth, useCreateAccount, useLogin, useToast } from '@goudchain/hooks'
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui'
+import {
+  Button,
+  Input,
+  Label,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from '@goudchain/ui'
+import { ButtonVariant } from '@goudchain/types'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -11,7 +20,9 @@ export default function AuthPage() {
   const createAccountMutation = useCreateAccount()
   const loginMutation = useLogin()
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
+  const handleCreateAccount = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault()
     try {
       const result = await createAccountMutation.mutateAsync({ username })
@@ -22,7 +33,9 @@ export default function AuthPage() {
     }
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault()
     try {
       const result = await loginMutation.mutateAsync({ api_key: apiKey })
@@ -38,19 +51,25 @@ export default function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Goud Chain</CardTitle>
-          <p className="text-sm text-zinc-500 mt-2">Encrypted Blockchain Platform</p>
+          <p className="text-sm text-zinc-500 mt-2">
+            Encrypted Blockchain Platform
+          </p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 mb-6">
             <Button
-              variant={isLogin ? 'primary' : 'secondary'}
+              variant={
+                isLogin ? ButtonVariant.Primary : ButtonVariant.Secondary
+              }
               onClick={() => setIsLogin(true)}
               className="flex-1"
             >
               Login
             </Button>
             <Button
-              variant={!isLogin ? 'primary' : 'secondary'}
+              variant={
+                !isLogin ? ButtonVariant.Primary : ButtonVariant.Secondary
+              }
               onClick={() => setIsLogin(false)}
               className="flex-1"
             >
@@ -66,13 +85,19 @@ export default function AuthPage() {
                   id="apiKey"
                   type="password"
                   value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setApiKey(e.target.value)
+                  }
                   placeholder="Enter your API key"
                   required
                   className="mt-1"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loginMutation.isPending}
+              >
                 {loginMutation.isPending ? 'Logging in...' : 'Login'}
               </Button>
             </form>
@@ -83,14 +108,22 @@ export default function AuthPage() {
                 <Input
                   id="username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setUsername(e.target.value)
+                  }
                   placeholder="Choose a username"
                   required
                   className="mt-1"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={createAccountMutation.isPending}>
-                {createAccountMutation.isPending ? 'Creating...' : 'Create Account'}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={createAccountMutation.isPending}
+              >
+                {createAccountMutation.isPending
+                  ? 'Creating...'
+                  : 'Create Account'}
               </Button>
               {apiKey && (
                 <div className="mt-4 p-4 bg-yellow-950/50 border border-yellow-700 rounded-lg">

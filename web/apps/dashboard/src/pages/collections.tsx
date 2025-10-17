@@ -1,6 +1,13 @@
 import { useListCollections } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Spinner,
+} from '@goudchain/ui'
 import { formatDate, formatNumber } from '@goudchain/utils'
+import { SpinnerSize } from '@goudchain/types'
 
 export default function CollectionsPage() {
   const { data, isLoading } = useListCollections()
@@ -8,7 +15,7 @@ export default function CollectionsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+        <Spinner size={SpinnerSize.Large} />
       </div>
     )
   }
@@ -23,7 +30,9 @@ export default function CollectionsPage() {
       {data?.collections.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
-            <p className="text-zinc-500">No collections yet. Submit some data to get started!</p>
+            <p className="text-zinc-500">
+              No collections yet. Submit some data to get started!
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -31,7 +40,9 @@ export default function CollectionsPage() {
           {data?.collections.map((collection) => (
             <Card key={collection.collection_id}>
               <CardHeader>
-                <CardTitle className="text-lg truncate">{collection.collection_id}</CardTitle>
+                <CardTitle className="text-lg truncate">
+                  {collection.collection_id}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">

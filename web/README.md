@@ -51,6 +51,7 @@ pnpm format
 ## Migration from Alpine.js
 
 This monorepo replaces the legacy `dashboard/index.html` (2,201 lines) with:
+
 - Modular React components
 - Type-safe API integration (manual hooks, will be replaced by GC-175)
 - Proper separation of concerns
@@ -59,6 +60,7 @@ This monorepo replaces the legacy `dashboard/index.html` (2,201 lines) with:
 ## API Integration
 
 The dashboard proxies API requests to the Rust backend:
+
 - Development: `http://localhost:3000` → `http://localhost:8080`
 - Production: Nginx serves static files and proxies `/api` to backend nodes
 

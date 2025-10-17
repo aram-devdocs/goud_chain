@@ -13,7 +13,9 @@ export default function AnalyticsPage() {
           <CardTitle>Chain Analytics</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-zinc-500">Analytics charts will be displayed here</p>
+          <p className="text-zinc-500">
+            Analytics charts will be displayed here
+          </p>
         </CardContent>
       </Card>
     </div>

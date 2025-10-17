@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useChainInfo, useMetrics, useListCollections } from '@goudchain/hooks'
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@goudchain/ui'
+import { ButtonVariant } from '@goudchain/types'
 
 export default function DebugPage() {
   const [showRaw, setShowRaw] = useState(false)
@@ -12,11 +13,16 @@ export default function DebugPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Debug</h2>
-        <p className="text-zinc-500">Development tools and raw data inspection</p>
+        <p className="text-zinc-500">
+          Development tools and raw data inspection
+        </p>
       </div>
 
       <div className="flex gap-2">
-        <Button variant={showRaw ? 'primary' : 'secondary'} onClick={() => setShowRaw(!showRaw)}>
+        <Button
+          variant={showRaw ? ButtonVariant.Primary : ButtonVariant.Secondary}
+          onClick={() => setShowRaw(!showRaw)}
+        >
           {showRaw ? 'Hide' : 'Show'} Raw Data
         </Button>
       </div>

@@ -1,6 +1,13 @@
 import { useChainInfo } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Spinner,
+} from '@goudchain/ui'
 import { formatHash, formatRelativeTime } from '@goudchain/utils'
+import { SpinnerSize } from '@goudchain/types'
 
 export default function ExplorerPage() {
   const { data: chainInfo, isLoading } = useChainInfo()
@@ -8,7 +15,7 @@ export default function ExplorerPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+        <Spinner size={SpinnerSize.Large} />
       </div>
     )
   }
@@ -16,7 +23,9 @@ export default function ExplorerPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Blockchain Explorer</h2>
+        <h2 className="text-3xl font-bold text-white mb-2">
+          Blockchain Explorer
+        </h2>
         <p className="text-zinc-500">Explore blocks and chain data</p>
       </div>
 
@@ -52,7 +61,9 @@ export default function ExplorerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-zinc-400">Block Number</p>
-                  <p className="text-white">{chainInfo.latest_block.block_number}</p>
+                  <p className="text-white">
+                    {chainInfo.latest_block.block_number}
+                  </p>
                 </div>
                 <div>
                   <p className="text-zinc-400">Timestamp</p>
@@ -86,7 +97,9 @@ export default function ExplorerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-zinc-400">Data Count</p>
-                  <p className="text-white">{chainInfo.latest_block.data_count}</p>
+                  <p className="text-white">
+                    {chainInfo.latest_block.data_count}
+                  </p>
                 </div>
                 <div>
                   <p className="text-zinc-400">Signature</p>

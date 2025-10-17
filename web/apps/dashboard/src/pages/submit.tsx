@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { useSubmitData, useToast } from '@goudchain/hooks'
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui'
+import {
+  Button,
+  Input,
+  Label,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from '@goudchain/ui'
 import { encryptData } from '@goudchain/utils'
 
 export default function SubmitPage() {
@@ -9,7 +17,9 @@ export default function SubmitPage() {
   const { success, error } = useToast()
   const submitMutation = useSubmitData()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault()
     try {
       const apiKey = localStorage.getItem('api_key')
@@ -35,7 +45,9 @@ export default function SubmitPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Submit Data</h2>
-        <p className="text-zinc-500">Encrypt and submit data to the blockchain</p>
+        <p className="text-zinc-500">
+          Encrypt and submit data to the blockchain
+        </p>
       </div>
 
       <Card className="max-w-2xl">
@@ -49,7 +61,9 @@ export default function SubmitPage() {
               <Input
                 id="collectionId"
                 value={collectionId}
-                onChange={(e) => setCollectionId(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setCollectionId(e.target.value)
+                }
                 placeholder="e.g., medical_records"
                 required
                 className="mt-1"
@@ -75,7 +89,11 @@ export default function SubmitPage() {
               </p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={submitMutation.isPending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={submitMutation.isPending}
+            >
               {submitMutation.isPending ? 'Submitting...' : 'Submit Data'}
             </Button>
           </form>

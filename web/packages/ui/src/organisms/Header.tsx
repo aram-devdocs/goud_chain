@@ -6,7 +6,13 @@ export interface HeaderProps extends HTMLAttributes<HTMLElement> {
   subtitle?: string
 }
 
-export function Header({ title, subtitle, className, children, ...props }: HeaderProps) {
+export function Header({
+  title,
+  subtitle,
+  className,
+  children,
+  ...props
+}: HeaderProps) {
   return (
     <header
       className={clsx(

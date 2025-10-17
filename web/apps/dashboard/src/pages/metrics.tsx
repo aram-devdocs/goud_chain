@@ -1,6 +1,13 @@
 import { useMetrics } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Spinner,
+} from '@goudchain/ui'
 import { formatNumber, formatDate } from '@goudchain/utils'
+import { SpinnerSize } from '@goudchain/types'
 
 export default function MetricsPage() {
   const { data, isLoading } = useMetrics()
@@ -8,7 +15,7 @@ export default function MetricsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
+        <Spinner size={SpinnerSize.Large} />
       </div>
     )
   }
@@ -23,7 +30,9 @@ export default function MetricsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm text-zinc-400">Chain Length</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">
+              Chain Length
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white font-mono">
@@ -45,7 +54,9 @@ export default function MetricsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm text-zinc-400">Operations Total</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">
+              Operations Total
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white font-mono">
@@ -70,7 +81,9 @@ export default function MetricsPage() {
             <div className="w-full bg-zinc-800 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full"
-                style={{ width: `${(data?.performance.cache_hit_rate ?? 0) * 100}%` }}
+                style={{
+                  width: `${(data?.performance.cache_hit_rate ?? 0) * 100}%`,
+                }}
               />
             </div>
           </div>
@@ -84,7 +97,9 @@ export default function MetricsPage() {
         <CardContent className="space-y-2 font-mono text-sm">
           <div className="flex justify-between">
             <span className="text-zinc-400">Block Number:</span>
-            <span className="text-white">{data?.chain.latest_block_number ?? 0}</span>
+            <span className="text-white">
+              {data?.chain.latest_block_number ?? 0}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-zinc-400">Block Timestamp:</span>

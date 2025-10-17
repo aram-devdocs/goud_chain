@@ -22,15 +22,12 @@ export function Toast({ type, message, onDismiss }: ToastProps) {
       )}
     >
       <div
-        className={clsx(
-          'text-xs font-mono font-bold px-1.5 py-0.5 rounded',
-          {
-            'bg-green-500/20 text-green-400': type === ToastType.Success,
-            'bg-blue-500/20 text-blue-400': type === ToastType.Info,
-            'bg-yellow-500/20 text-yellow-400': type === ToastType.Warning,
-            'bg-red-500/20 text-red-400': type === ToastType.Error,
-          }
-        )}
+        className={clsx('text-xs font-mono font-bold px-1.5 py-0.5 rounded', {
+          'bg-green-500/20 text-green-400': type === ToastType.Success,
+          'bg-blue-500/20 text-blue-400': type === ToastType.Info,
+          'bg-yellow-500/20 text-yellow-400': type === ToastType.Warning,
+          'bg-red-500/20 text-red-400': type === ToastType.Error,
+        })}
       >
         {type === ToastType.Success && 'OK'}
         {type === ToastType.Info && 'INFO'}
