@@ -53,3 +53,6 @@ services:
 
 volumes:
   shared_cargo_cache:
+  node1_data:
+  node2_data:
+  node3_data:
