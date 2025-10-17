@@ -22,7 +22,18 @@ const queryClient = new QueryClient({
   },
 })
 
-const navItems = [
+type RouteId =
+  | 'dashboard'
+  | 'submit'
+  | 'collections'
+  | 'explorer'
+  | 'network'
+  | 'analytics'
+  | 'audit'
+  | 'metrics'
+  | 'debug'
+
+const navItems: Array<{ id: RouteId; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'submit', label: 'Submit Data' },
   { id: 'collections', label: 'Collections' },
@@ -34,10 +45,31 @@ const navItems = [
   { id: 'debug', label: 'Debug' },
 ]
 
+const validRoutes = new Set<RouteId>([
+  'dashboard',
+  'submit',
+  'collections',
+  'explorer',
+  'network',
+  'analytics',
+  'audit',
+  'metrics',
+  'debug',
+])
+
 function AppContent() {
   const { isAuthenticated, logout } = useAuth()
   const { toasts, dismiss } = useToast()
-  const [activeView, setActiveView] = useState('dashboard')
+  const [activeView, setActiveView] = useState<RouteId>('dashboard')
+
+  const handleNavigate = (id: string): void => {
+    if (validRoutes.has(id as RouteId)) {
+      setActiveView(id as RouteId)
+    } else {
+      console.warn(`Invalid route: ${id}`)
+      setActiveView('dashboard')
+    }
+  }
 
   if (!isAuthenticated) {
     return <AuthPage />
@@ -96,7 +128,7 @@ function AppContent() {
       <Navigation
         items={navItems}
         activeId={activeView}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigate}
       />
 
       {/* Main Content */}

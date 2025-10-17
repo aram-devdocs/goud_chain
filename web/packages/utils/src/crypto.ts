@@ -3,10 +3,10 @@ export async function encryptData(
   apiKey: string
 ): Promise<string> {
   const encoder = new TextEncoder()
-  
+
   // Generate random salt per encryption (32 bytes)
   const salt = crypto.getRandomValues(new Uint8Array(32))
-  
+
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     encoder.encode(apiKey),
@@ -36,7 +36,9 @@ export async function encryptData(
   )
 
   // Format: salt (32 bytes) + iv (12 bytes) + ciphertext
-  const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength)
+  const combined = new Uint8Array(
+    salt.length + iv.length + encrypted.byteLength
+  )
   combined.set(salt)
   combined.set(iv, salt.length)
   combined.set(new Uint8Array(encrypted), salt.length + iv.length)
@@ -52,7 +54,7 @@ export async function decryptData(
   const decoder = new TextDecoder()
 
   const combined = Uint8Array.from(atob(encryptedData), (c) => c.charCodeAt(0))
-  
+
   // Extract salt (32 bytes), iv (12 bytes), and ciphertext
   const salt = combined.slice(0, 32)
   const iv = combined.slice(32, 44)

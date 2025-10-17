@@ -10,6 +10,7 @@ import {
   CardContent,
 } from '@goudchain/ui'
 import { ButtonVariant } from '@goudchain/types'
+import { validateUsername, validateApiKey } from '@goudchain/utils'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -37,8 +38,16 @@ export default function AuthPage() {
     e: React.FormEvent<HTMLFormElement>
   ): Promise<void> => {
     e.preventDefault()
+
+    // Validate API key
+    const validation = validateApiKey(apiKey)
+    if (!validation.valid) {
+      error(validation.error ?? 'Invalid API key')
+      return
+    }
+
     try {
-      const result = await loginMutation.mutateAsync({ api_key: apiKey })
+      const result = await loginMutation.mutateAsync({ api_key: apiKey.trim() })
       login(result)
       success('Logged in successfully')
     } catch (err) {
