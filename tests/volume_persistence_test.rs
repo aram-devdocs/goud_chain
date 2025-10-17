@@ -4,7 +4,6 @@
 /// and that the volume management commands work as expected.
 ///
 /// Note: These tests require Docker to be running and may be skipped in CI environments.
-
 #[cfg(test)]
 mod volume_persistence_tests {
     use std::process::Command;
