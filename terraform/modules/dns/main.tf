@@ -23,19 +23,8 @@ resource "cloudflare_record" "dashboard" {
   comment = "Goud Chain ${var.environment} Dashboard - managed by Terraform"
 }
 
-# A record for API (dev-api.goudchain.com)
-resource "cloudflare_record" "api" {
-  count = var.enable_dns ? 1 : 0
-
-  zone_id = var.cloudflare_zone_id
-  name    = var.environment == "production" ? var.api_subdomain : "${var.environment}-${var.api_subdomain}"
-  content = var.load_balancer_ip
-  type    = "A"
-  ttl     = 1 # Auto TTL when proxied
-  proxied = var.enable_cloudflare_proxy
-
-  comment = "Goud Chain ${var.environment} API - managed by Terraform"
-}
+# Note: API requests are now proxied through the dashboard domain
+# No separate API subdomain needed - nginx routes /api/* to backend nodes
 
 # Optional: A records for individual nodes (for debugging)
 resource "cloudflare_record" "nodes" {
