@@ -4,6 +4,8 @@ Cargo.lock
 **/*.rs.bk
 *.pdb
 
+archive/
+
 cs-audit.md
 docs/ZERO_KNOWLEDGE_ENHANCEMENT_REPORT.md
 

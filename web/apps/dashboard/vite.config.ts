@@ -10,14 +10,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001, // Changed from 3000 to avoid conflict with Docker dashboard
+    port: 3000,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: 'http://localhost:8080',
         ws: true,
       },
     },

@@ -25,8 +25,8 @@ export interface LoginResponse {
 }
 
 export interface SubmitDataRequest {
-  collection_id: string
-  encrypted_data: string
+  label: string
+  data: string
 }
 
 export interface SubmitDataResponse {
@@ -78,4 +78,10 @@ export interface MetricsResponse {
     cache_hit_rate: number
     operations_total: number
   }
+}
+
+export interface PeersResponse {
+  peers: string[]
+  count: number
+  reputation: Record<string, number>
 }

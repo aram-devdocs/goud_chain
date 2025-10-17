@@ -8,14 +8,15 @@ export function useSubmitData() {
 
   return useMutation({
     mutationFn: async (data: SubmitDataRequest) => {
-      const token = localStorage.getItem('session_token')
-      if (!token) throw new Error('Not authenticated')
+      // Data submission requires the actual API key, not session token
+      const apiKey = localStorage.getItem('api_key')
+      if (!apiKey) throw new Error('API key not found. Please save your API key.')
 
-      const response = await fetch(`${API_BASE}/data/submit`, {
+      const response = await fetch(`${API_BASE}/api/data/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(data),
       })

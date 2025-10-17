@@ -30,7 +30,7 @@ export function useAuditLogs(params: AuditLogsParams = {}) {
       if (params.page_size)
         queryParams.set('page_size', params.page_size.toString())
 
-      const url = `${API_BASE}/audit${queryParams.toString() ? `?${queryParams}` : ''}`
+      const url = `${API_BASE}/api/audit${queryParams.toString() ? `?${queryParams}` : ''}`
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,

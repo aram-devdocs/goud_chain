@@ -11,7 +11,7 @@ import { API_BASE } from '../config'
 export function useCreateAccount() {
   return useMutation({
     mutationFn: async (data: CreateAccountRequest) => {
-      const response = await fetch(`${API_BASE}/account/create`, {
+      const response = await fetch(`${API_BASE}/api/account/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,7 +31,7 @@ export function useCreateAccount() {
 export function useLogin() {
   return useMutation({
     mutationFn: async (data: LoginRequest) => {
-      const response = await fetch(`${API_BASE}/account/login`, {
+      const response = await fetch(`${API_BASE}/api/account/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

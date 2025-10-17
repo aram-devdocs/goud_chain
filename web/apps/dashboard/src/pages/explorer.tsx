@@ -38,80 +38,83 @@ export default function ExplorerPage() {
             <div>
               <p className="text-sm text-zinc-400">Chain Length</p>
               <p className="text-2xl font-bold text-white font-mono">
-                {chainInfo?.chain_length ?? 0}
+                {chainInfo?.chain?.length ?? 0}
               </p>
             </div>
             <div>
-              <p className="text-sm text-zinc-400">Pending Data</p>
+              <p className="text-sm text-zinc-400">Total Data Count</p>
               <p className="text-2xl font-bold text-white font-mono">
-                {chainInfo?.pending_data_count ?? 0}
+                {chainInfo?.chain?.reduce((sum, block) => sum + (block?.data_count ?? 0), 0) ?? 0}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {chainInfo?.latest_block && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest Block</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 font-mono text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-zinc-400">Block Number</p>
-                  <p className="text-white">
-                    {chainInfo.latest_block.block_number}
-                  </p>
+      {chainInfo?.chain && chainInfo.chain.length > 0 && (() => {
+        const latestBlock = chainInfo.chain[chainInfo.chain.length - 1]!
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Latest Block</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 font-mono text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-zinc-400">Block Number</p>
+                    <p className="text-white">
+                      {latestBlock.block_number}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-400">Timestamp</p>
+                    <p className="text-white">
+                      {formatRelativeTime(latestBlock.timestamp)}
+                    </p>
+                  </div>
                 </div>
+
                 <div>
-                  <p className="text-zinc-400">Timestamp</p>
-                  <p className="text-white">
-                    {formatRelativeTime(chainInfo.latest_block.timestamp)}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-zinc-400">Previous Hash</p>
-                <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
-                  {formatHash(chainInfo.latest_block.previous_hash, 16)}
-                </code>
-              </div>
-
-              <div>
-                <p className="text-zinc-400">Merkle Root</p>
-                <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
-                  {formatHash(chainInfo.latest_block.merkle_root, 16)}
-                </code>
-              </div>
-
-              <div>
-                <p className="text-zinc-400">Validator</p>
-                <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
-                  {formatHash(chainInfo.latest_block.validator, 16)}
-                </code>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-zinc-400">Data Count</p>
-                  <p className="text-white">
-                    {chainInfo.latest_block.data_count}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-zinc-400">Signature</p>
-                  <code className="text-xs text-white">
-                    {formatHash(chainInfo.latest_block.signature, 12)}
+                  <p className="text-zinc-400">Previous Hash</p>
+                  <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
+                    {formatHash(latestBlock.previous_hash, 16)}
                   </code>
                 </div>
+
+                <div>
+                  <p className="text-zinc-400">Merkle Root</p>
+                  <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
+                    {formatHash(latestBlock.merkle_root, 16)}
+                  </code>
+                </div>
+
+                <div>
+                  <p className="text-zinc-400">Validator</p>
+                  <code className="block p-2 bg-zinc-900 rounded text-xs break-all text-white">
+                    {formatHash(latestBlock.validator, 16)}
+                  </code>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-zinc-400">Data Count</p>
+                    <p className="text-white">
+                      {latestBlock.data_count}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-zinc-400">Signature</p>
+                    <code className="text-xs text-white">
+                      {formatHash(latestBlock.signature, 12)}
+                    </code>
+                  </div>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )
+      })()}
     </div>
   )
 }

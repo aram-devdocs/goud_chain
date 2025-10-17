@@ -14,7 +14,7 @@ export function useChainInfo() {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE}/chain`, { headers })
+      const response = await fetch(`${API_BASE}/api/chain`, { headers })
       if (!response.ok) {
         await handleApiError(response)
       }
@@ -27,7 +27,7 @@ export function useBlock(blockNumber: number) {
   return useQuery({
     queryKey: ['block', blockNumber],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/chain/block/${blockNumber}`)
+      const response = await fetch(`${API_BASE}/api/chain/block/${blockNumber}`)
       if (!response.ok) {
         await handleApiError(response)
       }

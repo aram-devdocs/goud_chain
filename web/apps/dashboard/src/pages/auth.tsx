@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useAuth, useCreateAccount, useLogin, useToast } from '@goudchain/hooks'
 import {
   Button,
@@ -22,6 +23,7 @@ export default function AuthPage() {
   const [apiKeyConfirmed, setApiKeyConfirmed] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const navigate = useNavigate()
   const { login } = useAuth()
   const { success, error } = useToast()
   const createAccountMutation = useCreateAccount()
@@ -60,11 +62,17 @@ export default function AuthPage() {
     }
 
     try {
+      const trimmedApiKey = apiKey.trim()
+
+      // Store the actual API key for data submission
+      localStorage.setItem('api_key', trimmedApiKey)
+
       const result = await loginMutation.mutateAsync({
-        api_key: apiKey.trim(),
+        api_key: trimmedApiKey,
       })
       login(result)
       success('Logged in successfully')
+      navigate({ to: '/' })
     } catch (err) {
       error((err as Error).message)
     }
@@ -73,19 +81,17 @@ export default function AuthPage() {
   const loginWithNewKey = async (): Promise<void> => {
     if (!newAccount || !apiKeyConfirmed) return
 
-    console.log('[AuthPage] loginWithNewKey called')
     try {
+      // Store the actual API key for data submission
+      localStorage.setItem('api_key', newAccount.api_key)
+
       const result = await loginMutation.mutateAsync({
         api_key: newAccount.api_key,
       })
-      console.log('[AuthPage] login mutation result:', result)
       login(result)
-      console.log(
-        '[AuthPage] login function called, should navigate to dashboard'
-      )
       success('Logged in successfully')
+      navigate({ to: '/' })
     } catch (err) {
-      console.error('[AuthPage] login error:', err)
       error((err as Error).message)
     }
   }

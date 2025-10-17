@@ -11,8 +11,8 @@ import { formatDate, formatHash } from '@goudchain/utils'
 import { SpinnerSize } from '@goudchain/types'
 
 export default function AuditPage() {
-  const [limit] = useState(50)
-  const { data, isLoading } = useAuditLogs({ limit })
+  const [pageSize] = useState(50)
+  const { data, isLoading} = useAuditLogs({ page_size: pageSize })
 
   if (isLoading) {
     return (

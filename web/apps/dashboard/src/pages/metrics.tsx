@@ -36,7 +36,7 @@ export default function MetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white font-mono">
-              {formatNumber(data?.chain.length ?? 0)}
+              {formatNumber(data?.chain?.length ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -47,7 +47,7 @@ export default function MetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white font-mono">
-              {formatNumber(data?.network.peer_count ?? 0)}
+              {formatNumber(data?.network?.peer_count ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -60,7 +60,7 @@ export default function MetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-white font-mono">
-              {formatNumber(data?.performance.operations_total ?? 0)}
+              {formatNumber(data?.performance?.operations_total ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -75,14 +75,14 @@ export default function MetricsPage() {
             <div className="flex justify-between mb-2">
               <span className="text-sm text-zinc-400">Cache Hit Rate</span>
               <span className="text-sm font-mono text-white">
-                {((data?.performance.cache_hit_rate ?? 0) * 100).toFixed(2)}%
+                {((data?.performance?.cache_hit_rate ?? 0) * 100).toFixed(2)}%
               </span>
             </div>
             <div className="w-full bg-zinc-800 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full"
                 style={{
-                  width: `${(data?.performance.cache_hit_rate ?? 0) * 100}%`,
+                  width: `${(data?.performance?.cache_hit_rate ?? 0) * 100}%`,
                 }}
               />
             </div>
@@ -98,13 +98,13 @@ export default function MetricsPage() {
           <div className="flex justify-between">
             <span className="text-zinc-400">Block Number:</span>
             <span className="text-white">
-              {data?.chain.latest_block_number ?? 0}
+              {data?.chain?.latest_block_number ?? 0}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-zinc-400">Block Timestamp:</span>
             <span className="text-white">
-              {data?.chain.latest_block_timestamp
+              {data?.chain?.latest_block_timestamp
                 ? formatDate(data.chain.latest_block_timestamp)
                 : 'N/A'}
             </span>

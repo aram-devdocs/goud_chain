@@ -27,7 +27,7 @@ export default function CollectionsPage() {
         <p className="text-zinc-500">Your encrypted data collections</p>
       </div>
 
-      {data?.collections.length === 0 ? (
+      {!data?.collections || data.collections.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <p className="text-zinc-500">
@@ -37,7 +37,7 @@ export default function CollectionsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data?.collections.map((collection) => (
+          {data.collections.map((collection) => (
             <Card key={collection.collection_id}>
               <CardHeader>
                 <CardTitle className="text-lg truncate">
@@ -60,7 +60,7 @@ export default function CollectionsPage() {
                 <div className="text-zinc-500 text-xs break-all">
                   <span>Blind Index:</span>
                   <code className="block mt-1 p-1 bg-zinc-900 rounded">
-                    {collection.blind_index.slice(0, 16)}...
+                    {collection.blind_index ? `${collection.blind_index.slice(0, 16)}...` : 'N/A'}
                   </code>
                 </div>
               </CardContent>

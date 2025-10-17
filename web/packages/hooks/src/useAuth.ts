@@ -41,20 +41,14 @@ export function useAuth(): {
   })
 
   const login = useCallback((response: LoginResponse): void => {
-    console.log('[useAuth] login called with:', response)
     localStorage.setItem('session_token', response.session_token)
     localStorage.setItem('user_id', response.account_id)
-    localStorage.setItem('api_key', response.session_token) // Store for WebSocket
-    console.log('[useAuth] stored in localStorage:', {
-      session_token: localStorage.getItem('session_token'),
-      user_id: localStorage.getItem('user_id'),
-    })
+    // Note: api_key is stored separately in auth.tsx before calling login()
     setAuth({
       token: response.session_token,
       userId: response.account_id,
       isAuthenticated: true,
     })
-    console.log('[useAuth] auth state updated to authenticated')
   }, [])
 
   const logout = useCallback((): void => {

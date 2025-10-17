@@ -14,7 +14,7 @@ export function useMetrics() {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`${API_BASE}/stats`, { headers })
+      const response = await fetch(`${API_BASE}/api/stats`, { headers })
       if (!response.ok) {
         await handleApiError(response)
       }

@@ -26,9 +26,10 @@ export interface Collection {
 }
 
 export interface ChainInfo {
-  chain_length: number
-  latest_block: Block | null
-  pending_data_count: number
+  schema_version: string
+  chain: Block[]
+  node_id: string
+  checkpoints: string[]
 }
 
 export interface PeerInfo {

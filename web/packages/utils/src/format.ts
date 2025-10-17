@@ -22,6 +22,7 @@ export function formatRelativeTime(timestamp: number): string {
 }
 
 export function formatHash(hash: string, length: number = 8): string {
+  if (!hash || typeof hash !== 'string') return ''
   if (hash.length <= length) return hash
   return `${hash.slice(0, length / 2)}...${hash.slice(-length / 2)}`
 }
@@ -35,5 +36,6 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatNumber(num: number): string {
+  if (typeof num !== 'number' || isNaN(num)) return '0'
   return new Intl.NumberFormat().format(num)
 }
