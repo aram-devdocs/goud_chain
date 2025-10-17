@@ -62,5 +62,8 @@ networks:
 
 volumes:
   node1_data:
+    driver: {{VOLUME_DRIVER}}
   node2_data:
+    driver: {{VOLUME_DRIVER}}
   node3_data:
+    driver: {{VOLUME_DRIVER}}

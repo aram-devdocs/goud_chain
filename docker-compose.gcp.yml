@@ -2,7 +2,7 @@
 # Generated from template - DO NOT EDIT MANUALLY
 # Writer/Reader architecture: node1 (writer), node2 (reader)
 # Conservative allocation with 150M safety margin for OS + Docker
-# Generated: 2025-10-17 03:36:43 UTC
+# Generated: 2025-10-17 05:15:05 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.gcp.yml up -d
@@ -153,4 +153,6 @@ networks:
 
 volumes:
   node1_data:
+    driver: local
   node2_data:
+    driver: local

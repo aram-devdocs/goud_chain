@@ -14,6 +14,7 @@ services:
       - ./Cargo.lock:/app/Cargo.lock
       - shared_cargo_cache:/usr/local/cargo/registry
       - ./target:/app/target
+      - node1_data:/data
 
   node2:
     build:
@@ -25,6 +26,7 @@ services:
       - ./Cargo.lock:/app/Cargo.lock
       - shared_cargo_cache:/usr/local/cargo/registry
       - ./target:/app/target
+      - node2_data:/data
 
   node3:
     build:
@@ -36,6 +38,10 @@ services:
       - ./Cargo.lock:/app/Cargo.lock
       - shared_cargo_cache:/usr/local/cargo/registry
       - ./target:/app/target
+      - node3_data:/data
 
 volumes:
   shared_cargo_cache:
+  node1_data:
+  node2_data:
+  node3_data:

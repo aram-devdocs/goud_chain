@@ -331,6 +331,72 @@ case "$COMMAND" in
     done
     ;;
 
+  volumes-list)
+    echo "[VOLUMES] Listing Docker volumes..."
+    docker volume ls | grep "goud\|node.*_data\|jupyter"
+    ;;
+
+  volumes-inspect)
+    NODE=${1:-node1}
+    VOLUME="${NODE}_data"
+    echo "[VOLUMES] Inspecting volume: $VOLUME"
+    docker volume inspect "$VOLUME" || {
+      echo "[ERR] Volume not found: $VOLUME"
+      exit 1
+    }
+    ;;
+
+  volumes-check)
+    echo "[VOLUMES] Volume Health Check"
+    echo "============================="
+    echo ""
+    
+    # Check for volumes
+    VOLUMES=$(docker volume ls -q | grep "node.*_data" || true)
+    
+    if [ -z "$VOLUMES" ]; then
+      echo "[WARN] No data volumes found (network may not be started)"
+      exit 0
+    fi
+    
+    for volume in $VOLUMES; do
+      echo "[CHECK] Volume: $volume"
+      
+      # Get volume info
+      SIZE=$(docker run --rm -v "$volume:/data:ro" alpine du -sh /data 2>/dev/null | cut -f1 || echo "unknown")
+      MOUNT=$(docker volume inspect "$volume" --format '{{.Mountpoint}}' 2>/dev/null || echo "unknown")
+      
+      echo "  Size: $SIZE"
+      echo "  Mountpoint: $MOUNT"
+      
+      # Check if RocksDB directory exists
+      HAS_ROCKSDB=$(docker run --rm -v "$volume:/data:ro" alpine test -d /data/rocksdb && echo "yes" || echo "no")
+      if [ "$HAS_ROCKSDB" = "yes" ]; then
+        BLOCK_COUNT=$(docker run --rm -v "$volume:/data:ro" alpine find /data/rocksdb -name "*.sst" 2>/dev/null | wc -l || echo "0")
+        echo "  RocksDB: Present ($BLOCK_COUNT SST files)"
+      else
+        echo "  RocksDB: Not initialized"
+      fi
+      echo ""
+    done
+    ;;
+
+  backup)
+    ENV=${1:-local}
+    echo "[BACKUP] Creating volume backup for environment: $ENV"
+    ./scripts/backup-volumes.sh --environment "$ENV" "$@"
+    ;;
+
+  restore)
+    if [ -z "$1" ]; then
+      echo "[ERR] Backup file required"
+      echo "Usage: ./run restore <backup-file>"
+      exit 1
+    fi
+    echo "[RESTORE] Restoring volumes from backup: $1"
+    ./scripts/restore-volumes.sh --backup "$1"
+    ;;
+
   help|--help|-h)
     echo "Goud Chain - Distributed Blockchain Network with Load Balancer"
     echo ""
@@ -350,6 +416,13 @@ case "$COMMAND" in
     echo "  logs [node]         Show logs (optional: node1, node2, node3, nginx)"
     echo "  status              Show status of load balancer and all nodes"
     echo "  lb-status           Show detailed load balancer status and metrics"
+    echo ""
+    echo "Volume Management:"
+    echo "  volumes-list        List all blockchain data volumes"
+    echo "  volumes-inspect [node]  Inspect volume details (default: node1)"
+    echo "  volumes-check       Check volume health and disk usage"
+    echo "  backup [env]        Create volume backup (default: local)"
+    echo "  restore <file>      Restore volumes from backup file"
     echo ""
     echo "Blockchain Commands:"
     echo "  mine [node] [data]  Mine a block (default: node1)"
@@ -372,6 +445,8 @@ case "$COMMAND" in
     echo "  ./run dev-perf                     # Start with hot reload (performance testing)"
     echo "  ./run status                       # Check load balancer + all nodes"
     echo "  ./run lb-status                    # Detailed load balancer stats"
+    echo "  ./run volumes-check                # Check volume health"
+    echo "  ./run backup local                 # Backup volumes"
     echo "  ./run logs nginx                   # View load balancer logs"
     echo "  ./run mine node1 \"Hello World\"     # Mine on node1"
     echo "  ./run chain node2                  # View node2's chain"
