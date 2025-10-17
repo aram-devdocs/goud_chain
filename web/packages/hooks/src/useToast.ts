@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react'
-
-export type ToastType = 'success' | 'error' | 'warning' | 'info'
+import { ToastType } from '@goudchain/types'
 
 export interface Toast {
   id: string
@@ -8,11 +7,19 @@ export interface Toast {
   message: string
 }
 
-export function useToast() {
+export function useToast(): {
+  toasts: Toast[]
+  show: (type: ToastType, message: string, duration?: number) => string
+  dismiss: (id: string) => void
+  success: (msg: string) => string
+  error: (msg: string) => string
+  warning: (msg: string) => string
+  info: (msg: string) => string
+} {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const show = useCallback(
-    (type: ToastType, message: string, duration: number = 3000) => {
+    (type: ToastType, message: string, duration = 3000): string => {
       const id = Math.random().toString(36).substring(7)
       const toast: Toast = { id, type, message }
 
@@ -27,7 +34,7 @@ export function useToast() {
     []
   )
 
-  const dismiss = useCallback((id: string) => {
+  const dismiss = useCallback((id: string): void => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
@@ -36,19 +43,19 @@ export function useToast() {
     show,
     dismiss,
     success: useCallback(
-      (msg: string) => show('success', msg),
+      (msg: string): string => show(ToastType.Success, msg),
       [show]
     ),
     error: useCallback(
-      (msg: string) => show('error', msg),
+      (msg: string): string => show(ToastType.Error, msg),
       [show]
     ),
     warning: useCallback(
-      (msg: string) => show('warning', msg),
+      (msg: string): string => show(ToastType.Warning, msg),
       [show]
     ),
     info: useCallback(
-      (msg: string) => show('info', msg),
+      (msg: string): string => show(ToastType.Info, msg),
       [show]
     ),
   }

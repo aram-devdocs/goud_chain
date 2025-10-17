@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { MetricsResponse } from '@workspace/types'
+import type { MetricsResponse } from '@goudchain/types'
 
 export function useMetrics() {
   return useQuery({

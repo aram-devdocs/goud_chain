@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/utils",
+  "name": "@goudchain/utils",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@workspace/typescript-config": "workspace:*",
+    "@goudchain/typescript-config": "workspace:*",
     "typescript": "^5.7.2"
   }
 }

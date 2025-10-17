@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import type { DecryptDataResponse } from '@workspace/types'
+import type { DecryptDataResponse } from '@goudchain/types'
 
 export function useDecryptData() {
   return useMutation({

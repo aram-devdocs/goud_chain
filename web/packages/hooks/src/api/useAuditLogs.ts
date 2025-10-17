@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { AuditLogsResponse } from '@workspace/types'
+import type { AuditLogsResponse } from '@goudchain/types'
 
 interface AuditLogsParams {
   limit?: number

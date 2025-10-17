@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss'
-import baseConfig from '@workspace/tailwind-config'
+import baseConfig from '@goudchain/tailwind-config'
 
 export default {
   ...baseConfig,

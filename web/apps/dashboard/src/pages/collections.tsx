@@ -1,6 +1,6 @@
-import { useListCollections } from '@workspace/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@workspace/ui'
-import { formatDate, formatNumber } from '@workspace/utils'
+import { useListCollections } from '@goudchain/hooks'
+import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import { formatDate, formatNumber } from '@goudchain/utils'
 
 export default function CollectionsPage() {
   const { data, isLoading } = useListCollections()

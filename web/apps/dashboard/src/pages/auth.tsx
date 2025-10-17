@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useAuth, useCreateAccount, useLogin, useToast } from '@workspace/hooks'
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@workspace/ui'
+import { useAuth, useCreateAccount, useLogin, useToast } from '@goudchain/hooks'
+import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)

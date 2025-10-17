@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useSubmitData, useToast } from '@workspace/hooks'
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@workspace/ui'
-import { encryptData } from '@workspace/utils'
+import { useSubmitData, useToast } from '@goudchain/hooks'
+import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui'
+import { encryptData } from '@goudchain/utils'
 
 export default function SubmitPage() {
   const [collectionId, setCollectionId] = useState('')

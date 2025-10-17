@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ListCollectionsResponse } from '@workspace/types'
+import type { ListCollectionsResponse } from '@goudchain/types'
 
 export function useListCollections() {
   return useQuery({

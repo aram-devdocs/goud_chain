@@ -4,7 +4,7 @@ import type {
   CreateAccountResponse,
   LoginRequest,
   LoginResponse,
-} from '@workspace/types'
+} from '@goudchain/types'
 
 export function useCreateAccount() {
   return useMutation({

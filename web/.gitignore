@@ -2,12 +2,16 @@
 node_modules
 .pnpm-store
 
-# Build artifacts
-dist
+# Build artifacts - ALL dist folders
+**/dist
+**/build
 .turbo
 .next
 out
-build
+
+# TypeScript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Environment files
 .env*.local
@@ -39,5 +43,6 @@ lerna-debug.log*
 coverage
 .nyc_output
 
-# TypeScript
-*.tsbuildinfo
+# OS
+.DS_Store
+Thumbs.db

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ChainInfo, Block } from '@workspace/types'
+import type { ChainInfo, Block } from '@goudchain/types'
 
 export function useChainInfo() {
   return useQuery({

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useChainInfo, useMetrics, useListCollections } from '@workspace/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@workspace/ui'
+import { useChainInfo, useMetrics, useListCollections } from '@goudchain/hooks'
+import { Card, CardHeader, CardTitle, CardContent, Button } from '@goudchain/ui'
 
 export default function DebugPage() {
   const [showRaw, setShowRaw] = useState(false)

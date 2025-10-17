@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { SubmitDataRequest, SubmitDataResponse } from '@workspace/types'
+import type { SubmitDataRequest, SubmitDataResponse } from '@goudchain/types'
 
 export function useSubmitData() {
   const queryClient = useQueryClient()

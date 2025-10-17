@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardTitle, CardContent } from '@workspace/ui'
+import { Card, CardHeader, CardTitle, CardContent } from '@goudchain/ui'
 
 export default function NetworkPage() {
   return (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useAuditLogs } from '@workspace/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@workspace/ui'
-import { formatDate, formatHash } from '@workspace/utils'
+import { useAuditLogs } from '@goudchain/hooks'
+import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import { formatDate, formatHash } from '@goudchain/utils'
 
 export default function AuditPage() {
   const [limit] = useState(50)

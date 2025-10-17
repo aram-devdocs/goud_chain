@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { LoginResponse } from '@workspace/types'
+import type { LoginResponse } from '@goudchain/types'
 
 interface AuthState {
   token: string | null

@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/hooks",
+  "name": "@goudchain/hooks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,14 +19,14 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.14",
-    "@workspace/types": "workspace:*"
+    "@goudchain/types": "workspace:*"
   },
   "peerDependencies": {
     "react": "^19.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.6",
-    "@workspace/typescript-config": "workspace:*",
+    "@goudchain/typescript-config": "workspace:*",
     "react": "^19.0.0",
     "typescript": "^5.7.2"
   }

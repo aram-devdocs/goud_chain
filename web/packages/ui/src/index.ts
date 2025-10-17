@@ -11,3 +11,8 @@ export * from './molecules/Toast'
 // Organisms
 export * from './organisms/Header'
 export * from './organisms/Navigation'
+
+// Templates
+export * from './templates/DashboardLayout'
+export * from './templates/AuthLayout'
+export * from './templates/PageContainer'
