@@ -20,8 +20,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   session_token: string
-  user_id: string
-  expires_at: number
+  account_id: string
+  expires_in: number
 }
 
 export interface SubmitDataRequest {
