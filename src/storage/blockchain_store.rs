@@ -44,8 +44,10 @@ impl BlockchainStore {
         // Compression (Snappy is faster than LZ4 on slow CPUs)
         opts.set_compression_type(rocksdb::DBCompressionType::Snappy);
 
-        // WAL optimization for slow disks
-        opts.set_manual_wal_flush(true);
+        // WAL optimization for durability
+        // NOTE: manual_wal_flush disabled to ensure data persists across container restarts
+        // Automatic flushing ensures WAL is written to disk, preventing data loss on abrupt shutdown
+        opts.set_manual_wal_flush(false);
 
         // Reduce write amplification (critical for free-tier IOPS limits)
         opts.set_level_compaction_dynamic_level_bytes(true);
@@ -83,42 +85,55 @@ impl BlockchainStore {
         let chain_length = block.index + 1;
         batch.put(b"metadata:chain_length", chain_length.to_le_bytes());
 
-        // Optimized write: disable sync for non-critical writes (blockchain is append-only)
-        // If node crashes, P2P sync will recover missing blocks
+        // Write with sync for durability (blockchain data must persist)
+        // This ensures data survives container restarts and abrupt shutdowns
         let mut write_opts = rocksdb::WriteOptions::default();
-        write_opts.set_sync(false); // Don't fsync immediately (10x faster on slow disks)
-        write_opts.disable_wal(false); // Keep WAL for durability
+        write_opts.set_sync(true); // Force fsync for data durability
+        write_opts.disable_wal(false); // Keep WAL enabled
 
         self.db
             .write_opt(batch, &write_opts)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
-        info!(block_index = block.index, "Block saved to RocksDB");
+        info!(block_index = block.index, "Block saved to RocksDB with sync");
         Ok(())
     }
 
     /// Save checkpoint (block hash at checkpoint interval)
     pub fn save_checkpoint(&self, block_index: u64, block_hash: &str) -> Result<()> {
         let checkpoint_key = format!("checkpoint:{}", block_index);
+        
+        // Use sync write for checkpoints (critical for recovery)
+        let mut write_opts = rocksdb::WriteOptions::default();
+        write_opts.set_sync(true);
+        
         self.db
-            .put(checkpoint_key.as_bytes(), block_hash.as_bytes())
+            .put_opt(checkpoint_key.as_bytes(), block_hash.as_bytes(), &write_opts)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
-        info!(block_index = block_index, "Checkpoint saved to RocksDB");
+        info!(block_index = block_index, "Checkpoint saved to RocksDB with sync");
         Ok(())
     }
 
     /// Save blockchain metadata (schema version, node ID)
     pub fn save_metadata(&self, node_id: &str, schema_version: &str) -> Result<()> {
+        // Use sync write for metadata (critical for schema version tracking)
+        let mut write_opts = rocksdb::WriteOptions::default();
+        write_opts.set_sync(true); // Force fsync for metadata durability
+
         self.db
-            .put(b"metadata:node_id", node_id.as_bytes())
+            .put_opt(b"metadata:node_id", node_id.as_bytes(), &write_opts)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
         self.db
-            .put(b"metadata:schema_version", schema_version.as_bytes())
+            .put_opt(
+                b"metadata:schema_version",
+                schema_version.as_bytes(),
+                &write_opts,
+            )
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
-        info!("Blockchain metadata saved to RocksDB");
+        info!("Blockchain metadata saved to RocksDB with sync");
         Ok(())
     }
 
