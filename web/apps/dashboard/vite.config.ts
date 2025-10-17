@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 3001, // Changed from 3000 to avoid conflict with Docker dashboard
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
