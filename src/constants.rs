@@ -10,7 +10,7 @@ pub const ROCKSDB_PATH: &str = "/data/rocksdb";
 
 // Blockchain parameters
 pub const CHECKPOINT_INTERVAL: u64 = 100;
-pub const TIMESTAMP_TOLERANCE_SECONDS: i64 = 120;
+pub const TIMESTAMP_TOLERANCE_SECONDS: i64 = 14400; // Must accommodate ±4 hour jitter for timestamp obfuscation
 pub const TIMESTAMP_GRANULARITY_SECONDS: i64 = 86400; // 1 day - hides exact timing and timezone
 pub const TIMESTAMP_JITTER_SECONDS: i64 = 14400; // ±4 hours random jitter prevents pattern analysis
 
