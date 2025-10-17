@@ -1,6 +1,6 @@
 # Docker Compose for Goud Chain - Local Development (3-node setup)
 # Generated from template - DO NOT EDIT MANUALLY
-# Generated: 2025-10-10 16:19:05 UTC
+# Generated: 2025-10-17 03:23:08 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.local.yml up -d
@@ -205,6 +205,9 @@ networks:
 
 volumes:
   node1_data:
+    driver: local
   node2_data:
+    driver: local
   node3_data:
+    driver: local
   jupyter_scratch:

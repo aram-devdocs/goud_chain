@@ -348,6 +348,19 @@ restore_volumes() {
     
     log_info "Restoring volumes..."
     
+    # Verify checksums before extraction
+    log_info "Verifying archive checksums..."
+    local checksums_file="$backup_dir/CHECKSUMS.sha256"
+    if [[ -f "$checksums_file" ]]; then
+        (cd "$backup_dir" && sha256sum -c CHECKSUMS.sha256) || {
+            log_error "Checksum verification failed! Archives may be corrupted"
+            exit 1
+        }
+        log_success "All archive checksums verified"
+    else
+        log_warn "No CHECKSUMS.sha256 file found, skipping verification"
+    fi
+    
     # Find all volume archives
     local archives=$(find "$backup_dir" -name "*_data.tar.gz" -o -name "*_data.tar.pigz")
     
@@ -369,6 +382,16 @@ restore_volumes() {
         local volume_name="${archive_name%.tar.*}"
         
         log_info "[$current/$archive_count] Restoring volume: $volume_name"
+        
+        # Verify individual archive checksum if available
+        local archive_checksum="${archive}.sha256"
+        if [[ -f "$archive_checksum" ]]; then
+            log_info "[$current/$archive_count] Verifying checksum for $archive_name..."
+            (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$archive_checksum")") || {
+                log_error "Checksum verification failed for $archive_name"
+                exit 1
+            }
+        fi
         
         # Decompress archive
         local temp_tar="${TEMP_DIR}/${volume_name}.tar"

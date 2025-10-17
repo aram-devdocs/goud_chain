@@ -303,9 +303,9 @@ backup_volumes() {
         log_success "[$current/$volume_count] Volume backed up: $volume"
     done
     
-    # Create master checksum file
+    # Create master checksum file for all archives
     log_info "Creating master checksum file..."
-    (cd "$backup_path" && sha256sum *.sha256 > CHECKSUMS.sha256) || {
+    (cd "$backup_path" && sha256sum *.tar.${COMPRESS_EXT} > CHECKSUMS.sha256) || {
         log_error "Failed to create master checksum file"
         exit 1
     }
@@ -372,11 +372,12 @@ upload_to_cloud() {
 
 # Cleanup old backups
 cleanup_old_backups() {
-    log_info "Cleaning up old backups (retention: 30 days)..."
+    local retention_days="${BACKUP_RETENTION_DAYS:-30}"
+    log_info "Cleaning up old backups (retention: ${retention_days} days)..."
     
     # Clean local backups
-    find "$BACKUP_DIR" -name "goud-chain-backup-*.tar.*" -mtime +30 -delete 2>/dev/null || true
-    find "$BACKUP_DIR" -name "goud-chain-backup-*.sha256" -mtime +30 -delete 2>/dev/null || true
+    find "$BACKUP_DIR" -name "goud-chain-backup-*.tar.*" -mtime +"${retention_days}" -delete 2>/dev/null || true
+    find "$BACKUP_DIR" -name "goud-chain-backup-*.sha256" -mtime +"${retention_days}" -delete 2>/dev/null || true
     
     log_success "Old backups cleaned up"
 }
