@@ -21,6 +21,7 @@ services:
       - ./Cargo.lock:/app/Cargo.lock
       - shared_cargo_cache:/usr/local/cargo/registry
       - ./target:/app/target
+      - node1_data:/data
 
   node2:
     build:
@@ -43,6 +44,7 @@ services:
       - ./Cargo.lock:/app/Cargo.lock
       - shared_cargo_cache:/usr/local/cargo/registry
       - ./target:/app/target
+      - node3_data:/data
 
   jupyter:
     volumes:

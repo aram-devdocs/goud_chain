@@ -276,7 +276,7 @@ check_schema_compatibility() {
     local metadata_file="$backup_dir/metadata.txt"
     
     local backup_schema=$(grep "^schema_version:" "$metadata_file" | cut -d' ' -f2 || echo "unknown")
-    local current_schema=$(grep 'SCHEMA_VERSION' "$PROJECT_ROOT/src/constants.rs" 2>/dev/null | grep -oP 'v\d+\.\d+\.\d+' || echo "unknown")
+    local current_schema=$(grep 'SCHEMA_VERSION' "$PROJECT_ROOT/src/constants.rs" 2>/dev/null | grep -oP '".*?"' | tr -d '"' || echo "unknown")
     
     log_info "Schema compatibility check:"
     log_info "  Backup schema: $backup_schema"

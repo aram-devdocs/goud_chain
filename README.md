@@ -754,7 +754,6 @@ goud_chain/
 ├── Dockerfile.dev-perf         # Rust dev build with cargo-watch (release)
 ├── run                         # CLI script
 ├── README.md                   # This file
-├── OPERATIONS.md               # Operations runbook (volume management, disaster recovery)
 └── CLAUDE.md                   # AI assistant guidelines
 ```
 

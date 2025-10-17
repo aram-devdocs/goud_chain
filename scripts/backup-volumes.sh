@@ -229,7 +229,7 @@ collect_metadata() {
 backup_name: $BACKUP_NAME
 timestamp: $TIMESTAMP
 environment: $ENVIRONMENT
-schema_version: $(grep 'SCHEMA_VERSION' "$PROJECT_ROOT/src/constants.rs" 2>/dev/null | grep -oP 'v\d+\.\d+\.\d+' || echo "unknown")
+schema_version: $(grep 'SCHEMA_VERSION' "$PROJECT_ROOT/src/constants.rs" 2>/dev/null | grep -oP '".*?"' | tr -d '"' || echo "unknown")
 docker_compose_version: $(docker compose version --short 2>/dev/null || echo "unknown")
 compression: $COMPRESS_CMD
 EOF

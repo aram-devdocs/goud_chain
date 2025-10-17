@@ -233,7 +233,10 @@ find ./backups -name "*.tar.gz" -mtime +30 -delete
 **Verification:**
 ```bash
 grep SCHEMA_VERSION src/constants.rs
+# Expected: pub const SCHEMA_VERSION: &str = "v8_envelope_encryption";
+
 curl http://localhost:8081/health | jq '.chain_length'
+# Expected: 1 (only genesis block after schema change)
 ```
 
 **No action required** - blockchain auto-reinitializes with current schema
