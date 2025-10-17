@@ -1,6 +1,7 @@
 # Auth Flow Debug Guide
 
 ## Problem
+
 API key generation works, login returns 200, but dashboard doesn't render.
 
 ## Expected Flow
@@ -94,6 +95,7 @@ Check checkbox and click "Continue to Dashboard". Watch for:
 ## Testing Steps
 
 1. **Clear all localStorage:**
+
    ```javascript
    localStorage.clear()
    ```
@@ -120,8 +122,8 @@ After login succeeds, check localStorage manually:
 
 ```javascript
 // Should all be present:
-localStorage.getItem('session_token')  // Should be a long string
-localStorage.getItem('user_id')        // Should be a UUID-like string
+localStorage.getItem('session_token') // Should be a long string
+localStorage.getItem('user_id') // Should be a UUID-like string
 ```
 
 If these are set but `isAuthenticated` is still false, there's a state management issue.
@@ -153,6 +155,7 @@ If logs show everything working but dashboard doesn't render:
 ## Remove Debug Logging
 
 Once fixed, remove console.log statements from:
+
 - `web/packages/hooks/src/useAuth.ts`
 - `web/apps/dashboard/src/App.tsx`
 - `web/apps/dashboard/src/pages/auth.tsx`

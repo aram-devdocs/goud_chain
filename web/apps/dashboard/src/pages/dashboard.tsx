@@ -10,12 +10,33 @@ import { formatNumber, formatRelativeTime } from '@goudchain/utils'
 import { SpinnerSize } from '@goudchain/types'
 
 export default function DashboardPage() {
-  const { data: chainInfo, isLoading: chainLoading } = useChainInfo()
-  const { data: metrics, isLoading: metricsLoading } = useMetrics()
-  const { data: collections, isLoading: collectionsLoading } =
+  const { data: chainInfo, isLoading: chainLoading, error: chainError } = useChainInfo()
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useMetrics()
+  const { data: collections, isLoading: collectionsLoading, error: collectionsError } =
     useListCollections()
 
   if (chainLoading || metricsLoading || collectionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner size={SpinnerSize.Large} />
+      </div>
+    )
+  }
+
+  if (chainError || metricsError || collectionsError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center text-red-400">
+          <p className="text-lg font-semibold mb-2">Failed to load dashboard data</p>
+          <p className="text-sm text-zinc-500">
+            {(chainError || metricsError || collectionsError)?.toString()}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!chainInfo || !metrics || !collections) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size={SpinnerSize.Large} />
