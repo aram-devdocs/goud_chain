@@ -74,6 +74,8 @@ terraform.tfplan
 *.json
 !package.json
 !package-lock.json
+!web/**/*.json
+!web/.prettierrc
 *.pem
 *.key
 ~/.gcloud/
