@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import type { DecryptDataResponse } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useDecryptData() {
   return useMutation({
@@ -15,11 +16,10 @@ export function useDecryptData() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to decrypt data')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<DecryptDataResponse>
+      return safeJsonParse<DecryptDataResponse>(response)
     },
   })
 }

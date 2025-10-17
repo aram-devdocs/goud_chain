@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { SubmitDataRequest, SubmitDataResponse } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useSubmitData() {
   const queryClient = useQueryClient()
@@ -19,11 +20,10 @@ export function useSubmitData() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to submit data')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<SubmitDataResponse>
+      return safeJsonParse<SubmitDataResponse>(response)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collections'] })

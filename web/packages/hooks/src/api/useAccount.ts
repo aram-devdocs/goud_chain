@@ -5,6 +5,7 @@ import type {
   LoginRequest,
   LoginResponse,
 } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useCreateAccount() {
   return useMutation({
@@ -18,11 +19,10 @@ export function useCreateAccount() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create account')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<CreateAccountResponse>
+      return safeJsonParse<CreateAccountResponse>(response)
     },
   })
 }
@@ -39,11 +39,10 @@ export function useLogin() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to login')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<LoginResponse>
+      return safeJsonParse<LoginResponse>(response)
     },
   })
 }

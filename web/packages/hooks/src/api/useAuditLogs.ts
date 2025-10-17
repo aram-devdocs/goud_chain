@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { AuditLogsResponse } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 interface AuditLogsParams {
   limit?: number
@@ -27,11 +28,10 @@ export function useAuditLogs(params: AuditLogsParams = {}) {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to fetch audit logs')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<AuditLogsResponse>
+      return safeJsonParse<AuditLogsResponse>(response)
     },
   })
 }

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { MetricsResponse } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useMetrics() {
   return useQuery({
@@ -7,9 +8,9 @@ export function useMetrics() {
     queryFn: async () => {
       const response = await fetch('/api/stats')
       if (!response.ok) {
-        throw new Error('Failed to fetch metrics')
+        await handleApiError(response)
       }
-      return response.json() as Promise<MetricsResponse>
+      return safeJsonParse<MetricsResponse>(response)
     },
     refetchInterval: 5000, // Refetch every 5 seconds
   })

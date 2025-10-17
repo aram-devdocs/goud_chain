@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ListCollectionsResponse } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useListCollections() {
   return useQuery({
@@ -15,11 +16,10 @@ export function useListCollections() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to fetch collections')
+        await handleApiError(response)
       }
 
-      return response.json() as Promise<ListCollectionsResponse>
+      return safeJsonParse<ListCollectionsResponse>(response)
     },
     staleTime: 30000, // 30 seconds
   })

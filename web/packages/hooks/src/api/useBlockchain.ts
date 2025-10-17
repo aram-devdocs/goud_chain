@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ChainInfo, Block } from '@goudchain/types'
+import { handleApiError, safeJsonParse } from './apiErrorHandler'
 
 export function useChainInfo() {
   return useQuery({
@@ -7,9 +8,9 @@ export function useChainInfo() {
     queryFn: async () => {
       const response = await fetch('/api/chain')
       if (!response.ok) {
-        throw new Error('Failed to fetch chain info')
+        await handleApiError(response)
       }
-      return response.json() as Promise<ChainInfo>
+      return safeJsonParse<ChainInfo>(response)
     },
     refetchInterval: 10000, // Refetch every 10 seconds
   })
@@ -21,9 +22,9 @@ export function useBlockByNumber(blockNumber: number) {
     queryFn: async () => {
       const response = await fetch(`/api/chain/block/${blockNumber}`)
       if (!response.ok) {
-        throw new Error('Failed to fetch block')
+        await handleApiError(response)
       }
-      return response.json() as Promise<Block>
+      return safeJsonParse<Block>(response)
     },
     enabled: blockNumber >= 0,
   })
