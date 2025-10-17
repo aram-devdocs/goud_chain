@@ -37,14 +37,14 @@ else
 fi
 
 echo "Running cargo audit (security vulnerabilities)..."
-if ! command -v cargo-audit >/dev/null 2>&1; then
-    echo "Installing cargo-audit..."
-    cargo install cargo-audit
+if command -v cargo-audit >/dev/null 2>&1; then
+    cargo audit || {
+        echo "Error: Security vulnerabilities found. Run 'cargo audit' for details."
+        exit 1
+    }
+else
+    echo "cargo-audit not installed, skipping (requires Rust 1.83+ for edition2024)"
 fi
-cargo audit || {
-    echo "Error: Security vulnerabilities found. Run 'cargo audit' for details."
-    exit 1
-}
 
 echo "Building Rust project..."
 cargo build || {
@@ -113,7 +113,7 @@ if [ -d "web" ] && git diff --cached --name-only | grep -q "^web/"; then
 fi
 
 # Terraform checks
-if [ -d "terraform" ]; then
+if [ -d "terraform" ] && command -v terraform >/dev/null 2>&1; then
     echo "Running Terraform format check..."
     terraform -chdir=terraform fmt -check -recursive || {
         echo "Error: Terraform files are not formatted. Run 'terraform fmt -recursive' in terraform/ to fix."
@@ -128,6 +128,8 @@ if [ -d "terraform" ]; then
             exit 1
         }
     fi
+else
+    echo "Terraform not installed, skipping validation"
 fi
 
 echo "All pre-commit checks passed!"
