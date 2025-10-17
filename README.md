@@ -613,7 +613,7 @@ curl http://localhost:8080/api/metrics | jq '.volume_metrics'
 curl http://localhost:8080/api/metrics/prometheus | grep goud_volume
 ```
 
-See [OPERATIONS.md](OPERATIONS.md) for comprehensive volume management, disaster recovery procedures, and production deployment guidelines.
+See [docs/VOLUME_MANAGEMENT.md](docs/VOLUME_MANAGEMENT.md) for comprehensive volume management, disaster recovery procedures, and production deployment guidelines.
 
 ## Configuration Management
 
