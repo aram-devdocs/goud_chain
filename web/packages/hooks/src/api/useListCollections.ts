@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ListCollectionsResponse } from '@goudchain/types'
 import { handleApiError, safeJsonParse } from './apiErrorHandler'
+import { API_BASE } from '../config'
 
 export function useListCollections() {
   return useQuery({
@@ -9,7 +10,7 @@ export function useListCollections() {
       const token = localStorage.getItem('session_token')
       if (!token) throw new Error('Not authenticated')
 
-      const response = await fetch('/api/data/list', {
+      const response = await fetch(`${API_BASE}/data/list`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -21,6 +22,5 @@ export function useListCollections() {
 
       return safeJsonParse<ListCollectionsResponse>(response)
     },
-    staleTime: 30000, // 30 seconds
   })
 }
