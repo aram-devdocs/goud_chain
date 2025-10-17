@@ -7,7 +7,14 @@ export function useChainInfo() {
   return useQuery({
     queryKey: ['chain'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/chain`)
+      const token = localStorage.getItem('session_token')
+      const headers: Record<string, string> = {}
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_BASE}/chain`, { headers })
       if (!response.ok) {
         await handleApiError(response)
       }

@@ -10,10 +10,21 @@ import { formatNumber, formatRelativeTime } from '@goudchain/utils'
 import { SpinnerSize } from '@goudchain/types'
 
 export default function DashboardPage() {
-  const { data: chainInfo, isLoading: chainLoading, error: chainError } = useChainInfo()
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useMetrics()
-  const { data: collections, isLoading: collectionsLoading, error: collectionsError } =
-    useListCollections()
+  const {
+    data: chainInfo,
+    isLoading: chainLoading,
+    error: chainError,
+  } = useChainInfo()
+  const {
+    data: metrics,
+    isLoading: metricsLoading,
+    error: metricsError,
+  } = useMetrics()
+  const {
+    data: collections,
+    isLoading: collectionsLoading,
+    error: collectionsError,
+  } = useListCollections()
 
   if (chainLoading || metricsLoading || collectionsLoading) {
     return (
@@ -27,7 +38,9 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center text-red-400">
-          <p className="text-lg font-semibold mb-2">Failed to load dashboard data</p>
+          <p className="text-lg font-semibold mb-2">
+            Failed to load dashboard data
+          </p>
           <p className="text-sm text-zinc-500">
             {(chainError || metricsError || collectionsError)?.toString()}
           </p>
