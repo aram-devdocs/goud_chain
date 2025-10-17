@@ -3,16 +3,19 @@
 ## Quick Start
 
 **Prerequisites:**
+
 - Backend must be running on `http://localhost:8080`
 - Node.js 18+ and pnpm 9.15+
 
 **Start Backend:**
+
 ```bash
 cd /workspace
 ./run start
 ```
 
 **Start Frontend:**
+
 ```bash
 cd /workspace/web
 pnpm dev
@@ -30,8 +33,8 @@ The frontend uses `API_BASE` to determine the API endpoint:
 // web/packages/hooks/src/config.ts
 export const API_BASE =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:8080'  // ← Development
-    : window.location.origin     // ← Production (nginx proxies)
+    ? 'http://localhost:8080' // ← Development
+    : window.location.origin // ← Production (nginx proxies)
 ```
 
 **Development:** Direct calls to `http://localhost:8080` (no proxy)  
@@ -74,7 +77,7 @@ The original `dashboard/auth.html` called `localhost:8080` directly. Using Vite'
 ```bash
 pnpm dev         # Start dev server (port 3000)
 pnpm build       # Build for production (has issues, WIP)
-pnpm format      # Format code with Prettier  
+pnpm format      # Format code with Prettier
 pnpm format:check # Check formatting
 pnpm type-check  # TypeScript type checking (has issues, WIP)
 ```

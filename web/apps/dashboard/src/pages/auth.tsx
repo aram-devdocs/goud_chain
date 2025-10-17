@@ -73,13 +73,19 @@ export default function AuthPage() {
   const loginWithNewKey = async (): Promise<void> => {
     if (!newAccount || !apiKeyConfirmed) return
 
+    console.log('[AuthPage] loginWithNewKey called')
     try {
       const result = await loginMutation.mutateAsync({
         api_key: newAccount.api_key,
       })
+      console.log('[AuthPage] login mutation result:', result)
       login(result)
+      console.log(
+        '[AuthPage] login function called, should navigate to dashboard'
+      )
       success('Logged in successfully')
     } catch (err) {
+      console.error('[AuthPage] login error:', err)
       error((err as Error).message)
     }
   }

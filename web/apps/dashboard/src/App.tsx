@@ -62,6 +62,8 @@ function AppContent() {
   const { toasts, dismiss } = useToast()
   const [activeView, setActiveView] = useState<RouteId>('dashboard')
 
+  console.log('[AppContent] render, isAuthenticated:', isAuthenticated)
+
   const handleNavigate = (id: string): void => {
     if (validRoutes.has(id as RouteId)) {
       setActiveView(id as RouteId)
@@ -72,8 +74,11 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
+    console.log('[AppContent] not authenticated, showing AuthPage')
     return <AuthPage />
   }
+
+  console.log('[AppContent] authenticated, showing dashboard')
 
   const renderPage = () => {
     switch (activeView) {

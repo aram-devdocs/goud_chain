@@ -41,13 +41,19 @@ export function useAuth(): {
   })
 
   const login = useCallback((response: LoginResponse): void => {
+    console.log('[useAuth] login called with:', response)
     localStorage.setItem('session_token', response.session_token)
     localStorage.setItem('user_id', response.user_id)
+    console.log('[useAuth] stored in localStorage:', {
+      session_token: localStorage.getItem('session_token'),
+      user_id: localStorage.getItem('user_id'),
+    })
     setAuth({
       token: response.session_token,
       userId: response.user_id,
       isAuthenticated: true,
     })
+    console.log('[useAuth] auth state updated to authenticated')
   }, [])
 
   const logout = useCallback((): void => {
