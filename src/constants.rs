@@ -88,4 +88,8 @@ pub const AUDIT_BATCH_INTERVAL_SECONDS: u64 = 10; // Flush audit logs every 10 s
 pub const AUDIT_BATCH_SIZE: usize = 50; // Or when 50 events accumulated
 pub const AUDIT_IP_HASH_LENGTH: usize = 8; // Store truncated SHA256(IP) for privacy
 
+// Request Signature Replay Protection - Security
+pub const REQUEST_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5-minute window for request freshness
+pub const NONCE_CLEANUP_INTERVAL_SECONDS: u64 = 600; // Clean up expired nonces every 10 minutes
+
 // Metrics - Operational Security

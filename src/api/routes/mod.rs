@@ -4,6 +4,10 @@ pub mod audit;
 pub mod data;
 pub mod health;
 pub mod metrics;
+pub mod test;
+
+// OpenAPI tag constants
+pub use test::TEST_TAG;
 
 // OpenAPI tag constants (shared across all route modules)
 pub const ACCOUNT_TAG: &str = "Account Management";

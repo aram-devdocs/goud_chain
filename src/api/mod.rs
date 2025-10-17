@@ -4,6 +4,7 @@ use utoipa::{Modify, OpenApi};
 pub mod auth;
 pub mod internal_client;
 pub mod rate_limiter;
+pub mod request_signature;
 pub mod routes;
 pub mod schemas;
 pub mod websocket;
@@ -13,7 +14,7 @@ pub use rate_limiter::{RateLimitResult, RateLimiter};
 pub use websocket::WebSocketBroadcaster;
 
 // OpenAPI tags for route grouping
-use routes::{ACCOUNT_TAG, AUDIT_TAG, DATA_TAG, HEALTH_TAG, METRICS_TAG};
+use routes::{ACCOUNT_TAG, AUDIT_TAG, DATA_TAG, HEALTH_TAG, METRICS_TAG, TEST_TAG};
 
 /// Goud Chain API Documentation
 #[derive(OpenApi)]
@@ -35,7 +36,8 @@ use routes::{ACCOUNT_TAG, AUDIT_TAG, DATA_TAG, HEALTH_TAG, METRICS_TAG};
         (name = DATA_TAG, description = "Encrypted data submission and retrieval operations"),
         (name = HEALTH_TAG, description = "Blockchain health, sync status, and peer management"),
         (name = METRICS_TAG, description = "System metrics, statistics, and monitoring"),
-        (name = AUDIT_TAG, description = "Operational security audit logs (privacy-preserving)")
+        (name = AUDIT_TAG, description = "Operational security audit logs (privacy-preserving)"),
+        (name = TEST_TAG, description = "Test endpoints for demonstrating replay protection")
     )
 )]
 pub struct ApiDoc;
