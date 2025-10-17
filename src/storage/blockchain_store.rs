@@ -95,23 +95,33 @@ impl BlockchainStore {
             .write_opt(batch, &write_opts)
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
-        info!(block_index = block.index, "Block saved to RocksDB with sync");
+        info!(
+            block_index = block.index,
+            "Block saved to RocksDB with sync"
+        );
         Ok(())
     }
 
     /// Save checkpoint (block hash at checkpoint interval)
     pub fn save_checkpoint(&self, block_index: u64, block_hash: &str) -> Result<()> {
         let checkpoint_key = format!("checkpoint:{}", block_index);
-        
+
         // Use sync write for checkpoints (critical for recovery)
         let mut write_opts = rocksdb::WriteOptions::default();
         write_opts.set_sync(true);
-        
+
         self.db
-            .put_opt(checkpoint_key.as_bytes(), block_hash.as_bytes(), &write_opts)
+            .put_opt(
+                checkpoint_key.as_bytes(),
+                block_hash.as_bytes(),
+                &write_opts,
+            )
             .map_err(|e| GoudChainError::SaveFailed(e.to_string()))?;
 
-        info!(block_index = block_index, "Checkpoint saved to RocksDB with sync");
+        info!(
+            block_index = block_index,
+            "Checkpoint saved to RocksDB with sync"
+        );
         Ok(())
     }
 
