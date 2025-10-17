@@ -4,12 +4,14 @@ export interface ApiError {
 }
 
 export interface CreateAccountRequest {
-  username: string
+  username?: string
+  metadata?: unknown
 }
 
 export interface CreateAccountResponse {
   api_key: string
   user_id: string
+  account_id: string
 }
 
 export interface LoginRequest {
