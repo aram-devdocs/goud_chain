@@ -285,6 +285,34 @@ pub struct NodeMetricsResponse {
     /// Operations processed per second (placeholder)
     #[schema(example = 0.0)]
     pub operations_per_second: f64,
+
+    /// Volume storage metrics
+    #[schema(example = json!({"disk_used_bytes": 1048576, "disk_used_mb": 1, "mount_path": "/data", "rocksdb_present": true}))]
+    pub volume_metrics: Option<VolumeMetrics>,
+}
+
+/// Persistent volume storage metrics
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct VolumeMetrics {
+    /// Disk space used in bytes
+    #[schema(example = 1048576)]
+    pub disk_used_bytes: u64,
+
+    /// Disk space used in megabytes
+    #[schema(example = 1)]
+    pub disk_used_mb: u64,
+
+    /// Volume mount path
+    #[schema(example = "/data")]
+    pub mount_path: String,
+
+    /// Whether RocksDB database is present
+    #[schema(example = true)]
+    pub rocksdb_present: bool,
+
+    /// Number of RocksDB SST files (approximate block count indicator)
+    #[schema(example = 42)]
+    pub sst_file_count: Option<u64>,
 }
 
 /// API error response

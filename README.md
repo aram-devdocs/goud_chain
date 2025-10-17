@@ -46,6 +46,8 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 - **Fast Lookups** - O(1) block retrieval by index
 - **50% Disk Space Savings** - Snappy compression reduces storage footprint
 - **Schema Versioning** - Automatic validation and regeneration on schema changes
+- **Persistent Volumes** - Docker volumes survive container restarts with automated backup/restore
+- **Volume Monitoring** - Real-time disk usage, RocksDB health, and capacity alerts
 
 ### Blockchain & Consensus
 - **No Mining** - Instant blocks (<1s) using Proof of Authority
@@ -578,6 +580,41 @@ Runs on GCP's free tier (e2-micro VM, 1GB RAM) with Terraform-managed infrastruc
 
 **Free Tier Limits:** 1× e2-micro instance (us-west1/central1/east1), 30GB disk, 1GB egress/month. Upgrade to e2-small ($13/mo) or e2-medium ($27/mo) for additional nodes.
 
+## Persistent Storage
+
+Goud Chain uses Docker persistent volumes with RocksDB for enterprise-grade data durability:
+
+**Volume Architecture:**
+- Named Docker volumes (`node1_data`, `node2_data`, `node3_data`) persist across container restarts
+- RocksDB storage with Snappy compression (~50% reduction)
+- Automatic schema migration on version changes
+- Volume metrics exposed via `/api/metrics` endpoint
+
+**Backup & Recovery:**
+- Automated backup scripts with integrity verification (SHA-256 checksums)
+- Cloud storage integration (Google Cloud Storage, Amazon S3)
+- Point-in-time restore with schema compatibility validation
+- 30-day retention policy (configurable)
+
+**Volume Management:**
+```bash
+./run volumes-list        # List all data volumes
+./run volumes-check       # Check volume health and disk usage
+./run backup local        # Create backup (stops containers for consistency)
+./run restore backup.tar.gz  # Restore from backup with validation
+```
+
+**Monitoring:**
+```bash
+# JSON metrics
+curl http://localhost:8080/api/metrics | jq '.volume_metrics'
+
+# Prometheus metrics
+curl http://localhost:8080/api/metrics/prometheus | grep goud_volume
+```
+
+See [docs/VOLUME_MANAGEMENT.md](docs/VOLUME_MANAGEMENT.md) for comprehensive volume management, disaster recovery procedures, and production deployment guidelines.
+
 ## Configuration Management
 
 Template-based configuration system prevents drift between local and production environments. All nginx and docker-compose configs are generated from base templates with environment-specific overrides. Pre-commit hooks automatically regenerate configs when templates change, ensuring consistency across deployments.
@@ -669,6 +706,8 @@ goud_chain/
 │   ├── deploy.sh                       # Deploy to GCP
 │   ├── destroy.sh                      # Destroy GCP resources
 │   ├── setup-terraform-backend.sh      # Create GCS bucket for Terraform state
+│   ├── backup-volumes.sh               # Automated volume backup with cloud upload
+│   ├── restore-volumes.sh              # Volume restore with integrity verification
 │   └── generate_module_graph.sh        # Dependency visualization
 ├── config/
 │   ├── base/

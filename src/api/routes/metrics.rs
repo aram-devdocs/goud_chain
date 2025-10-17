@@ -1,10 +1,13 @@
 use axum::{extract::Extension, http::StatusCode, Json};
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::api::schemas::{ChainStatsResponse, ErrorResponse, NodeMetricsResponse};
+use crate::api::schemas::{ChainStatsResponse, ErrorResponse, NodeMetricsResponse, VolumeMetrics};
+use crate::constants::DATA_DIRECTORY;
 use crate::domain::Blockchain;
 use crate::network::P2PNode;
 use crate::types::*;
@@ -72,10 +75,95 @@ async fn handle_get_stats(
     Ok(Json(stats))
 }
 
+/// Collect volume metrics from filesystem
+fn collect_volume_metrics() -> Option<VolumeMetrics> {
+    let data_path = Path::new(DATA_DIRECTORY);
+
+    // Check if data directory exists
+    if !data_path.exists() {
+        return None;
+    }
+
+    // Calculate disk usage
+    let disk_used_bytes = calculate_directory_size(data_path).unwrap_or(0);
+    let disk_used_mb = disk_used_bytes / (1024 * 1024);
+
+    // Check if RocksDB is present
+    let rocksdb_path = data_path.join("rocksdb");
+    let rocksdb_present = rocksdb_path.exists() && rocksdb_path.is_dir();
+
+    // Count SST files if RocksDB exists
+    let sst_file_count = if rocksdb_present {
+        count_sst_files(&rocksdb_path)
+    } else {
+        None
+    };
+
+    Some(VolumeMetrics {
+        disk_used_bytes,
+        disk_used_mb,
+        mount_path: DATA_DIRECTORY.to_string(),
+        rocksdb_present,
+        sst_file_count,
+    })
+}
+
+/// Calculate total size of a directory recursively
+fn calculate_directory_size(path: &Path) -> std::io::Result<u64> {
+    let mut total_size = 0u64;
+
+    if path.is_dir() {
+        for entry in fs::read_dir(path)? {
+            let entry = entry.map_err(|e| {
+                tracing::warn!("Failed to read directory entry in {:?}: {}", path, e);
+                e
+            })?;
+            let metadata = entry.metadata().map_err(|e| {
+                tracing::warn!("Failed to get metadata for {:?}: {}", entry.path(), e);
+                e
+            })?;
+
+            if metadata.is_file() {
+                total_size += metadata.len();
+            } else if metadata.is_dir() {
+                total_size += calculate_directory_size(&entry.path())?;
+            }
+        }
+    }
+
+    Ok(total_size)
+}
+
+/// Count SST files in RocksDB directory (indicator of data volume)
+fn count_sst_files(rocksdb_path: &Path) -> Option<u64> {
+    let mut count = 0u64;
+
+    fn count_recursive(path: &Path, count: &mut u64) -> std::io::Result<()> {
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == "sst" {
+                        *count += 1;
+                    }
+                }
+            } else if path.is_dir() {
+                count_recursive(&path, count)?;
+            }
+        }
+        Ok(())
+    }
+
+    count_recursive(rocksdb_path, &mut count).ok()?;
+    Some(count)
+}
+
 /// Get system metrics
 ///
 /// Returns real-time system metrics including blockchain statistics, network health,
-/// and performance data. JSON format suitable for dashboards and monitoring tools.
+/// performance data, and volume storage metrics. JSON format suitable for dashboards and monitoring tools.
 #[utoipa::path(
     get,
     path = "/metrics",
@@ -110,6 +198,9 @@ async fn handle_get_metrics(
     let cache_stats = cache.stats();
     let cache_hit_rate = cache_stats.hit_rate();
 
+    // Collect volume metrics
+    let volume_metrics = collect_volume_metrics();
+
     let metrics = NodeMetricsResponse {
         node_id: chain.node_id.clone(),
         chain_length: chain.chain.len() as u64,
@@ -120,6 +211,7 @@ async fn handle_get_metrics(
         total_operations,
         cache_hit_rate,
         operations_per_second: 0.0,
+        volume_metrics,
     };
 
     Ok(Json(metrics))
@@ -128,7 +220,7 @@ async fn handle_get_metrics(
 /// Get Prometheus metrics
 ///
 /// Returns metrics in Prometheus text format for monitoring and alerting.
-/// Includes blockchain metrics, network metrics, and key cache performance statistics.
+/// Includes blockchain metrics, network metrics, key cache performance statistics, and volume metrics.
 #[utoipa::path(
     get,
     path = "/metrics/prometheus",
@@ -171,8 +263,32 @@ async fn handle_get_prometheus_metrics(
         latest_block.map(|b| b.timestamp).unwrap_or(0)
     );
 
+    // Collect volume metrics
+    let volume_metrics = if let Some(vm) = collect_volume_metrics() {
+        format!(
+            "# HELP goud_volume_disk_used_bytes Disk space used by blockchain data in bytes\n\
+             # TYPE goud_volume_disk_used_bytes gauge\n\
+             goud_volume_disk_used_bytes {}\n\
+             # HELP goud_volume_disk_used_mb Disk space used by blockchain data in megabytes\n\
+             # TYPE goud_volume_disk_used_mb gauge\n\
+             goud_volume_disk_used_mb {}\n\
+             # HELP goud_volume_rocksdb_present Whether RocksDB database is present (1=present, 0=absent)\n\
+             # TYPE goud_volume_rocksdb_present gauge\n\
+             goud_volume_rocksdb_present {}\n\
+             # HELP goud_volume_sst_files Number of RocksDB SST files\n\
+             # TYPE goud_volume_sst_files gauge\n\
+             goud_volume_sst_files {}\n",
+            vm.disk_used_bytes,
+            vm.disk_used_mb,
+            if vm.rocksdb_present { 1 } else { 0 },
+            vm.sst_file_count.unwrap_or(0)
+        )
+    } else {
+        String::new()
+    };
+
     let cache_metrics = global_key_cache().prometheus_metrics();
-    let all_metrics = format!("{}\n{}", node_metrics, cache_metrics);
+    let all_metrics = format!("{}\n{}\n{}", node_metrics, volume_metrics, cache_metrics);
 
     Ok((
         StatusCode::OK,
