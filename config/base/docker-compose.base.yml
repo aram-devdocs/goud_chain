@@ -2,8 +2,6 @@
 # This file contains shared configuration using YAML anchors
 # Environment-specific files extend this base
 
-version: '3.8'
-
 # YAML anchors for reusable configuration
 x-logging: &default-logging
   driver: json-file

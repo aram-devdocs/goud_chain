@@ -5,8 +5,6 @@
 # Usage:
 #   docker-compose -f docker-compose.local.yml up -d
 
-version: '3.8'
-
 services:
   # NGINX Load Balancer - Primary API endpoint
   nginx:

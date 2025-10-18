@@ -288,11 +288,11 @@ generate_for_environment() {
 
     # Prepend anchors to template content
     {
-        head -n 8 "$compose_template"  # Keep version and comments
+        head -n 7 "$compose_template"  # Keep comments (no version field)
         echo ""
         echo "$anchors_section"
         echo ""
-        tail -n +9 "$compose_template"  # Rest of template
+        tail -n +8 "$compose_template"  # Rest of template
     } > "$temp_compose"
 
     substitute_template "$temp_compose" "$compose_output"

@@ -4,32 +4,15 @@ Modern React dashboard for Goud Chain blockchain, built with TypeScript, Vite, a
 
 ## Quick Start
 
-### One Command Setup
-
 ```bash
-cd /workspace/web
-./START_DEV.sh
+./run dev
 ```
 
-This automatically starts:
-- Backend nodes (node1, node2, node3) + nginx load balancer
-- React dashboard on http://localhost:3001
+Opens:
+- [API] http://localhost:8080 (Load Balancer)
+- [WEB] http://localhost:3001 (Dashboard with hot reload)
 
-### Manual Setup (Two Terminals)
-
-**Terminal 1: Start backend**
-```bash
-cd /workspace
-./run dev-perf
-```
-
-**Terminal 2: Start React dashboard**
-```bash
-cd /workspace/web
-pnpm dev
-```
-
-**Open:** http://localhost:3001
+Edit any file in [web/apps/dashboard/src/](apps/dashboard/src/) and see instant updates in the browser.
 
 ## Architecture
 
@@ -187,25 +170,22 @@ pnpm dev --port 3002
 curl http://localhost:8080/health
 
 # If failing, restart backend
-cd /workspace
 ./run stop
-./run dev-perf
+./run dev
 ```
 
 ### Dashboard stuck on loading
 
-1. Open DevTools → Console
-2. Check for errors
-3. Common issues:
-   - **401 Unauthorized:** Clear localStorage and login again
-   - **404 Not Found:** Backend not running
-   - **CORS errors:** Wrong API_BASE (should be `localhost:8080`)
-
-```javascript
-// Clear auth and reload
-localStorage.clear()
-location.reload()
+```bash
+# Restart everything
+./run stop
+./run dev
 ```
+
+If still failing:
+- Open DevTools → Console for errors
+- Clear localStorage: `localStorage.clear()` then reload
+- Verify backend: `curl http://localhost:8080/health`
 
 ### TypeScript build errors
 

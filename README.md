@@ -101,33 +101,28 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 ## Quick Start (Local Development)
 
 ```bash
-./run              # Start 3-node network (production mode)
-./run dev          # Start with hot reload (development mode - debug builds)
-./run dev-perf     # Start with hot reload (development mode - release builds)
+./run start              # Production mode (release builds)
+./run dev                # Hot reload (release builds - default)
+./run dev --fast-build   # Hot reload (debug builds - fast iteration)
 ```
 
-**Development Mode Comparison:**
+**Development Mode Options:**
 
-| Mode | Build Type | Rebuild Time | Block Creation | Use Case |
-|------|-----------|--------------|----------------|----------|
-| `./run start` | Release | ~2-3 min | ~20-50ms | Production testing, performance benchmarks |
-| `./run dev-perf` | Release | ~30-60s | ~20-50ms | Fast iteration + production performance |
-| `./run dev` | Debug | ~5-10s | ~4-10s | Quick prototyping, debugging |
+- `./run dev` - Release builds: Slow rebuilds (~30-60s), fast runtime (~20-50ms blocks)
+- `./run dev --fast-build` - Debug builds: Fast rebuilds (~5-10s), slow runtime (~4-10s blocks)
 
-**🚀 Primary API Endpoint:** [http://localhost:8080](http://localhost:8080) (Load Balancer)
+**Endpoints:**
 
-**🌐 Dashboard:** [http://localhost:3000](http://localhost:3000)
+- **Production (`./run start`):**
+  - [API] http://localhost:8080 (Load Balancer)
+  - [WEB] http://localhost:3000 (Dashboard)
+  - [NODES] http://localhost:8081, 8082, 8083 (debugging)
 
-**📓 Jupyter Lab (dev mode only):** [http://localhost:8888](http://localhost:8888)
-
-**📡 Individual Nodes (for debugging):**
-- Node 1: http://localhost:8081
-- Node 2: http://localhost:8082
-- Node 3: http://localhost:8083
-
-> **Note:** Always use the load balancer endpoint (`http://localhost:8080`) for all API calls. It provides automatic failover and intelligent routing.
->
-> **Note:** Jupyter Lab is **only available in local development** (`./run dev`). It is not deployed to GCP.
+- **Development (`./run dev`):**
+  - [API] http://localhost:8080 (Load Balancer)
+  - [WEB] http://localhost:3001 (Dashboard with hot reload)
+  - [JUPYTER] http://localhost:8888
+  - [NODES] http://localhost:8081, 8082, 8083 (debugging)
 
 ## Architecture
 
@@ -635,25 +630,12 @@ cargo fmt -- --check
 
 ### Running with Hot Reload
 
-**Debug Mode (Fast Rebuilds):**
 ```bash
-./run dev
+./run dev                # Release builds (default)
+./run dev --fast-build   # Debug builds (fast iteration)
 ```
-- Rebuild time: ~5-10 seconds
-- Block creation: ~4-10 seconds
-- Best for: Quick iteration, debugging, testing logic changes
 
-**Release Mode (Production Performance):**
-```bash
-./run dev-perf
-```
-- Rebuild time: ~30-60 seconds
-- Block creation: ~20-50ms (100-200x faster!)
-- Best for: Testing performance, integration testing, pre-deployment validation
-
-Both modes use `cargo-watch` for automatic recompilation when source files change. Choose based on whether you need fast rebuilds or fast runtime performance.
-
-**Performance Deep Dive:** See [PERFORMANCE.md](PERFORMANCE.md) for detailed benchmarks and security analysis.
+Uses `cargo-watch` for automatic recompilation on source file changes. Choose release builds for performance testing or debug builds for rapid iteration.
 
 ### Project Structure
 
@@ -748,10 +730,8 @@ goud_chain/
 ├── docker-compose.local.yml    # Generated - Local 3-node network
 ├── docker-compose.gcp.yml      # Generated - GCP 2-node network (e2-micro optimized)
 ├── docker-compose.local.dev.yml # Dev mode overlay (hot reload, jupyter)
-├── docker-compose.local.dev-perf.yml # Dev mode with release builds
 ├── Dockerfile                  # Rust production build
-├── Dockerfile.dev              # Rust dev build with cargo-watch (debug)
-├── Dockerfile.dev-perf         # Rust dev build with cargo-watch (release)
+├── Dockerfile.dev              # Rust dev build with cargo-watch (debug/release)
 ├── run                         # CLI script
 ├── README.md                   # This file
 └── CLAUDE.md                   # AI assistant guidelines
