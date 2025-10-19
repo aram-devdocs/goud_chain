@@ -87,7 +87,7 @@ services:
     <<: *dashboard-base
     container_name: goud_dashboard
     ports:
-      - "3000:8080"
+      - "3000:80"
     deploy:
       resources:
         limits:
