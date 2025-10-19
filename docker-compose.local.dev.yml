@@ -1,20 +1,10 @@
-# Development override for hot reload
-# SPACE OPTIMIZATION: Shares target/ and cargo cache across all nodes via bind mounts
-# This eliminates 3x duplication (saves ~15GB) while maintaining hot reload functionality
 services:
-  dashboard:
-    build:
-      context: ./dashboard
-      dockerfile: Dockerfile
-    command: npm run dev
-    volumes:
-      - ./dashboard:/app
-      - /app/node_modules
-
   node1:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        BUILD_MODE: ${BUILD_MODE:-release}
     volumes:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
@@ -27,6 +17,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        BUILD_MODE: ${BUILD_MODE:-release}
     volumes:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
@@ -38,6 +30,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        BUILD_MODE: ${BUILD_MODE:-release}
     volumes:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
@@ -46,9 +40,39 @@ services:
       - ./target:/app/target
       - node3_data:/data
 
+  dashboard:
+    build: !reset null
+    image: node:22-slim
+    container_name: dashboard-dev
+    working_dir: /app
+    command: sh -c "corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install && pnpm dev"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
   jupyter:
     volumes:
-      # Override with read-write for development (still git-tracked but editable)
       - ./python/notebooks:/home/jovyan/work/notebooks:rw
 
 volumes:

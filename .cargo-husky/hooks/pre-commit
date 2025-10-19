@@ -37,14 +37,16 @@ else
 fi
 
 echo "Running cargo audit (security vulnerabilities)..."
-if ! command -v cargo-audit >/dev/null 2>&1; then
-    echo "Installing cargo-audit..."
-    cargo install cargo-audit
-fi
-cargo audit || {
-    echo "Error: Security vulnerabilities found. Run 'cargo audit' for details."
+if command -v cargo-audit >/dev/null 2>&1; then
+    cargo audit || {
+        echo "Error: Security vulnerabilities found. Run 'cargo audit' for details."
+        exit 1
+    }
+else
+    echo "Error: cargo-audit not installed. Install with: cargo install cargo-audit"
+    echo "Note: Requires Rust 1.83+ for edition2024 support"
     exit 1
-}
+fi
 
 echo "Building Rust project..."
 cargo build || {
@@ -77,15 +79,43 @@ if git diff --cached --name-only | grep -qE "^config/(base|environments)/"; then
     echo "✅ Generated configs staged for commit"
 fi
 
-# Dashboard checks
-echo "Running dashboard tests..."
-./dashboard/test.sh || {
-    echo "Error: Dashboard tests failed."
-    exit 1
-}
+# Frontend checks (if web/ directory exists and has changes)
+if [ -d "web" ] && git diff --cached --name-only | grep -q "^web/"; then
+    echo "Running frontend validation..."
+    cd web
+    
+    # Check if node_modules exists
+    if [ ! -d "node_modules" ]; then
+        echo "Installing frontend dependencies..."
+        pnpm install --frozen-lockfile
+    fi
+    
+    echo "Checking code formatting..."
+    pnpm format:check || {
+        echo "Error: Frontend code is not formatted. Run 'cd web && pnpm format' to fix."
+        cd ..
+        exit 1
+    }
+    
+    echo "Running ESLint..."
+    pnpm lint || {
+        echo "Error: ESLint found issues. Run 'cd web && pnpm lint:fix' to attempt auto-fix."
+        cd ..
+        exit 1
+    }
+    
+    echo "Type checking..."
+    pnpm type-check || {
+        echo "Error: TypeScript type check failed."
+        cd ..
+        exit 1
+    }
+    
+    cd ..
+fi
 
 # Terraform checks
-if [ -d "terraform" ]; then
+if [ -d "terraform" ] && command -v terraform >/dev/null 2>&1; then
     echo "Running Terraform format check..."
     terraform -chdir=terraform fmt -check -recursive || {
         echo "Error: Terraform files are not formatted. Run 'terraform fmt -recursive' in terraform/ to fix."
@@ -100,6 +130,8 @@ if [ -d "terraform" ]; then
             exit 1
         }
     fi
+else
+    echo "Terraform not installed, skipping validation"
 fi
 
 echo "All pre-commit checks passed!"

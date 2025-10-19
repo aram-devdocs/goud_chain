@@ -4,6 +4,8 @@ Cargo.lock
 **/*.rs.bk
 *.pdb
 
+archive/
+
 cs-audit.md
 docs/ZERO_KNOWLEDGE_ENHANCEMENT_REPORT.md
 
@@ -74,6 +76,8 @@ terraform.tfplan
 *.json
 !package.json
 !package-lock.json
+!web/**/*.json
+!web/.prettierrc
 *.pem
 *.key
 ~/.gcloud/
