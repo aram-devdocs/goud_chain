@@ -43,15 +43,21 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Get PR number
-        id: pr-number
+      - name: Get PR number and custom instructions
+        id: pr-info
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "custom_prompt=" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "number=${{ inputs.pr_number }}" >> $GITHUB_OUTPUT
+            echo "custom_prompt=" >> $GITHUB_OUTPUT
           else
             echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            # Extract text after @claude-review from comment
+            COMMENT_BODY="${{ github.event.comment.body }}"
+            CUSTOM_PROMPT=$(echo "$COMMENT_BODY" | sed -n 's/.*@claude-review\s*\(.*\)/\1/p' | tr '\n' ' ')
+            echo "custom_prompt=$CUSTOM_PROMPT" >> $GITHUB_OUTPUT
           fi
 
       - name: Run Claude Code Review
@@ -61,7 +67,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ steps.pr-number.outputs.number }}
+            PR NUMBER: ${{ steps.pr-info.outputs.number }}
 
             Please review this pull request and provide feedback on:
             - Code quality and best practices
@@ -71,6 +77,8 @@ jobs:
             - Test coverage
 
             Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+
+            ${{ steps.pr-info.outputs.custom_prompt && format('ADDITIONAL INSTRUCTIONS FROM USER:\n{0}\n', steps.pr-info.outputs.custom_prompt) || '' }}
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
 
