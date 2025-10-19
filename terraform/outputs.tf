@@ -12,12 +12,12 @@ output "instance_name" {
 }
 
 output "load_balancer_url" {
-  description = "Load balancer API URL"
-  value       = var.enable_dns && module.dns.api_url != null ? module.dns.api_url : "http://${module.compute.public_ip}:8080"
+  description = "Load balancer and API URL (single-domain architecture)"
+  value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : "http://${module.compute.public_ip}:8080"
 }
 
 output "dashboard_url" {
-  description = "Dashboard URL"
+  description = "Dashboard URL (also serves API via /api/* path)"
   value       = var.enable_dns && module.dns.dashboard_url != null ? module.dns.dashboard_url : "http://${module.compute.public_ip}:3000"
 }
 
@@ -42,10 +42,10 @@ output "deployment_summary" {
 
 output "health_check_commands" {
   description = "Commands to check health of deployed services"
-  value = var.enable_dns && module.dns.api_url != null ? {
-    load_balancer = "curl ${module.dns.api_url}/lb/health"
-    node_health   = "curl ${module.dns.api_url}/health"
-    blockchain    = "curl ${module.dns.api_url}/chain"
+  value = var.enable_dns && module.dns.dashboard_url != null ? {
+    load_balancer = "curl ${module.dns.dashboard_url}/lb/health"
+    node_health   = "curl ${module.dns.dashboard_url}/health"
+    blockchain    = "curl ${module.dns.dashboard_url}/chain"
     } : {
     load_balancer = "curl http://${module.compute.public_ip}:8080/lb/health"
     node_health   = "curl http://${module.compute.public_ip}:8080/health"
@@ -54,12 +54,12 @@ output "health_check_commands" {
 }
 
 output "dns_configuration" {
-  description = "DNS configuration details"
+  description = "DNS configuration details (single-domain architecture)"
   value = var.enable_dns ? {
     enabled               = true
     domain_name           = var.domain_name
     dashboard_fqdn        = module.dns.dashboard_fqdn
-    api_fqdn              = module.dns.api_fqdn
+    note                  = "Dashboard serves both UI (/) and API (/api/*) - no separate API subdomain"
     cloudflare_proxy      = var.enable_cloudflare_proxy
     dns_records           = module.dns.dns_records_created
     https_enabled         = var.enable_cloudflare_proxy
@@ -69,7 +69,7 @@ output "dns_configuration" {
     enabled               = false
     domain_name           = null
     dashboard_fqdn        = null
-    api_fqdn              = null
+    note                  = "DNS management is disabled"
     cloudflare_proxy      = false
     dns_records           = null
     https_enabled         = false
