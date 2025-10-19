@@ -14,7 +14,7 @@ resource "cloudflare_record" "dashboard" {
   count = var.enable_dns ? 1 : 0
 
   zone_id = var.cloudflare_zone_id
-  name    = var.environment == "production" ? var.dashboard_subdomain : "${var.environment}-${var.dashboard_subdomain}"
+  name    = var.dashboard_subdomain == "" ? var.environment : (var.environment == "production" ? var.dashboard_subdomain : "${var.environment}-${var.dashboard_subdomain}")
   content = var.load_balancer_ip
   type    = "A"
   ttl     = 1 # Auto TTL when proxied

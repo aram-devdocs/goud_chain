@@ -2,7 +2,7 @@
 
 output "dashboard_fqdn" {
   description = "Fully qualified domain name for dashboard and API (single-domain architecture)"
-  value       = var.enable_dns ? (var.environment == "production" ? "${var.dashboard_subdomain}.${var.domain_name}" : "${var.environment}-${var.dashboard_subdomain}.${var.domain_name}") : null
+  value       = var.enable_dns ? (var.dashboard_subdomain == "" ? "${var.environment}.${var.domain_name}" : (var.environment == "production" ? "${var.dashboard_subdomain}.${var.domain_name}" : "${var.environment}-${var.dashboard_subdomain}.${var.domain_name}")) : null
 }
 
 # API no longer has separate subdomain - accessed via {dashboard_fqdn}/api/*
@@ -34,7 +34,7 @@ output "dns_records_created" {
   description = "Summary of DNS records created (single-domain architecture)"
   value = var.enable_dns ? {
     dashboard = {
-      fqdn    = var.environment == "production" ? "${var.dashboard_subdomain}.${var.domain_name}" : "${var.environment}-${var.dashboard_subdomain}.${var.domain_name}"
+      fqdn    = var.dashboard_subdomain == "" ? "${var.environment}.${var.domain_name}" : (var.environment == "production" ? "${var.dashboard_subdomain}.${var.domain_name}" : "${var.environment}-${var.dashboard_subdomain}.${var.domain_name}")
       ip      = var.load_balancer_ip
       proxied = var.enable_cloudflare_proxy
       note    = "Serves both dashboard (/) and API (/api/*)"

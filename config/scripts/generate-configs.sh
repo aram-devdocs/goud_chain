@@ -218,6 +218,7 @@ generate_dashboard_server_block() {
         # It proxies API requests to the blockchain nodes (same as root load balancer)
         # This enables the dashboard to make API calls without CORS issues
         location /api/ {
+            rewrite ^/api/(.*) /\$1 break;  # Strip /api/ prefix before proxying
             proxy_pass http://blockchain_nodes;
 
             proxy_set_header Host \$host;
