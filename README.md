@@ -2,39 +2,39 @@
 
 Encrypted blockchain with API key-based authentication. Store any JSON data on an immutable, distributed ledger using Proof of Authority consensus.
 
-[![API Status](https://img.shields.io/badge/API-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-api.goudchain.com/)
-[![Dashboard Status](https://img.shields.io/badge/Dashboard-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev-dashboard.goudchain.com/)
+[![Platform Status](https://img.shields.io/badge/Platform-Live-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==)](https://dev.goudchain.com/)
 
 ## 🚀 Try the Live Demo
 
 **Test the blockchain in action** - No installation required!
 
-- **📡 API Endpoint:** [https://dev-api.goudchain.com](https://dev-api.goudchain.com)
-- **🌐 Dashboard:** [https://dev-dashboard.goudchain.com](https://dev-dashboard.goudchain.com)
+- **🌐 Platform:** [https://dev.goudchain.com](https://dev.goudchain.com) (Dashboard + API)
+- **📡 API:** [https://dev.goudchain.com/health](https://dev.goudchain.com/health) (Direct endpoint)
+- **📚 API Docs:** [https://dev.goudchain.com/rapidoc](https://dev.goudchain.com/rapidoc) (Interactive documentation)
 
 **Quick Test:**
 ```bash
 # Create account and get API key
-curl -X POST https://dev-api.goudchain.com/account/create \
+curl -X POST https://dev.goudchain.com/account/create \
   -H "Content-Type: application/json" \
   -d '{"metadata": null}'
 
 # Login with API key to get session token
-curl -X POST https://dev-api.goudchain.com/account/login \
+curl -X POST https://dev.goudchain.com/account/login \
   -H "Content-Type: application/json" \
   -d '{"api_key": "YOUR_API_KEY_HERE"}'
 
 # Submit encrypted data (use session token or API key)
-curl -X POST https://dev-api.goudchain.com/data/submit \
+curl -X POST https://dev.goudchain.com/data/submit \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"label": "test", "data": "{\"message\": \"Hello Blockchain!\"}"}'
 
 # View the blockchain
-curl https://dev-api.goudchain.com/chain
+curl https://dev.goudchain.com/chain
 ```
 
-Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with the blockchain visually.
+Or visit the [Dashboard](https://dev.goudchain.com/) to interact with the blockchain visually.
 
 > **Note:** This is a proof-of-concept deployment running on GCP's free tier. Hosted on a 2-node network with load balancing.
 
@@ -156,8 +156,8 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
                  Cloudflare CDN
                  (HTTPS, Port 443)
                         ↓
-            dev-api.goudchain.com
-            dev-dashboard.goudchain.com
+                dev.goudchain.com
+           (Dashboard + API endpoints)
                         ↓
         ┌───────────────────────────────┐
         │   GCP e2-micro VM (1GB RAM)   │
@@ -344,7 +344,7 @@ See [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) for comprehensive testing strat
 
 ## API Documentation
 
-**Interactive API Documentation:** [http://localhost:8080/rapidoc](http://localhost:8080/rapidoc) (local) or [https://dev-api.goudchain.com/rapidoc](https://dev-api.goudchain.com/rapidoc) (production)
+**Interactive API Documentation:** [http://localhost:8080/rapidoc](http://localhost:8080/rapidoc) (local) or [https://dev.goudchain.com/rapidoc](https://dev.goudchain.com/rapidoc) (production)
 
 Goud Chain provides comprehensive OpenAPI 3.1 documentation with interactive testing via RapiDoc UI:
 
@@ -565,7 +565,7 @@ curl http://localhost:8080/lb/health
 
 ## Cloud Deployment (Google Cloud Platform)
 
-**Live Demo:** https://dev-api.goudchain.com (API), https://dev-dashboard.goudchain.com (Dashboard)
+**Live Demo:** https://dev.goudchain.com (Dashboard + API)
 
 Runs on GCP's free tier (e2-micro VM, 1GB RAM) with Terraform-managed infrastructure. Single VM runs nginx load balancer, dashboard, and 2 blockchain nodes (node1: 384MB, node2: 384MB). Total memory footprint ~960MB leaves headroom for kernel and system processes.
 
