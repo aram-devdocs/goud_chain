@@ -45,6 +45,9 @@ docker-compose.override.yml
 
 # Web/Dashboard (React monorepo has its own .gitignore in web/)
 
+# Temporary files
+*.new
+
 # Database
 *.db
 *.sqlite
