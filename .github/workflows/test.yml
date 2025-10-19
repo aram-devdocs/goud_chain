@@ -93,6 +93,41 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Dashboard Docker build test
+  dashboard-build:
+    name: Dashboard Build Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify web/ directory exists
+        run: |
+          if [ ! -d "web" ]; then
+            echo "Error: web/ directory not found"
+            exit 1
+          fi
+          if [ ! -f "web/Dockerfile" ]; then
+            echo "Error: web/Dockerfile not found"
+            exit 1
+          fi
+          echo "✅ Dashboard directory and Dockerfile found"
+
+      - name: Build Dashboard Docker image (AMD64)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          file: ./web/Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: goud-chain-dashboard:test-amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Terraform validation
   terraform-validate:
     name: Terraform Validation

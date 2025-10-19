@@ -99,7 +99,7 @@ if [ "$IS_LOCAL" = true ]; then
 
     # Calculate hash of source code to detect changes
     NODE_HASH=$(find src Cargo.toml Cargo.lock Dockerfile -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
-    DASHBOARD_HASH=$(find dashboard -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+    DASHBOARD_HASH=$(find web -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
 
     HASH_FILE="/tmp/goud-chain-deploy/.build_hashes"
     REBUILD_NEEDED=false
@@ -140,7 +140,7 @@ if [ "$IS_LOCAL" = true ]; then
 
         # Build dashboard image for AMD64
         echo "Building dashboard image for AMD64 platform..."
-        docker buildx build --platform linux/amd64 -t goud-chain-dashboard:latest --load ./dashboard
+        docker buildx build --platform linux/amd64 -t goud-chain-dashboard:latest --load ./web
 
         # Save images to compressed tar files (overwrite existing)
         echo "Saving images..."
@@ -630,14 +630,14 @@ ssh -i ~/.ssh/goud_chain_rsa ubuntu@$INSTANCE_IP << 'ENDSSH'
                 echo "✅ Pulled pre-built dashboard image"
             else
                 echo "⚠️  Failed to pull dashboard, falling back to local build..."
-                cd /opt/goud-chain/dashboard
+                cd /opt/goud-chain/web
                 sudo docker build -t goud-chain-dashboard:latest .
                 cd /opt/goud-chain
             fi
         else
             # Fallback: Build on VM
             echo "Building dashboard on VM (fallback)..."
-            cd /opt/goud-chain/dashboard
+            cd /opt/goud-chain/web
             sudo docker build -t goud-chain-dashboard:latest .
             cd /opt/goud-chain
         fi

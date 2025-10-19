@@ -713,11 +713,17 @@ goud_chain/
 │   ├── nginx.local.conf        # Generated from config/ templates
 │   ├── nginx.gcp.conf          # Generated from config/ templates
 │   └── cors.conf               # Shared CORS config
-├── dashboard/
-│   ├── index.html              # Main dashboard (authenticated)
-│   ├── auth.html               # Login & signup page
-│   ├── server.js               # Dashboard server
-│   └── Dockerfile              # Dashboard container
+├── web/                        # React monorepo (migrated from Alpine.js)
+│   ├── apps/
+│   │   └── dashboard/          # Main dashboard application
+│   ├── packages/
+│   │   ├── ui/                 # Shared UI components
+│   │   ├── hooks/              # React hooks
+│   │   ├── utils/              # Utility functions
+│   │   ├── types/              # TypeScript type definitions
+│   │   └── config/             # Shared configurations
+│   ├── Dockerfile              # Dashboard container
+│   └── nginx.conf              # Dashboard nginx config
 ├── terraform/
 │   ├── main.tf                 # Root Terraform module
 │   ├── variables.tf            # Input variables
