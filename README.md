@@ -115,14 +115,18 @@ Or visit the [Dashboard](https://dev-dashboard.goudchain.com) to interact with t
 
 - **Production (`./run start`):**
   - [API] http://localhost:8080 (Load Balancer)
-  - [WEB] http://localhost:3000 (Dashboard)
+  - [WEB] http://localhost:3000 (Dashboard - served via Docker/Nginx)
   - [NODES] http://localhost:8081, 8082, 8083 (debugging)
 
 - **Development (`./run dev`):**
   - [API] http://localhost:8080 (Load Balancer)
-  - [WEB] http://localhost:3001 (Dashboard with hot reload)
+  - [WEB] http://localhost:3000 (Dashboard - Docker/Nginx) OR http://localhost:3001 (Vite dev server with HMR)
   - [JUPYTER] http://localhost:8888
   - [NODES] http://localhost:8081, 8082, 8083 (debugging)
+
+**Note:** In development, you can use either:
+- Docker dashboard at :3000 (served via Nginx, matches production)
+- Vite dev server at :3001 (hot module reload for faster frontend iteration)
 
 ## Architecture
 

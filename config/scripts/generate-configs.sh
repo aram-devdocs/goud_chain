@@ -214,6 +214,9 @@ generate_dashboard_server_block() {
         }
 
         # Proxy API requests to backend nodes
+        # Note: This /api/ location block is for the React dashboard server
+        # It proxies API requests to the blockchain nodes (same as root load balancer)
+        # This enables the dashboard to make API calls without CORS issues
         location /api/ {
             proxy_pass http://blockchain_nodes;
 

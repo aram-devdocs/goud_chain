@@ -43,7 +43,9 @@ if command -v cargo-audit >/dev/null 2>&1; then
         exit 1
     }
 else
-    echo "cargo-audit not installed, skipping (requires Rust 1.83+ for edition2024)"
+    echo "Error: cargo-audit not installed. Install with: cargo install cargo-audit"
+    echo "Note: Requires Rust 1.83+ for edition2024 support"
+    exit 1
 fi
 
 echo "Building Rust project..."
