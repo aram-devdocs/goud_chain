@@ -100,8 +100,8 @@ jobs:
           cloudflare_api_token    = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
           cloudflare_zone_id      = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
           enable_cloudflare_proxy = true
-          dashboard_subdomain     = "dashboard"
-          api_subdomain           = "api"
+          dashboard_subdomain     = ""  # Empty string creates dev.goudchain.com (single-domain architecture)
+          api_subdomain           = "api"  # Kept for backwards compatibility (not used for DNS)
 
           # Tags (GCP labels: lowercase, numbers, underscores, dashes only)
           tags = {
