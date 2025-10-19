@@ -43,10 +43,7 @@ docker-compose.override.yml
 # docker-compose.local.yml
 # docker-compose.gcp.yml
 
-# Node (for dashboard)
-dashboard/node_modules/
-dashboard/package-lock.json
-dashboard/dist/
+# Web/Dashboard (React monorepo has its own .gitignore in web/)
 
 # Database
 *.db
