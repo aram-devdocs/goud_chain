@@ -37,17 +37,19 @@ export interface SubmitDataResponse {
 export interface ListCollectionsResponse {
   collections: Array<{
     collection_id: string
+    label: string
     user_id: string
     blind_index: string
     created_at: number
+    block_number: number
     data_count: number
   }>
 }
 
 export interface DecryptDataResponse {
-  data_id: string
   collection_id: string
-  encrypted_data: string
+  label: string
+  data: string
   created_at: number
 }
 
@@ -63,6 +65,9 @@ export interface AuditLogEntry {
 export interface AuditLogsResponse {
   logs: AuditLogEntry[]
   total: number
+  page: number
+  total_pages: number
+  page_size: number
 }
 
 export interface MetricsResponse {

@@ -1,7 +1,10 @@
 export interface Block {
-  block_number: number
-  previous_hash: string
+  index: number
   timestamp: number
+  encrypted_block_data: string
+  blind_indexes: string[]
+  block_salt: string
+  previous_hash: string
   merkle_root: string
   validator: string
   signature: string

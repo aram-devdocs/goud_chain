@@ -1,6 +1,8 @@
 import { createRootRoute, createRoute, createRouter, Outlet, redirect, useNavigate } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 import { Header, Navigation, Toast } from '@goudchain/ui'
-import { useAuth, useToast } from '@goudchain/hooks'
+import { useAuth, useToast, useListCollections, useAuditLogs } from '@goudchain/hooks'
+import { useWebSocketContext } from './contexts/WebSocketContext'
 import AuthPage from './pages/auth'
 import DashboardPage from './pages/dashboard'
 import SubmitPage from './pages/submit'
@@ -27,18 +29,6 @@ type RouteId =
   | 'audit'
   | 'metrics'
   | 'debug'
-
-const navItems: Array<{ id: RouteId; label: string; path: string }> = [
-  { id: 'dashboard', label: 'Dashboard', path: '/' },
-  { id: 'submit', label: 'Submit Data', path: '/submit' },
-  { id: 'collections', label: 'Collections', path: '/collections' },
-  { id: 'explorer', label: 'Blockchain', path: '/explorer' },
-  { id: 'network', label: 'Network', path: '/network' },
-  { id: 'analytics', label: 'Analytics', path: '/analytics' },
-  { id: 'audit', label: 'Audit Logs', path: '/audit' },
-  { id: 'metrics', label: 'Metrics', path: '/metrics' },
-  { id: 'debug', label: 'Debug', path: '/debug' },
-]
 
 // Root layout - just renders children with toast notifications
 function RootComponent() {
@@ -67,19 +57,62 @@ function RootComponent() {
 function ProtectedLayout() {
   const { logout } = useAuth()
   const navigate = useNavigate()
+  const { isConnected: wsConnected } = useWebSocketContext()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Get counts for nav badges
+  const { data: collectionsData } = useListCollections()
+  // Get total audit log count (use page_size=1 to minimize data transfer, we only need total)
+  const { data: auditData, refetch: refetchAuditCount } = useAuditLogs({ page_size: 1 }, true)
+
+  // Refetch audit count when audit log events come in
+  const { lastMessage } = useWebSocketContext()
+  useEffect(() => {
+    if (!lastMessage) return
+    const message = lastMessage as unknown as { type: string; event?: string }
+    if (message.type === 'event' && message.event === 'audit_log_update') {
+      refetchAuditCount()
+    }
+  }, [lastMessage, refetchAuditCount])
 
   const handleLogout = () => {
     logout()
     navigate({ to: '/auth' })
   }
 
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    window.location.reload()
+  }
+
+  const accountId = localStorage.getItem('account_id')
+
+  const navItems: Array<{ id: RouteId; label: string; path: string; count?: number }> = [
+    { id: 'dashboard', label: 'Dashboard', path: '/' },
+    { id: 'submit', label: 'Submit Data', path: '/submit' },
+    { id: 'collections', label: 'Collections', path: '/collections', count: collectionsData?.collections.length },
+    { id: 'explorer', label: 'Explorer', path: '/explorer' },
+    { id: 'network', label: 'Network', path: '/network' },
+    { id: 'analytics', label: 'Analytics', path: '/analytics' },
+    { id: 'audit', label: 'Audit Logs', path: '/audit', count: auditData?.total },
+    { id: 'metrics', label: 'Metrics', path: '/metrics' },
+    { id: 'debug', label: 'Debug', path: '/debug' },
+  ]
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
-      <Header title="Goud Chain" subtitle="Encrypted Blockchain Platform">
+      <Header
+        title="Goud Chain"
+        subtitle="Encrypted Blockchain"
+        wsConnected={wsConnected}
+        accountId={accountId}
+        isRefreshing={isRefreshing}
+        onRefresh={handleRefresh}
+      >
         <button
           onClick={handleLogout}
-          className="text-sm text-zinc-400 hover:text-white transition-colors"
+          className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-sm border border-zinc-700 transition"
         >
           Logout
         </button>

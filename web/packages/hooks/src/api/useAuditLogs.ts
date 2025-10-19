@@ -5,15 +5,16 @@ import { API_BASE } from '../config'
 
 export interface AuditLogsParams {
   event_type?: string
-  start_timestamp?: number
-  end_timestamp?: number
+  start_ts?: number
+  end_ts?: number
   page?: number
   page_size?: number
 }
 
-export function useAuditLogs(params: AuditLogsParams = {}) {
+export function useAuditLogs(params: AuditLogsParams = {}, enabled: boolean = true) {
   return useQuery({
     queryKey: ['audit-logs', params],
+    enabled,
     queryFn: async () => {
       const token = localStorage.getItem('session_token')
       if (!token) {
@@ -22,11 +23,11 @@ export function useAuditLogs(params: AuditLogsParams = {}) {
 
       const queryParams = new URLSearchParams()
       if (params.event_type) queryParams.set('event_type', params.event_type)
-      if (params.start_timestamp)
-        queryParams.set('start_timestamp', params.start_timestamp.toString())
-      if (params.end_timestamp)
-        queryParams.set('end_timestamp', params.end_timestamp.toString())
-      if (params.page) queryParams.set('page', params.page.toString())
+      if (params.start_ts)
+        queryParams.set('start_ts', params.start_ts.toString())
+      if (params.end_ts)
+        queryParams.set('end_ts', params.end_ts.toString())
+      if (params.page !== undefined) queryParams.set('page', params.page.toString())
       if (params.page_size)
         queryParams.set('page_size', params.page_size.toString())
 

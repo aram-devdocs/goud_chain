@@ -1,11 +1,21 @@
-import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useWebSocket } from '@goudchain/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@goudchain/hooks'
 
+export interface ActivityEvent {
+  id: string
+  type: 'blockchain' | 'collection' | 'peer' | 'audit' | 'metrics'
+  message: string
+  timestamp: number
+}
+
 interface WebSocketContextType {
   isConnected: boolean
   send: (message: unknown) => void
+  activityFeed: ActivityEvent[]
+  clearActivityFeed: () => void
+  lastMessage: unknown
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null)
@@ -25,6 +35,7 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const queryClient = useQueryClient()
   const { success, info } = useToast()
+  const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
 
   // Get API key for WebSocket authentication
   const apiKey = localStorage.getItem('api_key')
@@ -48,6 +59,17 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     }
   }, [isConnected, send])
 
+  // Helper to add activity
+  const addActivity = (type: ActivityEvent['type'], message: string) => {
+    const event: ActivityEvent = {
+      id: `${Date.now()}-${Math.random()}`,
+      type,
+      message,
+      timestamp: Date.now(),
+    }
+    setActivityFeed((prev) => [event, ...prev].slice(0, 50)) // Keep last 50 items
+  }
+
   // Handle incoming WebSocket messages
   useEffect(() => {
     if (!lastMessage) return
@@ -60,12 +82,14 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
           // Invalidate chain and metrics queries
           queryClient.invalidateQueries({ queryKey: ['chain'] })
           queryClient.invalidateQueries({ queryKey: ['metrics'] })
+          addActivity('blockchain', 'New block added to chain')
           info('New block added to chain')
           break
 
         case 'collection_update':
           // Invalidate collections query
           queryClient.invalidateQueries({ queryKey: ['collections'] })
+          addActivity('collection', 'New collection created')
           success('New collection created')
           break
 
@@ -73,17 +97,19 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
           // Invalidate peers query
           queryClient.invalidateQueries({ queryKey: ['peers'] })
           queryClient.invalidateQueries({ queryKey: ['metrics'] })
+          addActivity('peer', 'Network topology changed')
           info('Network topology changed')
           break
 
         case 'audit_log_update':
-          // Invalidate audit logs query
-          queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+          // Don't invalidate audit logs query - let the audit page handle real-time events
+          addActivity('audit', 'New audit log entry')
           break
 
         case 'metrics_update':
           // Invalidate metrics query
           queryClient.invalidateQueries({ queryKey: ['metrics'] })
+          addActivity('metrics', 'System metrics updated')
           break
 
         default:
@@ -92,8 +118,12 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     }
   }, [lastMessage, queryClient, success, info])
 
+  const clearActivityFeed = () => {
+    setActivityFeed([])
+  }
+
   return (
-    <WebSocketContext.Provider value={{ isConnected, send }}>
+    <WebSocketContext.Provider value={{ isConnected, send, activityFeed, clearActivityFeed, lastMessage }}>
       {children}
     </WebSocketContext.Provider>
   )

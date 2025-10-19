@@ -168,7 +168,7 @@ async fn main() {
     let (api_router, api_spec) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/account", api::routes::account::router())
         .nest("/data", api::routes::data::router())
-        .nest("/api/audit", api::routes::audit::router())
+        .nest("/audit", api::routes::audit::router())
         .nest("/test", api::routes::test::router())
         .merge(api::routes::health::router())
         .merge(api::routes::metrics::router())
@@ -258,7 +258,7 @@ async fn main() {
     info!("   Data Operations    - /data/*");
     info!("   Health & Status    - /health, /chain, /peers, /sync");
     info!("   Metrics & Stats    - /metrics, /stats");
-    info!("   Audit Logs         - /api/audit");
+    info!("   Audit Logs         - /audit");
     info!("   WebSocket          - /ws\n");
 
     // Start async HTTP server

@@ -1,13 +1,142 @@
-import { usePeers, useMetrics } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '@goudchain/ui'
+import { useState, useMemo } from 'react'
+import {
+  usePeers,
+  useChainInfo,
+  useValidator,
+  useSync,
+  useToast,
+} from '@goudchain/hooks'
+import {
+  NetworkHealthCard,
+  NodeStatsGrid,
+  PeerConnectivityTable,
+  NetworkActions,
+  Spinner,
+  type NetworkHealth,
+  type NodeStats,
+  type PeerInfo,
+} from '@goudchain/ui'
 import { SpinnerSize } from '@goudchain/types'
-import { formatNumber } from '@goudchain/utils'
+
+function formatRelativeTime(timestamp: number): string {
+  const now = Math.floor(Date.now() / 1000)
+  const diff = now - timestamp
+  const seconds = Math.floor(diff)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (seconds < 60) return `${seconds}s ago`
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
+}
 
 export default function NetworkPage() {
-  const { data: peers, isLoading: peersLoading } = usePeers()
-  const { data: metrics, isLoading: metricsLoading } = useMetrics()
+  const { data: peers, isLoading: peersLoading, refetch: refetchPeers } = usePeers()
+  const { data: chainInfo, isLoading: chainLoading, refetch: refetchChain } = useChainInfo()
+  const { data: validatorInfo, isLoading: validatorLoading } = useValidator()
+  const syncMutation = useSync()
+  const { success } = useToast()
 
-  if (peersLoading || metricsLoading) {
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const isLoading = peersLoading || chainLoading || validatorLoading
+
+  // Calculate network health
+  const networkHealth: NetworkHealth = useMemo(() => {
+    const peerCount = peers?.count ?? 0
+    const currentValidator = validatorInfo?.expected_validator ?? 'Unknown'
+    const isThisNodeValidator = validatorInfo?.is_this_node_validator ?? false
+
+    // Calculate health score
+    let healthScore = 0
+
+    // Network connectivity (40 points)
+    if (peerCount >= 2) healthScore += 40
+    else if (peerCount === 1) healthScore += 20
+
+    // Sync status (40 points) - assume synced for now
+    healthScore += 40
+
+    // Validator participation (20 points)
+    if (isThisNodeValidator) healthScore += 20
+    else healthScore += 10
+
+    return {
+      status: peerCount > 0 ? 'connected' : 'disconnected',
+      syncStatus: 'synced', // TODO: Calculate based on peer chain lengths
+      peerCount,
+      currentValidator,
+      isThisNodeValidator,
+      healthScore,
+    }
+  }, [peers, validatorInfo])
+
+  // Calculate node stats
+  const nodeStats: NodeStats = useMemo(() => {
+    const chainLength = chainInfo?.chain?.length ?? 0
+    const latestBlock = chainInfo?.chain?.[chainLength - 1]
+    const latestBlockAge = latestBlock
+      ? formatRelativeTime(latestBlock.timestamp)
+      : 'N/A'
+
+    return {
+      nodeId: validatorInfo?.current_node_id ?? 'Unknown',
+      chainLength,
+      latestBlockAge,
+      isValidator: validatorInfo?.is_this_node_validator ?? false,
+      nextValidatorTurn: validatorInfo?.is_this_node_validator
+        ? `Block #${validatorInfo.next_block_number}`
+        : undefined,
+      syncStatus: 'Up to date',
+      blocksBehind: 0,
+    }
+  }, [chainInfo, validatorInfo])
+
+  // Transform peers data for table
+  const peerInfoList: PeerInfo[] = useMemo(() => {
+    if (!peers?.peers) return []
+
+    return peers.peers.map((peerAddress) => {
+      // Extract role from address (node1:9000 -> Validator_1)
+      const nodeMatch = peerAddress.match(/node(\d+)/)
+      const nodeNumber = nodeMatch ? nodeMatch[1] : '?'
+      const role = `Validator_${nodeNumber}`
+
+      return {
+        address: peerAddress,
+        role,
+        chainLength: undefined, // TODO: Get from peer info when available
+        lastSeen: undefined, // TODO: Get from peer info when available
+        isCurrentValidator: role === validatorInfo?.expected_validator,
+      }
+    })
+  }, [peers, validatorInfo])
+
+  const handleSyncAll = () => {
+    syncMutation.mutate()
+  }
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await Promise.all([refetchPeers(), refetchChain()])
+    setIsRefreshing(false)
+    success('Network data refreshed')
+  }
+
+  const handleSyncPeer = (peerAddress: string) => {
+    // TODO: Implement peer-specific sync
+    success(`Syncing with ${peerAddress}...`)
+    syncMutation.mutate()
+  }
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+    success('Copied to clipboard')
+  }
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size={SpinnerSize.Large} />
@@ -18,78 +147,31 @@ export default function NetworkPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Network</h2>
-        <p className="text-zinc-500">P2P network status and peer information</p>
+        <h2 className="text-3xl font-bold text-white mb-2">Network Status</h2>
+        <p className="text-zinc-500">P2P network health and peer connectivity</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-zinc-400">Connected Peers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-white font-mono">
-              {formatNumber(peers?.count ?? 0)}
-            </p>
-            <p className="text-xs text-zinc-500 mt-1">P2P Network Peers</p>
-          </CardContent>
-        </Card>
+      {/* Network Health Overview */}
+      <NetworkHealthCard health={networkHealth} nodeId={nodeStats.nodeId} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-zinc-400">Peer Addresses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-white font-mono">
-              {formatNumber(peers?.peers?.length ?? 0)}
-            </p>
-            <p className="text-xs text-zinc-500 mt-1">Available Addresses</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Node Stats Grid */}
+      <NodeStatsGrid stats={nodeStats} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Peer List</CardTitle>
-          <p className="text-xs text-zinc-500 mt-1">
-            Reputation: <span className="text-green-500">Positive</span> = Trusted,
-            <span className="text-zinc-400"> Neutral (0)</span> = Unknown,
-            <span className="text-red-500"> Negative</span> = Suspicious
-          </p>
-        </CardHeader>
-        <CardContent>
-          {peers?.peers && peers.peers.length > 0 ? (
-            <div className="space-y-2">
-              {peers.peers.map((peer) => {
-                const reputation = peers?.reputation?.[peer] ?? 0
-                const reputationColor =
-                  reputation > 0
-                    ? 'text-green-500'
-                    : reputation < 0
-                      ? 'text-red-500'
-                      : 'text-zinc-400'
+      {/* Peer Connectivity Table */}
+      <PeerConnectivityTable
+        peers={peerInfoList}
+        localChainLength={nodeStats.chainLength}
+        onSync={handleSyncPeer}
+        onCopy={handleCopy}
+      />
 
-                return (
-                  <div
-                    key={peer}
-                    className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg border border-zinc-800"
-                  >
-                    <code className="text-sm text-white font-mono">{peer}</code>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs text-zinc-400">Reputation:</span>
-                      <span className={`text-sm font-mono font-bold ${reputationColor}`}>
-                        {reputation > 0 ? `+${reputation}` : reputation}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="text-zinc-500">No peers connected</p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Network Actions */}
+      <NetworkActions
+        onSyncAll={handleSyncAll}
+        onRefresh={handleRefresh}
+        isSyncing={syncMutation.isPending}
+        isRefreshing={isRefreshing}
+      />
     </div>
   )
 }
