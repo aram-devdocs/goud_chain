@@ -14,7 +14,9 @@ export function NetworkActions({
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <div className="flex-1">
-        <h3 className="text-sm font-medium text-zinc-400 mb-1">Network Management</h3>
+        <h3 className="text-sm font-medium text-zinc-400 mb-1">
+          Network Management
+        </h3>
         <p className="text-xs text-zinc-500">
           Trigger blockchain synchronization with all connected peers
         </p>

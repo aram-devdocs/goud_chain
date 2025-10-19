@@ -16,8 +16,14 @@ export default function ExplorerPage() {
 
   const [chainHealth, setChainHealth] = useState<ChainHealth | null>(null)
   const [isValidating, setIsValidating] = useState(false)
-  const [validationProgress, setValidationProgress] = useState({ current: 0, total: 0, step: '' })
-  const [selectedBlockNumber, setSelectedBlockNumber] = useState<number | null>(null)
+  const [validationProgress, setValidationProgress] = useState({
+    current: 0,
+    total: 0,
+    step: '',
+  })
+  const [selectedBlockNumber, setSelectedBlockNumber] = useState<number | null>(
+    null
+  )
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBy, setFilterBy] = useState<'all' | 'with_data' | 'empty'>('all')
 
@@ -29,21 +35,37 @@ export default function ExplorerPage() {
     const totalSteps = 4
 
     // Step 1: Hash chain validation
-    setValidationProgress({ current: 1, total: totalSteps, step: 'Validating hash chain...' })
+    setValidationProgress({
+      current: 1,
+      total: totalSteps,
+      step: 'Validating hash chain...',
+    })
 
     setTimeout(() => {
       const hashChainValid = validateHashChain()
 
       // Step 2: Merkle root validation
-      setValidationProgress({ current: 2, total: totalSteps, step: 'Verifying merkle roots...' })
+      setValidationProgress({
+        current: 2,
+        total: totalSteps,
+        step: 'Verifying merkle roots...',
+      })
 
       setTimeout(() => {
         // Step 3: Signature validation
-        setValidationProgress({ current: 3, total: totalSteps, step: 'Checking signatures...' })
+        setValidationProgress({
+          current: 3,
+          total: totalSteps,
+          step: 'Checking signatures...',
+        })
 
         setTimeout(() => {
           // Step 4: Timestamp validation
-          setValidationProgress({ current: 4, total: totalSteps, step: 'Validating timestamps...' })
+          setValidationProgress({
+            current: 4,
+            total: totalSteps,
+            step: 'Validating timestamps...',
+          })
 
           setTimeout(() => {
             const checks = {
@@ -54,10 +76,13 @@ export default function ExplorerPage() {
             }
 
             const issues: string[] = []
-            if (!checks.hashChainValid) issues.push('Hash chain broken at some blocks')
-            if (!checks.merkleRootsValid) issues.push('Merkle root mismatch detected')
+            if (!checks.hashChainValid)
+              issues.push('Hash chain broken at some blocks')
+            if (!checks.merkleRootsValid)
+              issues.push('Merkle root mismatch detected')
             if (!checks.signaturesValid) issues.push('Invalid signatures found')
-            if (!checks.timestampsMonotonic) issues.push('Timestamp ordering violated')
+            if (!checks.timestampsMonotonic)
+              issues.push('Timestamp ordering violated')
 
             const isValid = Object.values(checks).every(Boolean)
             const score = isValid ? 100 : Math.max(0, 100 - issues.length * 25)
@@ -116,7 +141,10 @@ export default function ExplorerPage() {
   }
 
   const handleNext = () => {
-    if (selectedBlockNumber !== null && selectedBlockNumber < blocks.length - 1) {
+    if (
+      selectedBlockNumber !== null &&
+      selectedBlockNumber < blocks.length - 1
+    ) {
       setSelectedBlockNumber(selectedBlockNumber + 1)
     }
   }
@@ -130,13 +158,19 @@ export default function ExplorerPage() {
   }
 
   const selectedBlock =
-    selectedBlockNumber !== null ? blocks.find((b) => b.index === selectedBlockNumber) : null
+    selectedBlockNumber !== null
+      ? blocks.find((b) => b.index === selectedBlockNumber)
+      : null
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Blockchain Explorer</h2>
-        <p className="text-zinc-500">Validate chain integrity and explore blocks</p>
+        <h2 className="text-3xl font-bold text-white mb-2">
+          Blockchain Explorer
+        </h2>
+        <p className="text-zinc-500">
+          Validate chain integrity and explore blocks
+        </p>
       </div>
 
       {/* Chain Health Dashboard */}
@@ -159,7 +193,9 @@ export default function ExplorerPage() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left: Block Timeline */}
           <div className="flex-1 lg:max-w-md xl:max-w-lg">
-            <h3 className="text-xl font-bold text-white mb-4">Block Timeline</h3>
+            <h3 className="text-xl font-bold text-white mb-4">
+              Block Timeline
+            </h3>
             <BlockTimeline
               blocks={blocks}
               selectedBlockNumber={selectedBlockNumber}
@@ -174,7 +210,9 @@ export default function ExplorerPage() {
           {/* Right: Block Details */}
           <div className="flex-1">
             <h3 className="text-xl font-bold text-white mb-4">
-              {selectedBlock ? 'Block Details' : 'Select a block to view details'}
+              {selectedBlock
+                ? 'Block Details'
+                : 'Select a block to view details'}
             </h3>
             {selectedBlock ? (
               <BlockDetailPanel
@@ -182,13 +220,25 @@ export default function ExplorerPage() {
                 blockIndex={selectedBlock.index}
                 totalBlocks={blocks.length}
                 onCopy={handleCopy}
-                onPrevious={selectedBlockNumber !== null && selectedBlockNumber > 0 ? handlePrevious : undefined}
-                onNext={selectedBlockNumber !== null && selectedBlockNumber < blocks.length - 1 ? handleNext : undefined}
+                onPrevious={
+                  selectedBlockNumber !== null && selectedBlockNumber > 0
+                    ? handlePrevious
+                    : undefined
+                }
+                onNext={
+                  selectedBlockNumber !== null &&
+                  selectedBlockNumber < blocks.length - 1
+                    ? handleNext
+                    : undefined
+                }
               />
             ) : (
               <div className="bg-zinc-900 rounded-lg p-12 text-center border border-zinc-800">
                 <p className="text-zinc-500 mb-2">No block selected</p>
-                <p className="text-xs text-zinc-600">Click on a block in the timeline to view its cryptographic details</p>
+                <p className="text-xs text-zinc-600">
+                  Click on a block in the timeline to view its cryptographic
+                  details
+                </p>
               </div>
             )}
           </div>

@@ -8,8 +8,11 @@ export interface DataGrowthChartProps {
   title?: string
 }
 
-export function DataGrowthChart({ data, title = 'Data Storage Growth' }: DataGrowthChartProps) {
-  const maxData = Math.max(...data.map(d => d.cumulativeData), 1)
+export function DataGrowthChart({
+  data,
+  title = 'Data Storage Growth',
+}: DataGrowthChartProps) {
+  const maxData = Math.max(...data.map((d) => d.cumulativeData), 1)
 
   return (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
@@ -31,9 +34,23 @@ export function DataGrowthChart({ data, title = 'Data Storage Growth' }: DataGro
             >
               {/* Create area path */}
               <defs>
-                <linearGradient id="dataGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgb(34, 197, 94)" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="rgb(34, 197, 94)" stopOpacity="0.05" />
+                <linearGradient
+                  id="dataGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="rgb(34, 197, 94)"
+                    stopOpacity="0.3"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="rgb(34, 197, 94)"
+                    stopOpacity="0.05"
+                  />
                 </linearGradient>
               </defs>
 

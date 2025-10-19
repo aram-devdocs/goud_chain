@@ -14,7 +14,9 @@ export default function CollectionsPage() {
   const { success, error: showErrorToast } = useToast()
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [decryptedData, setDecryptedData] = useState<Map<string, string>>(new Map())
+  const [decryptedData, setDecryptedData] = useState<Map<string, string>>(
+    new Map()
+  )
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
@@ -70,7 +72,9 @@ export default function CollectionsPage() {
     if (selectedIds.size === filteredAndSortedCollections.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(filteredAndSortedCollections.map((c) => c.collection_id)))
+      setSelectedIds(
+        new Set(filteredAndSortedCollections.map((c) => c.collection_id))
+      )
     }
   }
 
@@ -81,7 +85,9 @@ export default function CollectionsPage() {
       setExpandedRows((prev) => new Set(prev).add(id))
       success('Data decrypted successfully')
     } catch (err) {
-      showErrorToast(`Failed to decrypt: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      showErrorToast(
+        `Failed to decrypt: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
     }
   }
 
@@ -169,7 +175,9 @@ export default function CollectionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">My Encrypted Collections</h2>
+          <h2 className="text-3xl font-bold text-white mb-2">
+            My Encrypted Collections
+          </h2>
           <p className="text-zinc-500">Your encrypted data collections</p>
         </div>
       </div>

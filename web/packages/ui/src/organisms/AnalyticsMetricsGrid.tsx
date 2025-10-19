@@ -73,7 +73,9 @@ export function AnalyticsMetricsGrid({ metrics }: AnalyticsMetricsGridProps) {
           className={`bg-gradient-to-br rounded-lg p-4 border ${getColorClasses(metric.color)}`}
         >
           <div className="text-xs mb-1">{metric.label}</div>
-          <div className={`text-2xl font-bold ${getValueColor(metric.color)} mb-1`}>
+          <div
+            className={`text-2xl font-bold ${getValueColor(metric.color)} mb-1`}
+          >
             {metric.value}
           </div>
           {metric.trend && (

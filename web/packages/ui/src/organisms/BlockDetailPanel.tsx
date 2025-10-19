@@ -53,12 +53,18 @@ export function BlockDetailPanel({
       <div className="p-6 space-y-6">
         {/* Core Information */}
         <div>
-          <h4 className="text-sm font-bold text-white mb-3">Core Information</h4>
+          <h4 className="text-sm font-bold text-white mb-3">
+            Core Information
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <div className="text-zinc-400 mb-1">Timestamp</div>
-              <div className="text-white font-mono">{formatTimestamp(block.timestamp)}</div>
-              <div className="text-xs text-zinc-500 mt-1">{block.timestamp} (Unix)</div>
+              <div className="text-white font-mono">
+                {formatTimestamp(block.timestamp)}
+              </div>
+              <div className="text-xs text-zinc-500 mt-1">
+                {block.timestamp} (Unix)
+              </div>
             </div>
             <div>
               <div className="text-zinc-400 mb-1">Data Count</div>
@@ -69,7 +75,9 @@ export function BlockDetailPanel({
 
         {/* Cryptographic Data */}
         <div>
-          <h4 className="text-sm font-bold text-white mb-3">Cryptographic Verification</h4>
+          <h4 className="text-sm font-bold text-white mb-3">
+            Cryptographic Verification
+          </h4>
           <div className="space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1">

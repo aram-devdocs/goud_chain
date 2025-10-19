@@ -8,8 +8,11 @@ export interface BlockCreationChartProps {
   title?: string
 }
 
-export function BlockCreationChart({ data, title = 'Block Creation Timeline' }: BlockCreationChartProps) {
-  const maxCount = Math.max(...data.map(d => d.count), 1)
+export function BlockCreationChart({
+  data,
+  title = 'Block Creation Timeline',
+}: BlockCreationChartProps) {
+  const maxCount = Math.max(...data.map((d) => d.count), 1)
 
   return (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
@@ -27,11 +30,20 @@ export function BlockCreationChart({ data, title = 'Block Creation Timeline' }: 
               const height = (point.count / maxCount) * 100
 
               return (
-                <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                  <div className="w-full flex items-end justify-center" style={{ height: '100%' }}>
+                <div
+                  key={index}
+                  className="flex-1 flex flex-col items-center gap-2"
+                >
+                  <div
+                    className="w-full flex items-end justify-center"
+                    style={{ height: '100%' }}
+                  >
                     <div
                       className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all hover:from-blue-400 hover:to-blue-300 cursor-pointer relative group"
-                      style={{ height: `${height}%`, minHeight: point.count > 0 ? '4px' : '0' }}
+                      style={{
+                        height: `${height}%`,
+                        minHeight: point.count > 0 ? '4px' : '0',
+                      }}
                     >
                       {/* Tooltip on hover */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black border border-zinc-700 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">

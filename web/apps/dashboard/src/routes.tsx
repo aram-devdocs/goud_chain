@@ -1,7 +1,19 @@
-import { createRootRoute, createRoute, createRouter, Outlet, redirect, useNavigate } from '@tanstack/react-router'
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  redirect,
+  useNavigate,
+} from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { Header, Navigation, Toast } from '@goudchain/ui'
-import { useAuth, useToast, useListCollections, useAuditLogs } from '@goudchain/hooks'
+import {
+  useAuth,
+  useToast,
+  useListCollections,
+  useAuditLogs,
+} from '@goudchain/hooks'
 import { useWebSocketContext } from './contexts/WebSocketContext'
 import AuthPage from './pages/auth'
 import DashboardPage from './pages/dashboard'
@@ -63,7 +75,10 @@ function ProtectedLayout() {
   // Get counts for nav badges
   const { data: collectionsData } = useListCollections()
   // Get total audit log count (use page_size=1 to minimize data transfer, we only need total)
-  const { data: auditData, refetch: refetchAuditCount } = useAuditLogs({ page_size: 1 }, true)
+  const { data: auditData, refetch: refetchAuditCount } = useAuditLogs(
+    { page_size: 1 },
+    true
+  )
 
   // Refetch audit count when audit log events come in
   const { lastMessage } = useWebSocketContext()
@@ -87,14 +102,29 @@ function ProtectedLayout() {
 
   const accountId = localStorage.getItem('account_id')
 
-  const navItems: Array<{ id: RouteId; label: string; path: string; count?: number }> = [
+  const navItems: Array<{
+    id: RouteId
+    label: string
+    path: string
+    count?: number
+  }> = [
     { id: 'dashboard', label: 'Dashboard', path: '/' },
     { id: 'submit', label: 'Submit Data', path: '/submit' },
-    { id: 'collections', label: 'Collections', path: '/collections', count: collectionsData?.collections.length },
+    {
+      id: 'collections',
+      label: 'Collections',
+      path: '/collections',
+      count: collectionsData?.collections.length,
+    },
     { id: 'explorer', label: 'Explorer', path: '/explorer' },
     { id: 'network', label: 'Network', path: '/network' },
     { id: 'analytics', label: 'Analytics', path: '/analytics' },
-    { id: 'audit', label: 'Audit Logs', path: '/audit', count: auditData?.total },
+    {
+      id: 'audit',
+      label: 'Audit Logs',
+      path: '/audit',
+      count: auditData?.total,
+    },
     { id: 'metrics', label: 'Metrics', path: '/metrics' },
     { id: 'debug', label: 'Debug', path: '/debug' },
   ]

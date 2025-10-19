@@ -45,11 +45,15 @@ export function NetworkHealthCard({ health, nodeId }: NetworkHealthCardProps) {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h3 className="text-lg font-bold text-white mb-1">Network Health</h3>
-          <p className="text-xs text-zinc-400">P2P connectivity and synchronization status</p>
+          <p className="text-xs text-zinc-400">
+            P2P connectivity and synchronization status
+          </p>
         </div>
         <div className="text-right">
           <div className="flex items-baseline gap-2">
-            <div className={`text-4xl font-bold ${getScoreColor(health.healthScore)}`}>
+            <div
+              className={`text-4xl font-bold ${getScoreColor(health.healthScore)}`}
+            >
               {health.healthScore}
             </div>
             <div className="text-zinc-400">/100</div>
@@ -61,14 +65,18 @@ export function NetworkHealthCard({ health, nodeId }: NetworkHealthCardProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <div>
           <div className="text-xs text-zinc-400 mb-1">Network Status</div>
-          <div className={`text-sm font-medium ${getStatusColor(health.status)}`}>
+          <div
+            className={`text-sm font-medium ${getStatusColor(health.status)}`}
+          >
             {health.status === 'connected' ? '● Connected' : '○ Disconnected'}
           </div>
         </div>
 
         <div>
           <div className="text-xs text-zinc-400 mb-1">Sync Status</div>
-          <div className={`text-sm font-medium ${getStatusColor(health.syncStatus)}`}>
+          <div
+            className={`text-sm font-medium ${getStatusColor(health.syncStatus)}`}
+          >
             {health.syncStatus === 'synced' && '✓ In Sync'}
             {health.syncStatus === 'syncing' && '⟳ Syncing'}
             {health.syncStatus === 'behind' && '⚠ Behind'}
@@ -77,12 +85,16 @@ export function NetworkHealthCard({ health, nodeId }: NetworkHealthCardProps) {
 
         <div>
           <div className="text-xs text-zinc-400 mb-1">Connected Peers</div>
-          <div className="text-sm font-medium text-white">{health.peerCount}</div>
+          <div className="text-sm font-medium text-white">
+            {health.peerCount}
+          </div>
         </div>
 
         <div>
           <div className="text-xs text-zinc-400 mb-1">Current Validator</div>
-          <div className="text-sm font-medium text-white font-mono">{health.currentValidator}</div>
+          <div className="text-sm font-medium text-white font-mono">
+            {health.currentValidator}
+          </div>
         </div>
 
         <div>

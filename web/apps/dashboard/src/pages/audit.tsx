@@ -72,7 +72,11 @@ export default function AuditPage() {
     page_size: 50,
   }
 
-  const { data: queryData, isLoading, refetch } = useAuditLogs(queryParams, queryEnabled)
+  const {
+    data: queryData,
+    isLoading,
+    refetch,
+  } = useAuditLogs(queryParams, queryEnabled)
 
   const handleApplyFilters = () => {
     setQueryEnabled(true)
@@ -171,8 +175,12 @@ export default function AuditPage() {
         <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-white">Real-Time Audit Stream</h3>
-              <p className="text-sm text-zinc-400">Last 100 events (live updates)</p>
+              <h3 className="text-lg font-bold text-white">
+                Real-Time Audit Stream
+              </h3>
+              <p className="text-sm text-zinc-400">
+                Last 100 events (live updates)
+              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -211,17 +219,27 @@ export default function AuditPage() {
 
           {eventsToDisplay.length === 0 ? (
             <div className="text-center py-12 text-zinc-500">
-              {isPaused ? 'Stream paused. No new events will appear.' : 'Waiting for audit events...'}
+              {isPaused
+                ? 'Stream paused. No new events will appear.'
+                : 'Waiting for audit events...'}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-zinc-900 border-b border-zinc-800">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-400">Timestamp</th>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-400">Event Type</th>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-400">IP Hash</th>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-400">Event ID</th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                      Timestamp
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                      Event Type
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                      IP Hash
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                      Event ID
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,7 +252,9 @@ export default function AuditPage() {
                         {formatTimestamp(event.timestamp)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 text-xs border ${getEventTypeColor(event.event_type)}`}>
+                        <span
+                          className={`px-2 py-1 text-xs border ${getEventTypeColor(event.event_type)}`}
+                        >
                           {event.event_type}
                         </span>
                       </td>
@@ -260,7 +280,9 @@ export default function AuditPage() {
           <div className="bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Event Type</label>
+                <label className="block text-sm text-zinc-400 mb-2">
+                  Event Type
+                </label>
                 <select
                   value={eventTypeFilter}
                   onChange={(e) => setEventTypeFilter(e.target.value)}
@@ -276,7 +298,9 @@ export default function AuditPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Start Date</label>
+                <label className="block text-sm text-zinc-400 mb-2">
+                  Start Date
+                </label>
                 <input
                   type="date"
                   value={startDate}
@@ -286,7 +310,9 @@ export default function AuditPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">End Date</label>
+                <label className="block text-sm text-zinc-400 mb-2">
+                  End Date
+                </label>
                 <input
                   type="date"
                   value={endDate}
@@ -320,7 +346,9 @@ export default function AuditPage() {
           {/* Historical Table */}
           <div className="bg-zinc-950 border border-zinc-800 overflow-hidden rounded-lg">
             {isLoading ? (
-              <div className="text-center py-12 text-zinc-500">Loading audit logs...</div>
+              <div className="text-center py-12 text-zinc-500">
+                Loading audit logs...
+              </div>
             ) : eventsToDisplay.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
                 No audit logs found. Try adjusting your filters.
@@ -331,10 +359,18 @@ export default function AuditPage() {
                   <table className="w-full text-xs">
                     <thead className="bg-zinc-900 border-b border-zinc-800">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-zinc-400">Timestamp</th>
-                        <th className="px-4 py-3 text-left font-medium text-zinc-400">Event Type</th>
-                        <th className="px-4 py-3 text-left font-medium text-zinc-400">IP Hash</th>
-                        <th className="px-4 py-3 text-left font-medium text-zinc-400">Event ID</th>
+                        <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                          Timestamp
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                          Event Type
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                          IP Hash
+                        </th>
+                        <th className="px-4 py-3 text-left font-medium text-zinc-400">
+                          Event ID
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -347,7 +383,9 @@ export default function AuditPage() {
                             {formatTimestamp(event.timestamp)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs border ${getEventTypeColor(event.event_type)}`}>
+                            <span
+                              className={`px-2 py-1 text-xs border ${getEventTypeColor(event.event_type)}`}
+                            >
                               {event.event_type}
                             </span>
                           </td>
@@ -377,7 +415,8 @@ export default function AuditPage() {
                       Previous
                     </button>
                     <span className="text-sm text-zinc-400">
-                      Page {page + 1} of {queryData.total_pages || 1} ({queryData.total} total)
+                      Page {page + 1} of {queryData.total_pages || 1} (
+                      {queryData.total} total)
                     </span>
                     <button
                       onClick={() => {

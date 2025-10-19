@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useChainInfo, usePeers, useListCollections, useToast } from '@goudchain/hooks'
+import {
+  useChainInfo,
+  usePeers,
+  useListCollections,
+  useToast,
+} from '@goudchain/hooks'
 import { Spinner } from '@goudchain/ui'
 import { formatNumber, formatRelativeTime } from '@goudchain/utils'
 import { SpinnerSize } from '@goudchain/types'
@@ -10,7 +15,11 @@ import type { ActivityEvent } from '../contexts/WebSocketContext'
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { error: showErrorToast } = useToast()
-  const { isConnected: wsConnected, activityFeed, clearActivityFeed } = useWebSocketContext()
+  const {
+    isConnected: wsConnected,
+    activityFeed,
+    clearActivityFeed,
+  } = useWebSocketContext()
   const [lastUpdated, setLastUpdated] = useState({
     blockchain: Date.now(),
     collections: Date.now(),
@@ -156,12 +165,16 @@ export default function DashboardPage() {
         {/* Connection Status */}
         <div className="bg-gradient-to-br from-zinc-900/50 to-zinc-800/30 rounded-lg p-6 border border-zinc-700/50">
           <div className="text-xs text-zinc-300 mb-2">CONNECTION</div>
-          <div className={`text-4xl font-bold mb-1 ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
+          <div
+            className={`text-4xl font-bold mb-1 ${wsConnected ? 'text-green-400' : 'text-red-400'}`}
+          >
             {wsConnected ? 'Live' : 'Polling'}
           </div>
           <div className="text-xs text-zinc-400">WebSocket Status</div>
           <div className="text-xs text-zinc-500 mt-2">
-            {wsConnected ? 'Real-time updates active' : 'Using polling fallback'}
+            {wsConnected
+              ? 'Real-time updates active'
+              : 'Using polling fallback'}
           </div>
         </div>
       </div>
@@ -180,11 +193,19 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="divide-y divide-zinc-800" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div
+          className="divide-y divide-zinc-800"
+          style={{ maxHeight: '400px', overflowY: 'auto' }}
+        >
           {activityFeed.slice(0, 10).map((activity) => (
-            <div key={activity.id} className="px-6 py-3 hover:bg-zinc-900/50 transition">
+            <div
+              key={activity.id}
+              className="px-6 py-3 hover:bg-zinc-900/50 transition"
+            >
               <div className="flex items-start gap-3">
-                <div className={`text-xs font-mono font-bold px-2 py-1 rounded ${getActivityColor(activity.type)}`}>
+                <div
+                  className={`text-xs font-mono font-bold px-2 py-1 rounded ${getActivityColor(activity.type)}`}
+                >
                   {getActivityIcon(activity.type)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -200,7 +221,9 @@ export default function DashboardPage() {
           {activityFeed.length === 0 && (
             <div className="px-6 py-12 text-center text-zinc-500">
               <p>No recent activity</p>
-              <p className="text-xs mt-1">Events will appear here as they happen</p>
+              <p className="text-xs mt-1">
+                Events will appear here as they happen
+              </p>
             </div>
           )}
         </div>
@@ -213,7 +236,9 @@ export default function DashboardPage() {
           className="bg-white text-black rounded-lg p-4 hover:bg-zinc-200 transition text-left"
         >
           <div className="font-semibold mb-1">Submit Data</div>
-          <div className="text-sm text-zinc-700">Create encrypted collection</div>
+          <div className="text-sm text-zinc-700">
+            Create encrypted collection
+          </div>
         </button>
 
         <button
@@ -221,7 +246,9 @@ export default function DashboardPage() {
           className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-800 transition text-left"
         >
           <div className="font-semibold mb-1">Browse Collections</div>
-          <div className="text-sm text-zinc-400">View and decrypt your data</div>
+          <div className="text-sm text-zinc-400">
+            View and decrypt your data
+          </div>
         </button>
 
         <button

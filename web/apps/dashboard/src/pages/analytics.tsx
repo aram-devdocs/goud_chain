@@ -1,5 +1,10 @@
 import { useMemo } from 'react'
-import { useChainInfo, useMetrics, useListCollections, useValidator } from '@goudchain/hooks'
+import {
+  useChainInfo,
+  useMetrics,
+  useListCollections,
+  useValidator,
+} from '@goudchain/hooks'
 import {
   AnalyticsMetricsGrid,
   BlockCreationChart,
@@ -20,10 +25,12 @@ import { SpinnerSize } from '@goudchain/types'
 export default function AnalyticsPage() {
   const { data: chainInfo, isLoading: chainLoading } = useChainInfo()
   const { data: metrics, isLoading: metricsLoading } = useMetrics()
-  const { data: collectionsData, isLoading: collectionsLoading } = useListCollections()
+  const { data: collectionsData, isLoading: collectionsLoading } =
+    useListCollections()
   const { data: validatorInfo, isLoading: validatorLoading } = useValidator()
 
-  const isLoading = chainLoading || metricsLoading || collectionsLoading || validatorLoading
+  const isLoading =
+    chainLoading || metricsLoading || collectionsLoading || validatorLoading
 
   const blocks = chainInfo?.chain ?? []
 
@@ -36,12 +43,13 @@ export default function AnalyticsPage() {
     let avgBlockTime = 0
     if (blocks.length > 1) {
       const now = Math.floor(Date.now() / 1000)
-      const recentBlocks = blocks.filter(b => (now - b.timestamp) < 86400)
+      const recentBlocks = blocks.filter((b) => now - b.timestamp < 86400)
 
       if (recentBlocks.length > 1) {
         let totalTime = 0
         for (let i = 1; i < recentBlocks.length; i++) {
-          totalTime += recentBlocks[i]!.timestamp - recentBlocks[i - 1]!.timestamp
+          totalTime +=
+            recentBlocks[i]!.timestamp - recentBlocks[i - 1]!.timestamp
         }
         avgBlockTime = Math.round(totalTime / (recentBlocks.length - 1))
       }
@@ -81,22 +89,28 @@ export default function AnalyticsPage() {
 
     // Initialize buckets for last 24 hours
     for (let i = hoursAgo - 1; i >= 0; i--) {
-      const hourTimestamp = now - (i * 3600)
-      const hourLabel = new Date(hourTimestamp * 1000).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        hour12: false,
-      })
+      const hourTimestamp = now - i * 3600
+      const hourLabel = new Date(hourTimestamp * 1000).toLocaleTimeString(
+        'en-US',
+        {
+          hour: 'numeric',
+          hour12: false,
+        }
+      )
       hourlyBuckets[hourLabel] = 0
     }
 
     // Count blocks in each hour
-    blocks.forEach(block => {
+    blocks.forEach((block) => {
       const blockAge = now - block.timestamp
       if (blockAge < hoursAgo * 3600) {
-        const hourLabel = new Date(block.timestamp * 1000).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          hour12: false,
-        })
+        const hourLabel = new Date(block.timestamp * 1000).toLocaleTimeString(
+          'en-US',
+          {
+            hour: 'numeric',
+            hour12: false,
+          }
+        )
         if (hourlyBuckets[hourLabel] !== undefined) {
           hourlyBuckets[hourLabel]++
         }
@@ -111,7 +125,7 @@ export default function AnalyticsPage() {
   // Prepare data growth chart (cumulative data count)
   const dataGrowthData: DataGrowthPoint[] = useMemo(() => {
     let cumulativeData = 0
-    return blocks.map(block => {
+    return blocks.map((block) => {
       cumulativeData += block.data_count
       return {
         blockIndex: block.index,
@@ -124,8 +138,12 @@ export default function AnalyticsPage() {
   const collectionStats: CollectionStats = useMemo(() => {
     const collections = collectionsData?.collections ?? []
     const totalCollections = collections.length
-    const totalItems = collections.reduce((sum, c) => sum + (c?.data_count ?? 0), 0)
-    const avgItemsPerCollection = totalCollections > 0 ? totalItems / totalCollections : 0
+    const totalItems = collections.reduce(
+      (sum, c) => sum + (c?.data_count ?? 0),
+      0
+    )
+    const avgItemsPerCollection =
+      totalCollections > 0 ? totalItems / totalCollections : 0
     const largestCollectionSize = collections.reduce(
       (max, c) => Math.max(max, c?.data_count ?? 0),
       0
@@ -143,8 +161,9 @@ export default function AnalyticsPage() {
   const validatorPerformance: ValidatorStat[] = useMemo(() => {
     const validatorCounts: { [key: string]: number } = {}
 
-    blocks.forEach(block => {
-      validatorCounts[block.validator] = (validatorCounts[block.validator] || 0) + 1
+    blocks.forEach((block) => {
+      validatorCounts[block.validator] =
+        (validatorCounts[block.validator] || 0) + 1
     })
 
     const totalBlocks = blocks.length
@@ -165,7 +184,7 @@ export default function AnalyticsPage() {
     return [...blocks]
       .reverse()
       .slice(0, 20)
-      .map(block => ({
+      .map((block) => ({
         index: block.index,
         timestamp: block.timestamp,
         dataCount: block.data_count,
@@ -185,8 +204,12 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Analytics & Statistics</h2>
-        <p className="text-zinc-500">Blockchain metrics and performance insights</p>
+        <h2 className="text-3xl font-bold text-white mb-2">
+          Analytics & Statistics
+        </h2>
+        <p className="text-zinc-500">
+          Blockchain metrics and performance insights
+        </p>
       </div>
 
       <AnalyticsMetricsGrid metrics={keyMetrics} />
@@ -204,13 +227,18 @@ export default function AnalyticsPage() {
         />
 
         <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Performance Metrics</h3>
+          <h3 className="text-lg font-bold text-white mb-4">
+            Performance Metrics
+          </h3>
           <div className="space-y-4">
             <div>
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-zinc-400">Cache Hit Rate</span>
                 <span className="text-sm font-mono text-white">
-                  {((metrics?.performance?.cache_hit_rate ?? 0) * 100).toFixed(1)}%
+                  {((metrics?.performance?.cache_hit_rate ?? 0) * 100).toFixed(
+                    1
+                  )}
+                  %
                 </span>
               </div>
               <div className="w-full bg-zinc-800 rounded-full h-3">

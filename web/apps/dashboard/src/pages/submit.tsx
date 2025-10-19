@@ -98,7 +98,12 @@ export default function SubmitPage() {
         const fields: Field[] = Object.entries(parsed).map(([key, value]) => ({
           id: crypto.randomUUID(),
           key,
-          type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : ('string' as const),
+          type:
+            typeof value === 'number'
+              ? 'number'
+              : typeof value === 'boolean'
+                ? 'boolean'
+                : ('string' as const),
           value: value as string | number | boolean,
         }))
         setFormFields(fields)
@@ -124,7 +129,9 @@ export default function SubmitPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault()
 
     try {
@@ -178,7 +185,8 @@ export default function SubmitPage() {
                 className="mt-1"
               />
               <p className="text-xs text-zinc-500 mt-1">
-                Human-readable name for this collection ({label.length}/100 characters)
+                Human-readable name for this collection ({label.length}/100
+                characters)
               </p>
             </div>
 
@@ -233,10 +241,7 @@ export default function SubmitPage() {
                 )}
 
                 {formFields.map((field) => (
-                  <div
-                    key={field.id}
-                    className="bg-zinc-800 rounded-lg p-3"
-                  >
+                  <div key={field.id} className="bg-zinc-800 rounded-lg p-3">
                     <div className="grid grid-cols-12 gap-2">
                       {/* Key Input */}
                       <div className="col-span-4">
@@ -257,7 +262,8 @@ export default function SubmitPage() {
                           onChange={(e) =>
                             updateField(field.id, {
                               type: e.target.value as Field['type'],
-                              value: e.target.value === 'boolean' ? 'false' : '',
+                              value:
+                                e.target.value === 'boolean' ? 'false' : '',
                             })
                           }
                           className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"

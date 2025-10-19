@@ -19,9 +19,8 @@ export async function handleApiError(response: Response): Promise<never> {
         errorMessage = text
       }
     }
-  } catch (parseError) {
+  } catch {
     // Failed to parse error response - use default message
-    console.error('Failed to parse error response:', parseError)
   }
 
   throw new Error(errorMessage)

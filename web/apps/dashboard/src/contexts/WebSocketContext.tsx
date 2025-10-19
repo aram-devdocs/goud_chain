@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useWebSocket } from '@goudchain/hooks'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@goudchain/hooks'
@@ -74,7 +80,11 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   useEffect(() => {
     if (!lastMessage) return
 
-    const message = lastMessage as unknown as { type: string; event?: string; [key: string]: unknown }
+    const message = lastMessage as unknown as {
+      type: string
+      event?: string
+      [key: string]: unknown
+    }
 
     if (message.type === 'event') {
       switch (message.event) {
@@ -111,9 +121,6 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
           queryClient.invalidateQueries({ queryKey: ['metrics'] })
           addActivity('metrics', 'System metrics updated')
           break
-
-        default:
-          console.log('Unknown WebSocket event:', message.event)
       }
     }
   }, [lastMessage, queryClient, success, info])
@@ -123,7 +130,15 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   }
 
   return (
-    <WebSocketContext.Provider value={{ isConnected, send, activityFeed, clearActivityFeed, lastMessage }}>
+    <WebSocketContext.Provider
+      value={{
+        isConnected,
+        send,
+        activityFeed,
+        clearActivityFeed,
+        lastMessage,
+      }}
+    >
       {children}
     </WebSocketContext.Provider>
   )

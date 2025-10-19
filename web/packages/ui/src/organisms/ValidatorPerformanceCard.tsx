@@ -10,10 +10,15 @@ export interface ValidatorPerformanceCardProps {
   totalBlocks: number
 }
 
-export function ValidatorPerformanceCard({ validators, totalBlocks }: ValidatorPerformanceCardProps) {
+export function ValidatorPerformanceCard({
+  validators,
+  totalBlocks,
+}: ValidatorPerformanceCardProps) {
   return (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
-      <h3 className="text-lg font-bold text-white mb-4">Validator Performance</h3>
+      <h3 className="text-lg font-bold text-white mb-4">
+        Validator Performance
+      </h3>
 
       <div className="space-y-4">
         {validators.length === 0 ? (
@@ -25,7 +30,9 @@ export function ValidatorPerformanceCard({ validators, totalBlocks }: ValidatorP
             <div key={index}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-white">{validator.validator}</span>
+                  <span className="text-sm font-mono text-white">
+                    {validator.validator}
+                  </span>
                   {validator.isCurrentValidator && (
                     <span className="px-2 py-0.5 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
                       Active
@@ -33,8 +40,12 @@ export function ValidatorPerformanceCard({ validators, totalBlocks }: ValidatorP
                   )}
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-mono text-white mr-2">{validator.blockCount}</span>
-                  <span className="text-xs text-zinc-400">{validator.percentage.toFixed(1)}%</span>
+                  <span className="text-sm font-mono text-white mr-2">
+                    {validator.blockCount}
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    {validator.percentage.toFixed(1)}%
+                  </span>
                 </div>
               </div>
 

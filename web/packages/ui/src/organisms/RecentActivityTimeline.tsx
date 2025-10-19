@@ -25,7 +25,10 @@ function formatRelativeTime(timestamp: number): string {
   return `${days}d ago`
 }
 
-export function RecentActivityTimeline({ blocks, maxBlocks = 20 }: RecentActivityTimelineProps) {
+export function RecentActivityTimeline({
+  blocks,
+  maxBlocks = 20,
+}: RecentActivityTimelineProps) {
   const displayBlocks = blocks.slice(0, maxBlocks)
 
   return (
@@ -59,8 +62,12 @@ export function RecentActivityTimeline({ blocks, maxBlocks = 20 }: RecentActivit
 
                 {/* Block info */}
                 <div className="flex flex-col">
-                  <span className="text-sm font-mono text-white">Block #{block.index}</span>
-                  <span className="text-xs text-zinc-400">{formatRelativeTime(block.timestamp)}</span>
+                  <span className="text-sm font-mono text-white">
+                    Block #{block.index}
+                  </span>
+                  <span className="text-xs text-zinc-400">
+                    {formatRelativeTime(block.timestamp)}
+                  </span>
                 </div>
               </div>
 
@@ -68,7 +75,9 @@ export function RecentActivityTimeline({ blocks, maxBlocks = 20 }: RecentActivit
                 {/* Data count */}
                 <div className="text-right">
                   <p className="text-xs text-zinc-400">Data</p>
-                  <p className="text-sm font-mono text-white">{block.dataCount}</p>
+                  <p className="text-sm font-mono text-white">
+                    {block.dataCount}
+                  </p>
                 </div>
 
                 {/* Validator */}

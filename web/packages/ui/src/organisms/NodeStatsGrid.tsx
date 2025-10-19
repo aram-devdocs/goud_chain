@@ -37,12 +37,16 @@ export function NodeStatsGrid({ stats }: NodeStatsGridProps) {
 
         <div className="bg-gradient-to-br from-blue-950/50 to-blue-900/30 rounded-lg p-4 border border-blue-800/50">
           <div className="text-xs text-blue-300 mb-1">Chain Length</div>
-          <div className="text-2xl font-bold text-blue-400">{stats.chainLength}</div>
+          <div className="text-2xl font-bold text-blue-400">
+            {stats.chainLength}
+          </div>
         </div>
 
         <div className="bg-gradient-to-br from-zinc-900/50 to-zinc-800/30 rounded-lg p-4 border border-zinc-700/50">
           <div className="text-xs text-zinc-300 mb-1">Latest Block</div>
-          <div className="text-sm font-bold text-white">{stats.latestBlockAge}</div>
+          <div className="text-sm font-bold text-white">
+            {stats.latestBlockAge}
+          </div>
         </div>
 
         <div className="bg-gradient-to-br from-purple-950/50 to-purple-900/30 rounded-lg p-4 border border-purple-800/50">
@@ -52,7 +56,9 @@ export function NodeStatsGrid({ stats }: NodeStatsGridProps) {
               <div>
                 <div className="text-purple-400">Active</div>
                 {stats.nextValidatorTurn && (
-                  <div className="text-xs text-purple-300 mt-1">{stats.nextValidatorTurn}</div>
+                  <div className="text-xs text-purple-300 mt-1">
+                    {stats.nextValidatorTurn}
+                  </div>
                 )}
               </div>
             ) : (
@@ -68,7 +74,9 @@ export function NodeStatsGrid({ stats }: NodeStatsGridProps) {
               <span className="text-green-400">Up to date</span>
             ) : (
               <div>
-                <span className="text-yellow-400">{stats.blocksBehind} behind</span>
+                <span className="text-yellow-400">
+                  {stats.blocksBehind} behind
+                </span>
               </div>
             )}
           </div>

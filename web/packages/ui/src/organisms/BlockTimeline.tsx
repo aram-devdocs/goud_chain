@@ -122,7 +122,8 @@ export function BlockTimeline({
                     </div>
                     {block.data_count > 0 && (
                       <div className="px-2 py-1 bg-green-900/30 border border-green-700 rounded text-xs text-green-400">
-                        {block.data_count} {block.data_count === 1 ? 'item' : 'items'}
+                        {block.data_count}{' '}
+                        {block.data_count === 1 ? 'item' : 'items'}
                       </div>
                     )}
                   </div>
@@ -138,9 +139,7 @@ export function BlockTimeline({
                   <div className="font-mono">
                     Hash: {block.previous_hash.substring(0, 16)}...
                   </div>
-                  <div>
-                    {formatTimestamp(block.timestamp)}
-                  </div>
+                  <div>{formatTimestamp(block.timestamp)}</div>
                 </div>
               </button>
             )

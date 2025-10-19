@@ -39,7 +39,9 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-bold text-white">Real-Time Audit Stream</h3>
+          <h3 className="text-lg font-bold text-white">
+            Real-Time Audit Stream
+          </h3>
           <p className="text-sm text-zinc-400">Last 50 events (live updates)</p>
         </div>
         <div className="flex gap-2">
@@ -70,7 +72,9 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
 
       {displayEvents.length === 0 ? (
         <div className="text-center py-12 text-zinc-500">
-          {isPaused ? 'Stream paused. No new events will appear.' : 'Waiting for audit events...'}
+          {isPaused
+            ? 'Stream paused. No new events will appear.'
+            : 'Waiting for audit events...'}
         </div>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -87,7 +91,9 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
                       {formatTimestamp(event.timestamp)}
                     </span>
                   </div>
-                  <div className="text-sm text-zinc-300 truncate">{event.event_id}</div>
+                  <div className="text-sm text-zinc-300 truncate">
+                    {event.event_id}
+                  </div>
                 </div>
                 <div className="flex-shrink-0 text-xs text-zinc-500 font-mono">
                   {event.ip_address_hash.substring(0, 8)}...

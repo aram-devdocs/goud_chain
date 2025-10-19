@@ -42,13 +42,17 @@ export function CollectionsTable({
   onDownload,
   isDecrypting,
 }: CollectionsTableProps) {
-  const allSelected = collections.length > 0 && collections.every((c) => selectedIds.has(c.collection_id))
-  const someSelected = collections.some((c) => selectedIds.has(c.collection_id)) && !allSelected
+  const allSelected =
+    collections.length > 0 &&
+    collections.every((c) => selectedIds.has(c.collection_id))
+  const someSelected =
+    collections.some((c) => selectedIds.has(c.collection_id)) && !allSelected
 
-  const handleCheckboxChange = (id: string) => (e: ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation()
-    onToggleSelection(id)
-  }
+  const handleCheckboxChange =
+    (id: string) => (e: ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation()
+      onToggleSelection(id)
+    }
 
   if (collections.length === 0) {
     return (
@@ -85,19 +89,24 @@ export function CollectionsTable({
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="text-lg font-bold text-blue-400">{collection.label}</h3>
+                    <h3 className="text-lg font-bold text-blue-400">
+                      {collection.label}
+                    </h3>
                     <p className="text-xs text-zinc-400 mt-1 font-mono">
                       ID: {collection.collection_id.substring(0, 16)}...
                     </p>
                     <p className="text-xs text-zinc-500 mt-1">
-                      Block #{collection.block_number} • {formatDate(collection.created_at)}
+                      Block #{collection.block_number} •{' '}
+                      {formatDate(collection.created_at)}
                     </p>
                   </div>
 
                   {/* Quick Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => onCopy(collection.collection_id, 'Collection ID')}
+                      onClick={() =>
+                        onCopy(collection.collection_id, 'Collection ID')
+                      }
                       className="text-zinc-400 hover:text-blue-400 text-sm transition"
                     >
                       Copy ID
@@ -120,7 +129,9 @@ export function CollectionsTable({
                 {decrypted && isExpanded && (
                   <div className="bg-green-900/20 border border-green-700 rounded p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-green-400 text-sm font-bold">Decrypted Data:</p>
+                      <p className="text-green-400 text-sm font-bold">
+                        Decrypted Data:
+                      </p>
                       <div className="flex gap-2">
                         <button
                           onClick={() => onCopy(decrypted, 'Decrypted data')}
@@ -129,7 +140,9 @@ export function CollectionsTable({
                           Copy
                         </button>
                         <button
-                          onClick={() => onDownload(collection.label, decrypted)}
+                          onClick={() =>
+                            onDownload(collection.label, decrypted)
+                          }
                           className="text-xs text-purple-400 hover:text-purple-300 transition"
                         >
                           Download

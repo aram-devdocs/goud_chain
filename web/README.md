@@ -9,6 +9,7 @@ Modern React dashboard for Goud Chain blockchain, built with TypeScript, Vite, a
 ```
 
 Opens:
+
 - [API] http://localhost:8080 (Load Balancer)
 - [WEB] http://localhost:3001 (Dashboard with hot reload)
 
@@ -84,6 +85,7 @@ open http://localhost:3001
 ### 2. View Blockchain Data
 
 Dashboard shows:
+
 - Chain length
 - Number of collections
 - Peer count
@@ -109,8 +111,8 @@ Development uses **direct API calls** to avoid Vite proxy complexity:
 // packages/hooks/src/config.ts
 export const API_BASE =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:8080'      // Direct to nginx load balancer
-    : window.location.origin        // Production (nginx proxies)
+    ? 'http://localhost:8080' // Direct to nginx load balancer
+    : window.location.origin // Production (nginx proxies)
 ```
 
 ### Authentication
@@ -127,26 +129,26 @@ Session tokens are stored in `localStorage` (note: not production-ready, use htt
 
 ### API Endpoints
 
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
-| `/account/create` | POST | No | Generate API key |
-| `/account/login` | POST | No | Get session token |
-| `/data/submit` | POST | Yes | Submit encrypted data |
-| `/data/list` | GET | Yes | List collections |
-| `/data/decrypt/{id}` | POST | Yes | Decrypt data |
-| `/chain` | GET | Yes | Get chain info |
-| `/stats` | GET | Yes | Get blockchain stats |
+| Endpoint             | Method | Auth | Purpose               |
+| -------------------- | ------ | ---- | --------------------- |
+| `/account/create`    | POST   | No   | Generate API key      |
+| `/account/login`     | POST   | No   | Get session token     |
+| `/data/submit`       | POST   | Yes  | Submit encrypted data |
+| `/data/list`         | GET    | Yes  | List collections      |
+| `/data/decrypt/{id}` | POST   | Yes  | Decrypt data          |
+| `/chain`             | GET    | Yes  | Get chain info        |
+| `/stats`             | GET    | Yes  | Get blockchain stats  |
 
 ## Port Configuration
 
-| Service | Port | Notes |
-|---------|------|-------|
-| React Dashboard | 3001 | Changed from 3000 (conflict with old dashboard) |
-| Nginx Load Balancer | 8080 | Primary API endpoint |
-| Node 1 | 8081 | Direct node access (debugging) |
-| Node 2 | 8082 | Direct node access (debugging) |
-| Node 3 | 8083 | Direct node access (debugging) |
-| Jupyter Lab | 8888 | API testing notebooks |
+| Service             | Port | Notes                                           |
+| ------------------- | ---- | ----------------------------------------------- |
+| React Dashboard     | 3001 | Changed from 3000 (conflict with old dashboard) |
+| Nginx Load Balancer | 8080 | Primary API endpoint                            |
+| Node 1              | 8081 | Direct node access (debugging)                  |
+| Node 2              | 8082 | Direct node access (debugging)                  |
+| Node 3              | 8083 | Direct node access (debugging)                  |
+| Jupyter Lab         | 8888 | API testing notebooks                           |
 
 **Why 3001?**  
 The Docker setup includes an old dashboard container on port 3000. We use 3001 to avoid conflicts.
@@ -183,6 +185,7 @@ curl http://localhost:8080/health
 ```
 
 If still failing:
+
 - Open DevTools → Console for errors
 - Clear localStorage: `localStorage.clear()` then reload
 - Verify backend: `curl http://localhost:8080/health`
@@ -228,6 +231,7 @@ docker build -t goud-chain-dashboard:latest -f Dockerfile .
 ### Deploy
 
 The Dockerfile uses multi-stage build:
+
 1. **Builder stage:** pnpm install + build
 2. **Production stage:** nginx serving static files
 
@@ -273,6 +277,7 @@ Test infrastructure (Vitest + React Testing Library) is configured but no tests 
 **Current Phase:** Active migration from Alpine.js (`/workspace/dashboard/`) to React (`/workspace/web/`)
 
 **Completed:**
+
 - ✅ Monorepo setup (Turborepo + pnpm)
 - ✅ TypeScript strict mode
 - ✅ Core UI components
@@ -283,6 +288,7 @@ Test infrastructure (Vitest + React Testing Library) is configured but no tests 
 - ✅ API type safety
 
 **In Progress:**
+
 - 🚧 TanStack Router integration
 - 🚧 WebSocket real-time updates
 - 🚧 Comprehensive test coverage
@@ -290,6 +296,7 @@ Test infrastructure (Vitest + React Testing Library) is configured but no tests 
 - 🚧 Loading states improvements
 
 **Planned:**
+
 - 📋 Audit logs viewer
 - 📋 Metrics dashboard
 - 📋 Data management (decrypt, download)

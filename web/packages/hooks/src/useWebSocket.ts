@@ -19,25 +19,23 @@ export function useWebSocket(url: string, enabled: boolean = true) {
 
       ws.onopen = () => {
         setIsConnected(true)
-        console.log('WebSocket connected')
       }
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
           setLastMessage(message)
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error)
+        } catch {
+          // Ignore malformed messages
         }
       }
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+      ws.onerror = () => {
+        // Error will trigger onclose, which handles reconnection
       }
 
       ws.onclose = () => {
         setIsConnected(false)
-        console.log('WebSocket disconnected')
 
         // Reconnect after 5 seconds
         if (enabled) {
@@ -48,8 +46,8 @@ export function useWebSocket(url: string, enabled: boolean = true) {
       }
 
       wsRef.current = ws
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error)
+    } catch {
+      // WebSocket creation failed, will retry via reconnect logic
     }
   }, [url, enabled])
 

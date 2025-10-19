@@ -68,7 +68,9 @@ export function TableToolbar({
                   disabled={isDecrypting}
                   className="bg-green-600 hover:bg-green-700 px-4 py-2 text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isDecrypting ? 'Decrypting...' : `Decrypt (${selectedCount})`}
+                  {isDecrypting
+                    ? 'Decrypting...'
+                    : `Decrypt (${selectedCount})`}
                 </button>
               )}
               {onBulkExport && (
@@ -90,7 +92,8 @@ export function TableToolbar({
             </>
           ) : (
             <span className="text-sm text-zinc-400">
-              Total: <span className="text-blue-400 font-bold">{totalCount}</span>
+              Total:{' '}
+              <span className="text-blue-400 font-bold">{totalCount}</span>
             </span>
           )}
         </div>

@@ -10,7 +10,8 @@ export function useSubmitData() {
     mutationFn: async (data: SubmitDataRequest) => {
       // Data submission requires the actual API key, not session token
       const apiKey = localStorage.getItem('api_key')
-      if (!apiKey) throw new Error('API key not found. Please save your API key.')
+      if (!apiKey)
+        throw new Error('API key not found. Please save your API key.')
 
       const response = await fetch(`${API_BASE}/api/data/submit`, {
         method: 'POST',

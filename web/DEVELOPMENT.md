@@ -7,21 +7,26 @@
 - Backend must be running on `http://localhost:8080`
 - Node.js 18+ and pnpm 9.15+
 
-**Start Backend:**
+**Start Development Environment:**
 
 ```bash
-cd /workspace
-./run start
+# From repository root
+./run dev
 ```
 
-**Start Frontend:**
+Opens:
+
+- [API] http://localhost:8080 (Load Balancer)
+- [WEB] http://localhost:3001 (Dashboard with hot reload)
+
+**Standalone Frontend Development:**
 
 ```bash
-cd /workspace/web
+cd web
 pnpm dev
 ```
 
-Go to **http://localhost:3000**
+Go to **http://localhost:3001**
 
 ## How It Works
 
@@ -75,11 +80,12 @@ The original `dashboard/auth.html` called `localhost:8080` directly. Using Vite'
 ## Available Commands
 
 ```bash
-pnpm dev         # Start dev server (port 3000)
-pnpm build       # Build for production (has issues, WIP)
+pnpm dev         # Start dev server (port 3001)
+pnpm build       # Build for production
 pnpm format      # Format code with Prettier
 pnpm format:check # Check formatting
-pnpm type-check  # TypeScript type checking (has issues, WIP)
+pnpm type-check  # TypeScript type checking
+pnpm lint        # Run ESLint
 ```
 
 ## Production Build

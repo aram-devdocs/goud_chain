@@ -33,8 +33,16 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 export default function NetworkPage() {
-  const { data: peers, isLoading: peersLoading, refetch: refetchPeers } = usePeers()
-  const { data: chainInfo, isLoading: chainLoading, refetch: refetchChain } = useChainInfo()
+  const {
+    data: peers,
+    isLoading: peersLoading,
+    refetch: refetchPeers,
+  } = usePeers()
+  const {
+    data: chainInfo,
+    isLoading: chainLoading,
+    refetch: refetchChain,
+  } = useChainInfo()
   const { data: validatorInfo, isLoading: validatorLoading } = useValidator()
   const syncMutation = useSync()
   const { success } = useToast()
@@ -148,7 +156,9 @@ export default function NetworkPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white mb-2">Network Status</h2>
-        <p className="text-zinc-500">P2P network health and peer connectivity</p>
+        <p className="text-zinc-500">
+          P2P network health and peer connectivity
+        </p>
       </div>
 
       {/* Network Health Overview */}

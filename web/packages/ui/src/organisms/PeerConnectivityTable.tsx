@@ -57,7 +57,9 @@ export function PeerConnectivityTable({
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
-        (p) => p.address.toLowerCase().includes(query) || p.role.toLowerCase().includes(query)
+        (p) =>
+          p.address.toLowerCase().includes(query) ||
+          p.role.toLowerCase().includes(query)
       )
     }
 
@@ -122,7 +124,9 @@ export function PeerConnectivityTable({
                 >
                   Peer Address {getSortIndicator('address')}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400">
+                  Status
+                </th>
                 <th
                   onClick={() => handleSort('role')}
                   className="px-4 py-3 text-left text-xs font-medium text-zinc-400 cursor-pointer hover:text-white transition"
@@ -141,13 +145,18 @@ export function PeerConnectivityTable({
                 >
                   Last Sync {getSortIndicator('lastSeen')}
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-zinc-400">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-zinc-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {filteredAndSortedPeers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-8 text-center text-zinc-500"
+                  >
                     No peers found
                   </td>
                 </tr>
@@ -158,10 +167,15 @@ export function PeerConnectivityTable({
                   const isBehind = chainDiff < 0
 
                   return (
-                    <tr key={peer.address} className="hover:bg-zinc-900/50 transition">
+                    <tr
+                      key={peer.address}
+                      className="hover:bg-zinc-900/50 transition"
+                    >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <code className="text-sm text-white font-mono">{peer.address}</code>
+                          <code className="text-sm text-white font-mono">
+                            {peer.address}
+                          </code>
                           <button
                             onClick={() => onCopy(peer.address)}
                             className="text-xs text-blue-400 hover:text-blue-300 transition"
@@ -172,11 +186,15 @@ export function PeerConnectivityTable({
                       </td>
                       <td className="px-4 py-3">
                         <span className="w-2 h-2 rounded-full bg-green-500 inline-block mr-2" />
-                        <span className="text-xs text-green-400">Connected</span>
+                        <span className="text-xs text-green-400">
+                          Connected
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-white font-mono">{peer.role}</span>
+                          <span className="text-sm text-white font-mono">
+                            {peer.role}
+                          </span>
                           {peer.isCurrentValidator && (
                             <span className="px-2 py-0.5 bg-blue-900/30 border border-blue-700 rounded text-xs text-blue-400">
                               Active
@@ -190,14 +208,22 @@ export function PeerConnectivityTable({
                             {peer.chainLength ?? 'N/A'}
                           </span>
                           {isAhead && (
-                            <span className="text-xs text-yellow-400">+{chainDiff}</span>
+                            <span className="text-xs text-yellow-400">
+                              +{chainDiff}
+                            </span>
                           )}
-                          {isBehind && <span className="text-xs text-zinc-500">{chainDiff}</span>}
+                          {isBehind && (
+                            <span className="text-xs text-zinc-500">
+                              {chainDiff}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-zinc-400">
-                          {peer.lastSeen ? formatRelativeTime(peer.lastSeen) : 'Unknown'}
+                          {peer.lastSeen
+                            ? formatRelativeTime(peer.lastSeen)
+                            : 'Unknown'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">

@@ -1,4 +1,9 @@
-export type AuditEventType = 'AccountCreated' | 'Login' | 'DataSubmit' | 'DataListed' | 'DataDecrypt'
+export type AuditEventType =
+  | 'AccountCreated'
+  | 'Login'
+  | 'DataSubmit'
+  | 'DataListed'
+  | 'DataDecrypt'
 
 export interface AuditEventBadgeProps {
   eventType: AuditEventType

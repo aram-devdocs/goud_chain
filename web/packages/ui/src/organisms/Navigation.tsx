@@ -30,7 +30,8 @@ export function Navigation({ items }: NavigationProps) {
                   'px-3 py-2 border-b-2 transition whitespace-nowrap text-sm',
                   {
                     'border-white text-white': isActive,
-                    'border-transparent text-zinc-500 hover:text-zinc-300': !isActive,
+                    'border-transparent text-zinc-500 hover:text-zinc-300':
+                      !isActive,
                   }
                 )}
               >

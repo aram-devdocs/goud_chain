@@ -12,7 +12,9 @@ export interface CollectionStatsCardProps {
 export function CollectionStatsCard({ stats }: CollectionStatsCardProps) {
   return (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
-      <h3 className="text-lg font-bold text-white mb-4">Collection Statistics</h3>
+      <h3 className="text-lg font-bold text-white mb-4">
+        Collection Statistics
+      </h3>
 
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
