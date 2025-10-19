@@ -1,6 +1,6 @@
 # Docker Compose for Goud Chain - Local Development (3-node setup)
 # Generated from template - DO NOT EDIT MANUALLY
-# Generated: 2025-10-18 04:30:06 UTC
+# Generated: 2025-10-19 22:00:33 UTC
 #
 # Usage:
 #   docker-compose -f docker-compose.local.yml up -d
@@ -53,10 +53,10 @@ x-dashboard-base: &dashboard-base
   logging: *default-logging
   healthcheck:
     test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
-    interval: 30s
+    interval: 15s
     timeout: 10s
     retries: 3
-    start_period: 20s
+    start_period: 10s
 
 services:
   # NGINX Load Balancer - Primary API endpoint

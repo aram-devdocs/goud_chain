@@ -304,7 +304,7 @@ jobs:
       - name: Verify deployment
         run: |
           echo "Verifying deployment health..."
-          sleep 60  # Dashboard needs 60-90s for pnpm build + nginx startup
+          sleep 90  # Dashboard needs 90s for health checks to complete
 
           echo "=== Testing Direct IP Access ==="
 
