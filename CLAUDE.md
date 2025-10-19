@@ -73,7 +73,7 @@ Strict 6-layer unidirectional dependency hierarchy enforces separation of concer
 
 **State Management:** Separate pending from committed data, clear in-memory/persistent boundaries, graceful chain reorganization.
 
-**Storage Architecture:** RocksDB with incremental O(1) writes, Snappy compression (~50% reduction), Bincode serialization. Schema uses block/metadata/checkpoint namespaces. Immediate block persistence, checkpoints every 100 blocks.
+**Storage Architecture:** RocksDB with incremental O(1) writes, Snappy compression (~50% reduction), Bincode serialization. Schema uses block/metadata/checkpoint/migration namespaces. Immediate block persistence, checkpoints every 100 blocks. Programmatic migration system with up/down operations, atomic transactions, and rollback support.
 
 ### Security Best Practices
 

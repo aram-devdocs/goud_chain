@@ -68,6 +68,27 @@ impl BlockchainStore {
         Ok(Self { db: Arc::new(db) })
     }
 
+    /// Initialize RocksDB at a custom path (for testing)
+    #[cfg(test)]
+    pub fn new_with_path(path: &str) -> Result<Self> {
+        let mut opts = rocksdb::Options::default();
+        opts.create_if_missing(true);
+        opts.set_write_buffer_size(64 * 1024 * 1024);
+        opts.set_max_write_buffer_number(3);
+        opts.set_min_write_buffer_number_to_merge(1);
+        opts.set_compression_type(rocksdb::DBCompressionType::Snappy);
+        opts.set_manual_wal_flush(false);
+        opts.set_level_compaction_dynamic_level_bytes(true);
+        opts.set_max_background_jobs(2);
+        opts.set_allow_mmap_reads(false);
+        opts.set_allow_mmap_writes(false);
+        opts.set_use_fsync(false);
+
+        let db = DB::open(&opts, path).map_err(|e| GoudChainError::RocksDbError(e.to_string()))?;
+
+        Ok(Self { db: Arc::new(db) })
+    }
+
     /// Get the underlying RocksDB instance (for rate limiting and other extensions)
     pub fn get_db(&self) -> Arc<DB> {
         Arc::clone(&self.db)
