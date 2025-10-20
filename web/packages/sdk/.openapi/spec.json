@@ -1,0 +1,331 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Goud Chain API",
+    "version": "0.1.0",
+    "description": "Encrypted blockchain with API key-based authentication using Proof of Authority (PoA) consensus"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Load balancer (local development)"
+    }
+  ],
+  "paths": {
+    "/api/account/create": {
+      "post": {
+        "operationId": "createAccount",
+        "summary": "Create a new account",
+        "tags": ["Account Management"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAccountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Login with API key",
+        "tags": ["Account Management"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/submit": {
+      "post": {
+        "operationId": "submitData",
+        "summary": "Submit encrypted data",
+        "tags": ["Data Operations"],
+        "security": [{"api_key": []}],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitDataRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitDataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/list": {
+      "get": {
+        "operationId": "listCollections",
+        "summary": "List collections",
+        "tags": ["Data Operations"],
+        "security": [{"bearer_token": []}],
+        "responses": {
+          "200": {
+            "description": "Collections list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/decrypt/{id}": {
+      "post": {
+        "operationId": "decryptCollection",
+        "summary": "Decrypt collection",
+        "tags": ["Data Operations"],
+        "security": [{"bearer_token": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection decrypted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecryptCollectionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Health check",
+        "tags": ["Health & Status"],
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Raw API key for direct authentication (base64-encoded)"
+      },
+      "bearer_token": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT session token obtained from /account/login endpoint"
+      }
+    },
+    "schemas": {
+      "CreateAccountRequest": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CreateAccountResponse": {
+        "type": "object",
+        "required": ["account_id", "api_key", "warning"],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "api_key": {
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["api_key"],
+        "properties": {
+          "api_key": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "required": ["session_token", "expires_in", "account_id"],
+        "properties": {
+          "session_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "account_id": {
+            "type": "string"
+          }
+        }
+      },
+      "SubmitDataRequest": {
+        "type": "object",
+        "required": ["label", "data"],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          }
+        }
+      },
+      "SubmitDataResponse": {
+        "type": "object",
+        "required": ["message", "collection_id", "block_number"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "collection_id": {
+            "type": "string"
+          },
+          "block_number": {
+            "type": "integer"
+          }
+        }
+      },
+      "CollectionListItem": {
+        "type": "object",
+        "required": ["collection_id", "label", "created_at", "block_number"],
+        "properties": {
+          "collection_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "block_number": {
+            "type": "integer"
+          }
+        }
+      },
+      "CollectionListResponse": {
+        "type": "object",
+        "required": ["collections"],
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectionListItem"
+            }
+          }
+        }
+      },
+      "DecryptCollectionResponse": {
+        "type": "object",
+        "required": ["collection_id", "label", "data", "created_at"],
+        "properties": {
+          "collection_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "HealthCheckResponse": {
+        "type": "object",
+        "required": ["status", "node_id", "chain_length", "peer_count", "latest_block"],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "chain_length": {
+            "type": "integer"
+          },
+          "peer_count": {
+            "type": "integer"
+          },
+          "latest_block": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}
