@@ -120,7 +120,17 @@ jobs:
         working-directory: web
         run: pnpm exec playwright install --with-deps chromium
       
-      - name: Run E2E tests (Auth only for now)
+      - name: Run smoke tests
+        working-directory: web
+        run: pnpm test:e2e e2e/tests/smoke.spec.ts --project=chromium
+        env:
+          CI: true
+          E2E_SKIP_GLOBAL_SETUP: true
+          DASHBOARD_URL: http://localhost:3000
+          API_URL: http://localhost:8080
+          WS_URL: ws://localhost:8080/ws
+      
+      - name: Run auth tests
         working-directory: web
         run: pnpm test:e2e e2e/tests/auth.spec.ts --project=chromium
         env:

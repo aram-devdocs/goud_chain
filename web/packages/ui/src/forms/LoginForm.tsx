@@ -129,6 +129,7 @@ export function LoginForm({
                 setNewAccount(null)
                 setApiKeyConfirmed(false)
               }}
+              data-testid="create-account-tab"
               className="flex-1"
             >
               Create Account
@@ -136,7 +137,7 @@ export function LoginForm({
           </ButtonGroup>
 
           {error && (
-            <div className="mb-4 bg-red-900/20 border border-red-700 p-3 rounded text-sm text-red-400">
+            <div className="mb-4 bg-red-900/20 border border-red-700 p-3 rounded text-sm text-red-400" data-testid="login-error">
               {error}
             </div>
           )}
@@ -148,6 +149,7 @@ export function LoginForm({
                 <Label htmlFor="apiKey">API Key</Label>
                 <Input
                   id="apiKey"
+                  data-testid="api-key-input"
                   type="password"
                   value={apiKey}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,6 +173,7 @@ export function LoginForm({
               </div>
               <Button
                 type="submit"
+                data-testid="login-button"
                 className="w-full"
                 disabled={isLoading || !apiKey}
                 loading={isLoading}
@@ -197,6 +200,7 @@ export function LoginForm({
 
                   <Button
                     type="submit"
+                    data-testid="create-account-button"
                     className="w-full"
                     disabled={isLoading}
                     loading={isLoading}
@@ -221,6 +225,7 @@ export function LoginForm({
                         <input
                           value={newAccount.api_key}
                           readOnly
+                          data-testid="api-key-display"
                           className="flex-1 bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono text-xs text-zinc-300 focus:outline-none rounded"
                         />
                         <Button
@@ -266,6 +271,7 @@ export function LoginForm({
                     onClick={handleLoginWithNewKey}
                     disabled={!apiKeyConfirmed || isLoading}
                     loading={isLoading}
+                    data-testid="continue-to-dashboard-button"
                     className="w-full"
                   >
                     Continue to Dashboard

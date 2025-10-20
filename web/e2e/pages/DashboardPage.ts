@@ -28,8 +28,8 @@ export class DashboardPage extends BasePage {
     return this.page.locator('[data-testid="ws-status"]');
   }
   
-  get accountName(): Locator {
-    return this.page.locator('[data-testid="account-name"]');
+  get accountId(): Locator {
+    return this.page.locator('text=/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i');
   }
   
   get quickActions(): Locator {
@@ -42,7 +42,7 @@ export class DashboardPage extends BasePage {
   
   // Actions
   async goto(): Promise<void> {
-    await this.navigateTo('/dashboard');
+    await this.navigateTo('/');
   }
   
   async logout(): Promise<void> {
@@ -56,12 +56,20 @@ export class DashboardPage extends BasePage {
   }
   
   async isWebSocketConnected(): Promise<boolean> {
-    const status = await this.websocketStatus.textContent();
-    return status?.includes('Connected') || false;
+    try {
+      const status = await this.websocketStatus.textContent();
+      return status?.includes('Live') || false;
+    } catch {
+      return false;
+    }
   }
   
-  async getAccountName(): Promise<string> {
-    return await this.accountName.textContent() || '';
+  async getAccountId(): Promise<string> {
+    try {
+      return await this.accountId.textContent() || '';
+    } catch {
+      return '';
+    }
   }
   
   async navigateToSubmit(): Promise<void> {

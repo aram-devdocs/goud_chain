@@ -21,31 +21,30 @@ export const test = base.extend<AuthFixtures>({
    */
   authenticatedPage: async ({ page }, use) => {
     const apiUrl = process.env.API_URL || 'http://localhost:8080';
-    const accountName = `test_user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     
-    // Step 1: Create test account via API
+    // Step 1: Create test account via API (metadata is null, not account_name)
     const createResponse = await page.request.post(`${apiUrl}/account/create`, {
-      data: { account_name: accountName }
+      data: { metadata: null }
     });
     
     if (!createResponse.ok()) {
       throw new Error(`Failed to create test account: ${await createResponse.text()}`);
     }
     
-    const { api_key } = await createResponse.json();
+    const { api_key, account_id } = await createResponse.json();
     
     // Step 2: Navigate to auth page and log in
     await page.goto('/auth');
     
     // Wait for the login form to be visible
-    await page.waitForSelector('input[name="apiKey"]', { state: 'visible' });
+    await page.waitForSelector('[data-testid="api-key-input"]', { state: 'visible', timeout: 10000 });
     
     // Fill in API key and submit
-    await page.fill('input[name="apiKey"]', api_key);
-    await page.click('button[type="submit"]');
+    await page.fill('[data-testid="api-key-input"]', api_key);
+    await page.click('[data-testid="login-button"]');
     
-    // Wait for redirect to dashboard (authentication successful)
-    await page.waitForURL('/dashboard', { timeout: 10000 });
+    // Wait for redirect to dashboard (authentication successful) - redirects to '/' not '/dashboard'
+    await page.waitForURL('/', { timeout: 15000 });
     
     // Verify session token is stored in localStorage
     const sessionToken = await page.evaluate(() => localStorage.getItem('session_token'));
@@ -77,19 +76,19 @@ export const test = base.extend<AuthFixtures>({
   },
   
   /**
-   * Account name fixture
-   * Provides the account name for the authenticated user
+   * Account ID fixture
+   * Provides the account ID for the authenticated user
    */
   accountName: async ({ authenticatedPage }, use) => {
-    const accountName = await authenticatedPage.evaluate(() => 
-      localStorage.getItem('account_name')
+    const accountId = await authenticatedPage.evaluate(() => 
+      localStorage.getItem('account_id')
     );
     
-    if (!accountName) {
-      throw new Error('Account name not found in localStorage');
+    if (!accountId) {
+      throw new Error('Account ID not found in localStorage');
     }
     
-    await use(accountName);
+    await use(accountId);
   },
 });
 

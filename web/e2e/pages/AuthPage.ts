@@ -13,27 +13,35 @@ export class AuthPage extends BasePage {
   
   // Selectors
   get apiKeyInput(): Locator {
-    return this.page.locator('input[name="apiKey"]');
+    return this.page.locator('[data-testid="api-key-input"]');
   }
   
   get loginButton(): Locator {
-    return this.page.locator('button[type="submit"]');
+    return this.page.locator('[data-testid="login-button"]');
+  }
+  
+  get createAccountTab(): Locator {
+    return this.page.locator('[data-testid="create-account-tab"]');
   }
   
   get createAccountButton(): Locator {
-    return this.page.locator('button:has-text("Create Account")');
+    return this.page.locator('[data-testid="create-account-button"]');
   }
   
-  get accountNameInput(): Locator {
-    return this.page.locator('input[name="accountName"]');
+  get continueButton(): Locator {
+    return this.page.locator('[data-testid="continue-to-dashboard-button"]');
   }
   
   get errorMessage(): Locator {
-    return this.page.locator('[role="alert"], .error-message');
+    return this.page.locator('[data-testid="login-error"]');
   }
   
   get apiKeyDisplay(): Locator {
     return this.page.locator('[data-testid="api-key-display"]');
+  }
+  
+  get confirmCheckbox(): Locator {
+    return this.page.locator('input[type="checkbox"]#confirm-saved');
   }
   
   // Actions
@@ -44,18 +52,20 @@ export class AuthPage extends BasePage {
   async login(apiKey: string): Promise<void> {
     await this.apiKeyInput.fill(apiKey);
     await this.loginButton.click();
-    await this.page.waitForURL('/dashboard');
+    await this.page.waitForURL('/');
   }
   
-  async createAccount(accountName: string): Promise<string> {
-    // Fill account name
-    await this.accountNameInput.fill(accountName);
+  async createAccount(): Promise<string> {
+    // Switch to Create Account tab
+    await this.createAccountTab.click();
+    
+    // Click Generate API Key button
     await this.createAccountButton.click();
     
     // Wait for API key to be displayed
     await this.apiKeyDisplay.waitFor({ state: 'visible', timeout: 10000 });
     
-    const apiKey = await this.apiKeyDisplay.textContent();
+    const apiKey = await this.apiKeyDisplay.inputValue();
     
     if (!apiKey) {
       throw new Error('API key not displayed after account creation');
@@ -64,9 +74,18 @@ export class AuthPage extends BasePage {
     return apiKey.trim();
   }
   
-  async loginWithNewAccount(accountName: string): Promise<string> {
-    const apiKey = await this.createAccount(accountName);
-    await this.login(apiKey);
+  async loginWithNewAccount(): Promise<string> {
+    const apiKey = await this.createAccount();
+    
+    // Check the confirmation checkbox
+    await this.confirmCheckbox.check();
+    
+    // Click Continue to Dashboard
+    await this.continueButton.click();
+    
+    // Wait for redirect to dashboard
+    await this.page.waitForURL('/');
+    
     return apiKey;
   }
   
