@@ -355,12 +355,17 @@ export function SubmitDataForm({
               placeholder='{"key": "value", "another": 42}'
               rows={12}
               fullWidth
+              error={
+                jsonData && !jsonValid
+                  ? 'Invalid JSON - check syntax'
+                  : undefined
+              }
               helperText={
-                jsonData
-                  ? jsonValid
-                    ? 'Valid JSON format'
-                    : 'Invalid JSON - check syntax'
-                  : 'Enter any valid JSON object'
+                jsonData && jsonValid
+                  ? 'Valid JSON format'
+                  : !jsonData
+                    ? 'Enter any valid JSON object'
+                    : undefined
               }
               className="font-mono text-sm"
             />
@@ -371,8 +376,9 @@ export function SubmitDataForm({
             type="submit"
             className="w-full"
             disabled={!isFormValid() || isLoading}
+            loading={isLoading}
           >
-            {isLoading ? 'Submitting...' : 'Submit'}
+            Submit
           </Button>
         </form>
       </CardContent>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback } from 'react'
 import { ToastType } from '@goudchain/types'
 
 export interface Toast {
@@ -7,7 +7,7 @@ export interface Toast {
   message: string
 }
 
-export function useToast(): {
+interface ToastContextValue {
   toasts: Toast[]
   show: (type: ToastType, message: string, duration?: number) => string
   dismiss: (id: string) => void
@@ -15,7 +15,11 @@ export function useToast(): {
   error: (msg: string) => string
   warning: (msg: string) => string
   info: (msg: string) => string
-} {
+}
+
+const ToastContext = createContext<ToastContextValue | undefined>(undefined)
+
+export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const show = useCallback(
@@ -38,7 +42,7 @@ export function useToast(): {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  return {
+  const value: ToastContextValue = {
     toasts,
     show,
     dismiss,
@@ -59,4 +63,17 @@ export function useToast(): {
       [show]
     ),
   }
+
+  return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>
 }
+
+export function useToastContext(): ToastContextValue {
+  const context = useContext(ToastContext)
+  if (!context) {
+    throw new Error('useToastContext must be used within ToastProvider')
+  }
+  return context
+}
+
+// Backward-compatible hook name
+export const useToast = useToastContext

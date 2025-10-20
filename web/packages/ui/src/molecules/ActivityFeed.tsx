@@ -82,8 +82,10 @@ export function ActivityFeed({
         {activities.length > 0 && onClear && (
           <button
             onClick={onClear}
-            className="text-xs text-zinc-400 hover:text-white transition"
+            className="text-xs text-zinc-400 hover:text-white transition focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black rounded px-2 py-1"
             type="button"
+            aria-label="Clear activity feed"
+            tabIndex={0}
           >
             Clear
           </button>

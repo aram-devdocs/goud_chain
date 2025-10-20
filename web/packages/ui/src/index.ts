@@ -66,6 +66,8 @@ export { EmptyState } from './molecules/EmptyState'
 export type { EmptyStateProps } from './molecules/EmptyState'
 export { Pagination } from './molecules/Pagination'
 export type { PaginationProps } from './molecules/Pagination'
+export { ErrorBoundary } from './molecules/ErrorBoundary'
+export type { ErrorBoundaryProps } from './molecules/ErrorBoundary'
 
 // Organisms
 export { Header } from './organisms/Header'

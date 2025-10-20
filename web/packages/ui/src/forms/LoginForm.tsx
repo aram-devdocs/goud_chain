@@ -11,6 +11,7 @@ import {
   ButtonGroup,
 } from '../index'
 import { ButtonVariant, ButtonSize } from '@goudchain/types'
+import { validateApiKey } from '@goudchain/utils'
 
 export interface LoginFormProps {
   onLogin: (apiKey: string) => Promise<void>
@@ -35,6 +36,7 @@ export function LoginForm({
 }: LoginFormProps) {
   const [isLogin, setIsLogin] = useState(true)
   const [apiKey, setApiKey] = useState('')
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const [newAccount, setNewAccount] = useState<{
     api_key: string
     account_id: string
@@ -64,6 +66,20 @@ export function LoginForm({
   const handleLoginWithNewKey = async (): Promise<void> => {
     if (!newAccount || !apiKeyConfirmed) return
     await onLoginWithNewKey(newAccount.api_key)
+  }
+
+  const validateApiKeyOnBlur = (): void => {
+    if (!apiKey) {
+      setApiKeyError(null)
+      return
+    }
+
+    const validation = validateApiKey(apiKey)
+    if (!validation.valid) {
+      setApiKeyError(validation.error ?? 'Invalid API key')
+    } else {
+      setApiKeyError(null)
+    }
   }
 
   const copyApiKey = (): void => {
@@ -134,21 +150,32 @@ export function LoginForm({
                   id="apiKey"
                   type="password"
                   value={apiKey}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     setApiKey(e.target.value)
-                  }
+                    // Clear error when user starts typing
+                    if (apiKeyError) setApiKeyError(null)
+                  }}
+                  onBlur={validateApiKeyOnBlur}
                   placeholder="Paste your API key"
                   required
+                  error={!!apiKeyError}
                   className="mt-1 font-mono text-sm"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Enter your API key</p>
+                {apiKeyError ? (
+                  <p className="text-xs text-red-400 mt-1">{apiKeyError}</p>
+                ) : (
+                  <p className="text-xs text-zinc-500 mt-1">
+                    64-character hexadecimal string
+                  </p>
+                )}
               </div>
               <Button
                 type="submit"
                 className="w-full"
                 disabled={isLoading || !apiKey}
+                loading={isLoading}
               >
-                {isLoading ? 'Logging in...' : 'Login'}
+                Login
               </Button>
             </form>
           ) : (
@@ -168,8 +195,13 @@ export function LoginForm({
                     </ul>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Generating...' : 'Generate API Key'}
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                    loading={isLoading}
+                  >
+                    Generate API Key
                   </Button>
                 </form>
               ) : (
@@ -233,9 +265,10 @@ export function LoginForm({
                   <Button
                     onClick={handleLoginWithNewKey}
                     disabled={!apiKeyConfirmed || isLoading}
+                    loading={isLoading}
                     className="w-full"
                   >
-                    {isLoading ? 'Logging in...' : 'Continue to Dashboard'}
+                    Continue to Dashboard
                   </Button>
 
                   {!apiKeyConfirmed && (

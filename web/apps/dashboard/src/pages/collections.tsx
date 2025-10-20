@@ -1,5 +1,10 @@
 import { useState, useMemo } from 'react'
-import { useListCollections, useDecryptData, useToast } from '@goudchain/hooks'
+import {
+  useListCollections,
+  useDecryptData,
+  useToast,
+  useDebounce,
+} from '@goudchain/hooks'
 import {
   TableToolbar,
   CollectionsTable,
@@ -25,15 +30,18 @@ export default function CollectionsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
 
+  // Debounce search query for better performance
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
+
   // Filter and sort collections
   const filteredAndSortedCollections = useMemo(() => {
     if (!data?.collections) return []
 
     let filtered = [...data.collections]
 
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+    // Apply search filter (using debounced query)
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase()
       filtered = filtered.filter(
         (c) =>
           c.label.toLowerCase().includes(query) ||
@@ -58,7 +66,7 @@ export default function CollectionsPage() {
     }
 
     return filtered
-  }, [data?.collections, searchQuery, sortBy])
+  }, [data?.collections, debouncedSearchQuery, sortBy])
 
   const handleToggleSelection = (id: string) => {
     setSelectedIds((prev) => {

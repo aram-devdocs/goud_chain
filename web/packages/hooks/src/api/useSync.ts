@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useToast } from '../useToast'
+import { useToast } from '../ToastContext'
 import { API_BASE } from '../config'
 
 export function useSync() {

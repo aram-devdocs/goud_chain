@@ -11,8 +11,11 @@ export function Toast({ type, message, onDismiss }: ToastProps) {
   return (
     <div
       onClick={onDismiss}
+      role="status"
+      aria-live="polite"
+      aria-label="Dismiss notification"
       className={clsx(
-        'cursor-pointer rounded-lg border p-3 shadow-lg backdrop-blur-sm flex items-start gap-3',
+        'cursor-pointer rounded-lg border p-3 flex items-start gap-3 transition-opacity',
         {
           'bg-green-950/90 border-green-700': type === ToastType.Success,
           'bg-blue-950/90 border-blue-700': type === ToastType.Info,
@@ -20,6 +23,13 @@ export function Toast({ type, message, onDismiss }: ToastProps) {
           'bg-red-950/90 border-red-700': type === ToastType.Error,
         }
       )}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onDismiss()
+        }
+      }}
+      tabIndex={0}
     >
       <div
         className={clsx('text-xs font-mono font-bold px-1.5 py-0.5 rounded', {

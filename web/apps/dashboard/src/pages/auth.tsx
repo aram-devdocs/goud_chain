@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useAuth, useCreateAccount, useLogin, useToast } from '@goudchain/hooks'
 import { LoginForm } from '@goudchain/ui'
@@ -6,23 +7,35 @@ import { validateApiKey } from '@goudchain/utils'
 export default function AuthPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const { success, error } = useToast()
+  const { success, error: showErrorToast } = useToast()
   const createAccountMutation = useCreateAccount()
   const loginMutation = useLogin()
+  const [loginError, setLoginError] = useState<string | undefined>(undefined)
 
   const handleLogin = async (apiKey: string): Promise<void> => {
-    const validation = validateApiKey(apiKey)
-    if (!validation.valid) {
-      error(validation.error ?? 'Invalid API key')
-      throw new Error(validation.error ?? 'Invalid API key')
+    try {
+      setLoginError(undefined)
+
+      const validation = validateApiKey(apiKey)
+      if (!validation.valid) {
+        const errorMsg = validation.error ?? 'Invalid API key'
+        setLoginError(errorMsg)
+        showErrorToast(errorMsg)
+        throw new Error(errorMsg)
+      }
+
+      localStorage.setItem('api_key', apiKey)
+
+      const result = await loginMutation.mutateAsync({ api_key: apiKey })
+      login(result)
+      success('Logged in successfully')
+      navigate({ to: '/' })
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Login failed'
+      setLoginError(errorMsg)
+      showErrorToast(errorMsg)
+      throw err
     }
-
-    localStorage.setItem('api_key', apiKey)
-
-    const result = await loginMutation.mutateAsync({ api_key: apiKey })
-    login(result)
-    success('Logged in successfully')
-    navigate({ to: '/' })
   }
 
   const handleCreate = async () => {
@@ -55,6 +68,7 @@ export default function AuthPage() {
       onLoginWithNewKey={handleLoginWithNewKey}
       onCopyToClipboard={handleCopy}
       isLoading={createAccountMutation.isPending || loginMutation.isPending}
+      error={loginError}
     />
   )
 }
