@@ -1,0 +1,14 @@
+# Playwright artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Visual regression actual/diff outputs (not baseline)
+visual/actual/
+visual/diff/
+
+# Test screenshots (temporary)
+screenshots/
+
+# Environment files (if any local overrides)
+.env.local
