@@ -172,11 +172,26 @@ Tests run automatically on GitHub Actions for:
 - Manual workflow dispatch
 
 **CI workflow features:**
-- Cross-browser parallel execution
-- Docker Compose orchestration
-- Artifact collection (reports, screenshots, videos)
-- Visual regression testing
+- Cross-browser parallel execution (Chromium, Firefox, WebKit)
+- Docker Compose orchestration (3-node blockchain network)
+- Artifact collection (reports, screenshots, videos, logs)
+- Visual regression testing (Storybook integration)
 - Test result aggregation
+
+**Available workflows:**
+1. **e2e-tests.yml** - Full test suite (all browsers, all tests)
+2. **e2e-tests-simple.yml** - Quick validation (Chromium only, auth tests)
+
+**CI-specific configuration:**
+```yaml
+env:
+  CI: true                      # Enables CI mode
+  E2E_SKIP_GLOBAL_SETUP: true  # Skips Docker in global setup
+  DASHBOARD_URL: http://localhost:3000
+  API_URL: http://localhost:8080
+```
+
+**Troubleshooting CI failures:** See `e2e/CI_TROUBLESHOOTING.md`
 
 ## Test Architecture
 

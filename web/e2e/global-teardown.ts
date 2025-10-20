@@ -11,16 +11,25 @@ const execAsync = promisify(exec);
  * 1. Clean up test data (optional - tests should clean up after themselves)
  * 2. Stop Docker Compose services (optional - keep running for development)
  * 3. Archive test artifacts
+ * 
+ * Note: In CI, Docker Compose cleanup is handled by the workflow.
  */
 async function globalTeardown(config: FullConfig) {
   console.log('Starting E2E test environment teardown...');
   
   const shouldStopDocker = process.env.E2E_STOP_DOCKER === 'true';
+  const isCI = process.env.CI === 'true';
+  
+  // Skip Docker cleanup in CI (handled by workflow)
+  if (isCI) {
+    console.log('Skipping Docker Compose cleanup (running in CI)');
+    return;
+  }
   
   if (shouldStopDocker) {
     console.log('Stopping Docker Compose services...');
     try {
-      await execAsync('cd .. && docker-compose -f docker-compose.local.yml down', {
+      await execAsync('cd .. && docker compose -f docker-compose.local.yml down', {
         cwd: process.cwd(),
       });
       console.log('Docker Compose services stopped');

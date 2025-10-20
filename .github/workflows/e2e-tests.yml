@@ -31,20 +31,37 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
+      - name: Build backend Docker image
+        run: |
+          docker build -t goud-chain:latest -f Dockerfile .
+      
+      - name: Build dashboard Docker image
+        run: |
+          docker build -t goud-chain-dashboard:latest -f web/Dockerfile web/
+      
       - name: Start Docker Compose services
         run: |
-          docker-compose -f docker-compose.local.yml up -d
-          echo "Waiting for services to be healthy..."
+          docker compose -f docker-compose.local.yml up -d
+          echo "Waiting for services to start..."
           sleep 30
+      
+      - name: Check Docker Compose status
+        run: |
+          docker compose -f docker-compose.local.yml ps
       
       - name: Wait for backend health
         run: |
           for i in {1..30}; do
-            if curl -f http://localhost:8080/health; then
+            if curl -f http://localhost:8080/health 2>/dev/null; then
               echo "Backend is healthy"
               break
             fi
             echo "Waiting for backend... ($i/30)"
+            if [ $i -eq 30 ]; then
+              echo "Backend health check failed"
+              docker compose -f docker-compose.local.yml logs
+              exit 1
+            fi
             sleep 2
           done
       
@@ -75,22 +92,31 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
       
-      - name: Build dashboard
+      - name: Build packages
         working-directory: web
-        run: pnpm build
+        run: |
+          pnpm --filter @goudchain/ui build
+          pnpm --filter @goudchain/hooks build
+          pnpm --filter @goudchain/types build
+          pnpm --filter @goudchain/utils build
       
       - name: Start dashboard dev server
         working-directory: web/apps/dashboard
         run: |
-          pnpm dev &
+          nohup pnpm dev > dashboard.log 2>&1 &
           echo $! > dashboard.pid
           echo "Waiting for dashboard to start..."
-          for i in {1..30}; do
-            if curl -f http://localhost:3000; then
+          for i in {1..60}; do
+            if curl -f http://localhost:3000 2>/dev/null; then
               echo "Dashboard is ready"
               break
             fi
-            echo "Waiting for dashboard... ($i/30)"
+            if [ $i -eq 60 ]; then
+              echo "Dashboard startup failed. Log:"
+              cat dashboard.log
+              exit 1
+            fi
+            echo "Waiting for dashboard... ($i/60)"
             sleep 2
           done
       
@@ -103,6 +129,7 @@ jobs:
         run: pnpm test:e2e --project=${{ matrix.browser }}
         env:
           CI: true
+          E2E_SKIP_GLOBAL_SETUP: true
           DASHBOARD_URL: http://localhost:3000
           API_URL: http://localhost:8080
           WS_URL: ws://localhost:8080/ws
@@ -123,6 +150,14 @@ jobs:
           path: web/test-results/
           retention-days: 30
       
+      - name: Upload dashboard logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-logs-${{ matrix.browser }}
+          path: web/apps/dashboard/dashboard.log
+          retention-days: 7
+      
       - name: Stop dashboard
         if: always()
         working-directory: web/apps/dashboard
@@ -132,13 +167,13 @@ jobs:
             rm dashboard.pid
           fi
       
-      - name: Stop Docker Compose services
-        if: always()
-        run: docker-compose -f docker-compose.local.yml down -v
-      
       - name: Collect Docker logs
         if: failure()
-        run: docker-compose -f docker-compose.local.yml logs > docker-logs.txt
+        run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
+      
+      - name: Stop Docker Compose services
+        if: always()
+        run: docker compose -f docker-compose.local.yml down -v
       
       - name: Upload Docker logs
         if: failure()
@@ -171,6 +206,15 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
       
+      - name: Install http-server
+        run: npm install -g http-server
+      
+      - name: Build packages
+        working-directory: web
+        run: |
+          pnpm --filter @goudchain/types build
+          pnpm --filter @goudchain/utils build
+      
       - name: Build Storybook
         working-directory: web/packages/ui
         run: pnpm build-storybook
@@ -178,9 +222,21 @@ jobs:
       - name: Start Storybook server
         working-directory: web/packages/ui
         run: |
-          npx http-server storybook-static -p 6006 &
+          http-server storybook-static -p 6006 > storybook.log 2>&1 &
           echo $! > storybook.pid
-          sleep 5
+          echo "Waiting for Storybook..."
+          for i in {1..30}; do
+            if curl -f http://localhost:6006 2>/dev/null; then
+              echo "Storybook is ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Storybook startup failed"
+              cat storybook.log
+              exit 1
+            fi
+            sleep 2
+          done
       
       - name: Install Playwright browsers
         working-directory: web

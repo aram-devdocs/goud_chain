@@ -49,9 +49,9 @@ export default defineConfig({
     },
   },
   
-  // Global setup and teardown
-  globalSetup: './e2e/global-setup.ts',
-  globalTeardown: './e2e/global-teardown.ts',
+  // Global setup and teardown (skip in CI - handled by workflow)
+  globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-setup.ts',
+  globalTeardown: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-teardown.ts',
   
   // Cross-browser testing projects
   projects: [

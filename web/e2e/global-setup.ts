@@ -8,26 +8,33 @@ const execAsync = promisify(exec);
  * Global Setup for E2E Tests
  * 
  * Responsibilities:
- * 1. Start Docker Compose 3-node blockchain network
+ * 1. Start Docker Compose 3-node blockchain network (local only)
  * 2. Wait for backend health checks to pass
  * 3. Wait for dashboard application to be ready
  * 4. Seed test data if needed
+ * 
+ * Note: In CI, Docker Compose is started by the workflow, so we only verify services are ready.
  */
 async function globalSetup(config: FullConfig) {
   console.log('Starting E2E test environment setup...');
   
   const dashboardUrl = config.use.baseURL || 'http://localhost:3000';
   const apiUrl = process.env.API_URL || 'http://localhost:8080';
+  const isCI = process.env.CI === 'true';
   
-  // Step 1: Start Docker Compose (blockchain network + backend)
-  console.log('Starting Docker Compose services...');
-  try {
-    await execAsync('cd .. && docker-compose -f docker-compose.local.yml up -d', {
-      cwd: process.cwd(),
-    });
-    console.log('Docker Compose services started');
-  } catch (error) {
-    console.log('Docker Compose services may already be running:', error);
+  // Step 1: Start Docker Compose (local development only)
+  if (!isCI) {
+    console.log('Starting Docker Compose services...');
+    try {
+      await execAsync('cd .. && docker compose -f docker-compose.local.yml up -d', {
+        cwd: process.cwd(),
+      });
+      console.log('Docker Compose services started');
+    } catch (error) {
+      console.log('Docker Compose services may already be running:', error);
+    }
+  } else {
+    console.log('Skipping Docker Compose startup (running in CI)');
   }
   
   // Step 2: Wait for backend health check
