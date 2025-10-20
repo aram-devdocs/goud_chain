@@ -1,8 +1,10 @@
 mod api;
+mod cli;
 mod config;
 mod constants;
 mod crypto;
 mod domain;
+mod migrations;
 mod network;
 mod storage;
 mod types;
@@ -12,6 +14,7 @@ use axum::{
     routing::get,
     Extension, Json, Router,
 };
+use clap::Parser;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info};
@@ -19,10 +22,12 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 
 use api::{ApiDoc, RateLimiter, WebSocketBroadcaster};
+use cli::{Cli, Commands};
 use config::Config;
 use constants::NONCE_CLEANUP_INTERVAL_SECONDS;
 use domain::Block;
 use network::P2PNode;
+use storage::Migration;
 use storage::{
     init_data_directory, load_blockchain, AuditLogger, BlockchainStore, NonceStore, RateLimitStore,
 };
@@ -31,6 +36,24 @@ use storage::{
 async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
+
+    // Parse CLI arguments
+    let cli = Cli::parse();
+
+    // Handle migration create command early (doesn't need config or store)
+    if let Some(Commands::Migrate(cli::MigrateCommands::Create { description })) = &cli.command {
+        if let Err(e) = cli::handle_migrate_command(
+            &cli::MigrateCommands::Create {
+                description: description.clone(),
+            },
+            None, // Create command doesn't need store
+            &[],
+        ) {
+            error!(error = %e, "Migration command failed");
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
 
     // Load configuration
     let config = match Config::from_env() {
@@ -55,6 +78,18 @@ async fn main() {
             std::process::exit(1);
         }
     };
+
+    // Handle other migration commands (need store)
+    if let Some(Commands::Migrate(migrate_cmd)) = &cli.command {
+        let available_migrations = get_available_migrations();
+        if let Err(e) =
+            cli::handle_migrate_command(migrate_cmd, Some(blockchain_store), &available_migrations)
+        {
+            error!(error = %e, "Migration command failed");
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
 
     // Load or create blockchain from RocksDB
     let blockchain = match load_blockchain(
@@ -277,4 +312,19 @@ async fn main() {
         error!(error = %e, "HTTP server error");
         std::process::exit(1);
     }
+}
+
+/// Get all available migrations
+///
+/// This function should be updated to include all migration files.
+/// Each migration must be manually registered here in chronological order.
+fn get_available_migrations() -> Vec<Box<dyn Migration>> {
+    vec![
+        // Example migration demonstrating the migration system
+        Box::new(migrations::Migration20240101120000AddMetadataIndex::new()),
+        // Add new migrations here in chronological order (oldest first)
+        // Example:
+        // Box::new(migrations::Migration20240102000000AddAuditTables::new()),
+        // Box::new(migrations::Migration20240103000000UpdateUserSchema::new()),
+    ]
 }

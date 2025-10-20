@@ -45,7 +45,7 @@ Or visit the [Dashboard](https://dev.goudchain.com/) to interact with the blockc
 - **Incremental Writes** - O(1) block writes (vs O(n) for full JSON serialization)
 - **Fast Lookups** - O(1) block retrieval by index
 - **50% Disk Space Savings** - Snappy compression reduces storage footprint
-- **Schema Versioning** - Automatic validation and regeneration on schema changes
+- **Schema Migration System** - Non-destructive schema evolution with up/down migrations, RocksDB state tracking, and CLI tooling
 - **Persistent Volumes** - Docker volumes survive container restarts with automated backup/restore
 - **Volume Monitoring** - Real-time disk usage, RocksDB health, and capacity alerts
 
@@ -127,6 +127,61 @@ Or visit the [Dashboard](https://dev.goudchain.com/) to interact with the blockc
 **Note:** In development, you can use either:
 - Docker dashboard at :3000 (served via Nginx, matches production)
 - Vite dev server at :3001 (hot module reload for faster frontend iteration)
+
+## Schema Migrations
+
+Goud Chain includes a comprehensive migration framework for non-destructive schema evolution.
+
+### Migration CLI Commands
+
+```bash
+# Show migration status (applied and pending)
+cargo run -- migrate status
+
+# Apply all pending migrations
+cargo run -- migrate up
+
+# Rollback last N migrations (default: 1)
+cargo run -- migrate down
+cargo run -- migrate down 3
+
+# Non-interactive rollback (for automation/CI)
+cargo run -- migrate down --yes
+cargo run -- migrate down 2 --yes
+
+# Create new migration template
+cargo run -- migrate create add_user_indexes
+
+# Reset migration state (development only)
+cargo run -- migrate reset --confirm
+```
+
+### Creating Migrations
+
+1. Generate migration template:
+```bash
+cargo run -- migrate create my_migration_name
+```
+
+2. Edit the generated file in `src/migrations/` to implement up() and down() methods
+
+3. Register migration in `src/migrations/mod.rs` and `src/main.rs`
+
+4. Apply migration:
+```bash
+cargo run -- migrate up
+```
+
+### Migration Features
+
+- **Atomic Transactions** - RocksDB WriteBatch ensures all-or-nothing execution
+- **Rollback Support** - down() methods enable safe reversibility
+- **State Tracking** - Applied migrations stored in RocksDB
+- **Timestamp Versioning** - YYYYMMDDHHMMSS format ensures chronological ordering
+- **Validation** - Version format and duplicate detection
+- **Template Generation** - Scaffolding with proper structure and documentation
+
+See example migration in `src/migrations/example_20240101120000_add_metadata_index.rs`
 
 ## Architecture
 
