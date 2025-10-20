@@ -152,6 +152,25 @@ pub enum GoudChainError {
     #[error("Audit log operation failed: {0}")]
     AuditLogError(String),
 
+    // Migration errors
+    #[error("Migration not found: {0}")]
+    MigrationNotFound(String),
+
+    #[error("Migration already applied: {0}")]
+    MigrationAlreadyApplied(String),
+
+    #[error("Migration failed: {0}")]
+    MigrationFailed(String),
+
+    #[error("Invalid migration version format: {0}")]
+    InvalidMigrationVersion(String),
+
+    #[error("Migration rollback failed: {0}")]
+    MigrationRollbackFailed(String),
+
+    #[error("No migrations to rollback")]
+    NoMigrationsToRollback,
+
     // General errors
     #[error("Internal error: {0}")]
     Internal(String),

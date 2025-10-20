@@ -14,6 +14,7 @@ digraph ModuleDependencies {
 
     // Module nodes (auto-generated)
     api [label="api\n(Layer 5)", fillcolor="#ffca28", fontcolor="white"];
+    cli [label="cli\n(Layer 99)", fillcolor="#9e9e9e", fontcolor="white"];
     constants [label="constants\n(Layer 0)", fillcolor="#66bb6a", fontcolor="white"];
     crypto [label="crypto\n(Layer 1)", fillcolor="#42a5f5", fontcolor="white"];
     domain [label="domain\n(Layer 2)", fillcolor="#ffa726", fontcolor="white"];
@@ -28,6 +29,7 @@ digraph ModuleDependencies {
     {rank=same; storage;}
     {rank=same; network;}
     {rank=same; api;}
+    {rank=same; cli;}
 
     // Invisible edges to force horizontal alignment within layers
     constants -> types [style=invis];
@@ -38,6 +40,8 @@ digraph ModuleDependencies {
     api -> network;
     api -> storage;
     api -> types;
+    cli -> storage;
+    cli -> types;
     crypto -> constants;
     crypto -> types;
     domain -> constants;

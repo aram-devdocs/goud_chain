@@ -1,5 +1,8 @@
 pub mod audit_log;
 pub mod blockchain_store;
+pub mod migration;
+pub mod migration_runner;
+pub mod migration_store;
 pub mod nonce_store;
 pub mod rate_limit_store;
 
@@ -14,6 +17,9 @@ use crate::types::{GoudChainError, Result};
 // Re-export storage modules
 pub use self::audit_log::AuditLogger;
 pub use self::blockchain_store::BlockchainStore;
+pub use self::migration::Migration;
+pub use self::migration_runner::MigrationRunner;
+pub use self::migration_store::MigrationStore;
 pub use self::nonce_store::NonceStore;
 pub use self::rate_limit_store::{BanLevel, RateLimitStore};
 
