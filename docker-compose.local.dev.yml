@@ -75,6 +75,37 @@ services:
     volumes:
       - ./python/notebooks:/home/jovyan/work/notebooks:rw
 
+  storybook:
+    image: node:22-slim
+    container_name: storybook-dev
+    working_dir: /app/packages/ui
+    command: sh -c "corepack enable && corepack prepare pnpm@9.15.0 --activate && cd /app && pnpm install && cd /app/packages/ui && pnpm storybook --no-open"
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - BROWSER=none
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6006"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
 volumes:
   shared_cargo_cache:
   node1_data:
