@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Goud Chain is an encrypted blockchain with API key-based authentication using Proof of Authority (PoA) consensus. This is a proof-of-concept project demonstrating encrypted data storage on an immutable distributed ledger with high-performance RocksDB persistence.
 
 **Core Technologies:**
+
 - Rust for blockchain implementation
 - RocksDB for high-performance block storage (embedded key-value database)
 - AES-256-GCM for symmetric encryption
@@ -23,22 +24,26 @@ Use `cargo` for build/test, `./run` script for network management (dev/start/sto
 ### Rust Best Practices
 
 **Ownership & Borrowing:**
+
 - Prefer borrowing (`&T`) over cloning unless ownership transfer is necessary
 - Use `Arc<Mutex<T>>` for shared mutable state across threads
 - Avoid unnecessary `.clone()` calls in hot paths
 
 **Error Handling:**
+
 - Return `Result<T, E>` for recoverable errors
 - Use `Option<T>` for optional values, especially in cryptographic operations
 - Avoid `.unwrap()` in production code paths; use proper error propagation
 - Use `.expect()` with descriptive messages only when failure is truly impossible
 
 **Type Safety:**
+
 - Leverage Rust's type system to make invalid states unrepresentable
 - Use newtype patterns for domain-specific types (e.g., `BlockHash`, `DataId`)
 - Prefer `&str` for borrowed strings, `String` for owned
 
 **Concurrency:**
+
 - Use message passing (channels) over shared state when possible
 - Keep mutex lock guards short-lived to avoid contention
 - Spawn background threads for P2P networking and block creation
@@ -49,6 +54,7 @@ Use `cargo` for build/test, `./run` script for network management (dev/start/sto
 Strict 6-layer unidirectional dependency hierarchy enforces separation of concerns. Dependencies flow from higher to lower layers only (Presentation → Infrastructure → Persistence → Business Logic → Utilities → Foundation). Foundation layer has zero internal dependencies. Automated tests detect circular dependencies via pre-commit hooks and block violating commits.
 
 **Layer Responsibilities:**
+
 - **Layer 0 (Foundation):** Constants, type definitions, errors (no dependencies, affects all layers)
 - **Layer 1 (Utilities):** Crypto, configuration management (pure functions, reusable across project)
 - **Layer 2 (Business Logic):** Domain models, validation, consensus (blockchain core, independent of storage/network)
@@ -57,6 +63,7 @@ Strict 6-layer unidirectional dependency hierarchy enforces separation of concer
 - **Layer 5 (Presentation):** HTTP API, interfaces (orchestrates all layers, no business logic)
 
 **Key Principles:**
+
 - All magic numbers/strings centralized in constants module
 - Template-based configuration prevents environment drift (pre-commit hook enforces regeneration)
 - Atomic blockchain state changes (add block + clear pending data together)
@@ -114,11 +121,13 @@ Template-based system eliminates duplication and prevents environment drift. Bas
 Professional templates enforce structured, architecture-focused documentation for Linear issues, GitHub issues, and pull requests. Templates are located in `.claude/templates/` and `.github/` directories.
 
 **Linear Templates:**
+
 - `.claude/templates/linear/issue-template.md` - Issue format with architecture layers, testing strategy, acceptance criteria
 - `.claude/templates/linear/project-template.md` - Project format with work breakdown, risk assessment, success metrics
 - Templates integrated into `.claude/agents/linear-ticket-scoper.md` for automated enforcement
 
 **GitHub Templates:**
+
 - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug reports with environment, reproduction, impact analysis
 - `.github/ISSUE_TEMPLATE/feature_request.md` - Feature requests with technical considerations, integration points
 - `.github/ISSUE_TEMPLATE/performance.md` - Performance issues with profiling data, hot path analysis
@@ -126,10 +135,12 @@ Professional templates enforce structured, architecture-focused documentation fo
 - `.github/PULL_REQUEST_TEMPLATE.md` - PR format with testing performed, code quality checks, deployment considerations
 
 **Git Commit Conventions:**
+
 - `.claude/templates/git/commit-message-guide.md` - Commit message standards, format rules, examples
 - `.claude/templates/git/commit-types.md` - Type taxonomy (feat, fix, refactor, perf, test, docs, chore, security, style, ci, build, revert)
 
 **Template Principles:**
+
 - Architecture-focused: Reference 6-layer system, not specific files
 - System-aware: Account for blockchain/PoA, cryptography, RocksDB, infrastructure
 - Professional tone: No emojis, no filler, technical precision
@@ -150,6 +161,7 @@ See `.claude/templates/README.md` for comprehensive template documentation.
 **OpenAPI 3.1 Integration:** Type-safe, auto-generated API documentation using utoipa and utoipa-axum crates.
 
 **Design Principles:**
+
 - **Single Source of Truth:** API schemas derive directly from Rust types via `#[derive(ToSchema)]`
 - **Compile-time Validation:** Invalid schemas cause build failures (impossible to deploy broken docs)
 - **Route Organization:** Domain-driven modules (account, data, health, metrics, audit) for clean separation
@@ -157,12 +169,14 @@ See `.claude/templates/README.md` for comprehensive template documentation.
 - **Zero Runtime Overhead:** All OpenAPI generation happens at compile time
 
 **Documentation Stack:**
+
 - **utoipa 5.4** - Rust → OpenAPI schema derivation with procedural macros
 - **utoipa-axum 0.2** - Axum framework integration with `routes!()` macro
 - **RapiDoc UI** - Embedded documentation viewer (CDN-hosted, zero build dependencies)
 - **OpenAPI JSON** - Standard spec export for SDK generation and tooling integration
 
 **Route Architecture:**
+
 ```
 src/api/
 ├── mod.rs           # OpenAPI info, servers, security schemes, tags
@@ -176,6 +190,7 @@ src/api/
 ```
 
 **Documentation Standards:**
+
 - All endpoints have example requests/responses with realistic data
 - Security requirements explicitly defined per endpoint (api_key vs bearer_token)
 - Rate limit headers documented in response specifications
@@ -184,6 +199,7 @@ src/api/
 - Server URLs environment-aware (localhost:8080-8083 for local, production URLs for GCP)
 
 **Adding New Endpoints:**
+
 1. Define request/response types in `schemas.rs` with `#[derive(ToSchema)]`
 2. Create handler function with `#[utoipa::path]` annotation
 3. Add to appropriate route module with `routes!(handler_name)`
@@ -194,6 +210,7 @@ src/api/
 ## Quality Control Rules
 
 **Mandatory Requirements:**
+
 - NEVER use `--no-verify` flag - all commits MUST pass tests
 - NO unused code - delete legacy/dead code immediately
 - NO `#[allow(dead_code)]` annotations - fix or remove
@@ -201,6 +218,7 @@ src/api/
 - Code must compile with `cargo clippy -- -D warnings` (zero tolerance)
 
 **Code Hygiene:**
+
 - Remove commented-out code blocks
 - Delete unused imports and dependencies
 - Clean up test/debug code before committing
@@ -213,6 +231,7 @@ Prohibited: emojis, AI filler phrases, legacy code references, speculative featu
 Required: technical precision, declarative statements, professional tone, concise rationale.
 
 Examples:
+
 - Incorrect: "Great! Let's add a new feature."
 - Correct: "Add feature X. Implements Y protocol for Z use case."
 - Incorrect: "Oops! Something went wrong."
@@ -223,6 +242,7 @@ Examples:
 Follow conventions in `.claude/templates/git/commit-message-guide.md`:
 
 **Format:**
+
 ```
 <type>: <subject>
 
@@ -232,12 +252,14 @@ Follow conventions in `.claude/templates/git/commit-message-guide.md`:
 **Types:** feat, fix, refactor, perf, test, docs, chore, security, style, ci, build, revert
 
 **Subject Rules:**
+
 - Start with lowercase (except proper nouns)
 - Maximum 72 characters
 - No period at end
 - Imperative mood: "add" not "added", "fix" not "fixed"
 
 **Body Rules (optional):**
+
 - Separate from subject with blank line
 - Wrap at 72 characters
 - Explain what and why, not how
@@ -245,6 +267,7 @@ Follow conventions in `.claude/templates/git/commit-message-guide.md`:
 - Include breaking changes, migration steps, notable impacts
 
 **Examples:**
+
 ```
 feat: implement blind index queries for encrypted collections
 
@@ -287,66 +310,67 @@ Performance: skeleton loaders, optimistic updates, debounced search, virtualized
 
 ## Frontend Design System
 
-**Architecture:** Atomic design with design tokens, primitives, atoms, molecules, organisms, and templates. Single source of truth for all styling decisions.
+**Architecture:** Atomic design with design tokens for single source of truth. Hierarchical component composition from primitives to complex layouts.
 
 **Design Tokens:**
-- **Colors**: Zinc grayscale (50-950) + semantic colors (primary/success/error/warning) via `@goudchain/ui/tokens`
-- **Typography**: Font scale (xs-4xl), weights (normal-bold), line heights (tight/normal/relaxed)
-- **Spacing**: 4px base grid system (0-24 scale) for consistent rhythm
-- **Breakpoints**: Mobile-first (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px)
-- **Radius**: Border radius scale (none to full) for rounded corners
-- **Transitions**: Functional timing (fast: 150ms, normal: 250ms, slow: 350ms)
 
-**Layout Primitives:**
-- **Container**: Responsive container with max-width constraints and horizontal padding
-- **Stack**: Vertical/horizontal layout with consistent spacing (replaces manual flex)
-- **Flex**: Flexbox wrapper with comprehensive props (direction, align, justify, wrap, gap)
-- **Grid**: CSS Grid with responsive columns (mobile-first breakpoint system)
+- **Colors**: Grayscale foundation with semantic accents (primary/success/error/warning)
+- **Typography**: Consistent scale, weights, and line heights
+- **Spacing**: Grid-based system for rhythm and alignment
+- **Breakpoints**: Mobile-first responsive design
+- **Timing**: Functional transitions with consistent duration
 
-**Component Library:**
-- **Atoms**: Button, Input, Label, Spinner, Badge (smallest building blocks)
-- **Molecules**: Card, Toast (combinations of atoms)
-- **Organisms**: Header, Navigation, Tables, Charts, Dashboards (complex components)
-- **Templates**: DashboardLayout, AuthLayout, PageContainer (page-level layouts)
+**Component Hierarchy:**
 
-**Storybook Integration:**
-- Interactive component playground at `http://localhost:6006` (run `pnpm --filter @goudchain/ui storybook`)
-- All components have stories demonstrating variants, states, and responsive behavior
-- Accessibility testing via @storybook/addon-a11y
-- Dark theme matching GoudChain aesthetic (zinc-950 background)
+- **Atoms**: Basic building blocks (buttons, inputs, labels)
+- **Molecules**: Simple combinations of atoms
+- **Organisms**: Complex interface sections
+- **Templates**: Page-level layout structures
 
-**Development Workflow:**
-1. Import design tokens instead of hardcoding values: `import { colors, spacing } from '@goudchain/ui'`
-2. Use layout primitives for consistent spacing: `<Stack spacing={4}>` not `<div className="space-y-4">`
-3. Compose pages from atomic components: `<Card><CardHeader><CardTitle>` not raw HTML
-4. Test components in isolation via Storybook before integrating into pages
-5. Tailwind classes should map to design tokens (enforced by shared config)
+**Development Principles:**
 
-**Type Safety:**
-- Design token types in `@goudchain/types/design.ts` (branded types prevent mixing)
-- Component props strictly typed with TypeScript (compile-time validation)
-- Enum-based variants: `ButtonVariant.Primary` not `"primary"` strings
+- Import design tokens instead of hardcoding values
+- Use layout primitives for consistent spacing
+- Compose from atomic components rather than raw markup
+- Test components in isolation before integration
+- Strict TypeScript for compile-time validation
 
-**Accessibility Baseline:**
-- ARIA labels on all interactive elements (buttons, inputs, links)
-- Keyboard navigation support (Tab, Enter, Escape)
-- Focus indicators visible (focus:ring-2 focus:ring-white)
-- Semantic HTML (`<button>` not `<div onClick>`, `<nav>` not `<div>`)
-- High contrast colors (WCAG AA compliant: zinc-100 on zinc-950)
+**Accessibility Standards:**
 
-**Monorepo Structure:**
-- `/web/packages/types` - Design token types (Layer 0: Foundation)
-- `/web/packages/ui` - Component library + tokens (Layer 5: Presentation)
-- `/web/packages/config/tailwind-config` - Shared Tailwind config generated from tokens
-- `/web/apps/dashboard` - Dashboard application composing UI components
+- ARIA labels on interactive elements
+- Keyboard navigation support
+- High contrast color ratios
+- Semantic HTML structure
+- Visible focus indicators
 
-**Build System:**
-- Turborepo for caching and parallel builds
-- TypeScript strict mode enforced (no implicit any)
-- Prettier for consistent formatting
-- `pnpm validate` runs format check + type check + build (pre-commit requirement)
+**Build Architecture:**
 
-**Documentation:**
-- `/web/packages/ui/README.md` - Comprehensive design system guide
-- Storybook stories - Interactive component documentation with controls
-- JSDoc comments - Type definitions and usage examples in code
+- Monorepo with shared design system package
+- Strict mode compilation with zero tolerance for warnings
+- Automated formatting and type checking
+- Comprehensive documentation with interactive examples
+
+## Web Development Architecture
+
+**Separation of Concerns:** Strict separation between business logic and implementation details. Apps should orchestrate, not implement.
+
+**Package-First Development:**
+
+- **Business Logic**: Abstract domain models, validation rules, state management in shared packages
+- **UI Components**: Reusable design system components with clear interfaces
+- **Data Layer**: API clients, caching strategies, data transformation utilities
+- **Utilities**: Pure functions, type definitions, constants
+
+**App Layer Responsibilities:**
+
+- Compose packages into user-facing features
+- Define page layouts and routing
+- Handle user interactions through package interfaces
+- Write pseudocode-style implementation that delegates to packages
+
+**Prohibited in Apps:**
+
+- Raw HTML/CSS styling (use design system components)
+- Business logic implementation (delegate to domain packages)
+- Direct API calls (use data layer abstractions)
+- Hardcoded values (import from constants packages)
