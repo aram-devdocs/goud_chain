@@ -284,3 +284,69 @@ Data: metrics show label/value/context/timestamp, tables show essential columns 
 Navigation: tabs for sections, breadcrumbs for depth, quick actions for workflows, search for datasets.
 
 Performance: skeleton loaders, optimistic updates, debounced search, virtualized lists.
+
+## Frontend Design System
+
+**Architecture:** Atomic design with design tokens, primitives, atoms, molecules, organisms, and templates. Single source of truth for all styling decisions.
+
+**Design Tokens:**
+- **Colors**: Zinc grayscale (50-950) + semantic colors (primary/success/error/warning) via `@goudchain/ui/tokens`
+- **Typography**: Font scale (xs-4xl), weights (normal-bold), line heights (tight/normal/relaxed)
+- **Spacing**: 4px base grid system (0-24 scale) for consistent rhythm
+- **Breakpoints**: Mobile-first (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px)
+- **Radius**: Border radius scale (none to full) for rounded corners
+- **Transitions**: Functional timing (fast: 150ms, normal: 250ms, slow: 350ms)
+
+**Layout Primitives:**
+- **Container**: Responsive container with max-width constraints and horizontal padding
+- **Stack**: Vertical/horizontal layout with consistent spacing (replaces manual flex)
+- **Flex**: Flexbox wrapper with comprehensive props (direction, align, justify, wrap, gap)
+- **Grid**: CSS Grid with responsive columns (mobile-first breakpoint system)
+
+**Component Library:**
+- **Atoms**: Button, Input, Label, Spinner, Badge (smallest building blocks)
+- **Molecules**: Card, Toast (combinations of atoms)
+- **Organisms**: Header, Navigation, Tables, Charts, Dashboards (complex components)
+- **Templates**: DashboardLayout, AuthLayout, PageContainer (page-level layouts)
+
+**Storybook Integration:**
+- Interactive component playground at `http://localhost:6006` (run `pnpm --filter @goudchain/ui storybook`)
+- All components have stories demonstrating variants, states, and responsive behavior
+- Accessibility testing via @storybook/addon-a11y
+- Dark theme matching GoudChain aesthetic (zinc-950 background)
+
+**Development Workflow:**
+1. Import design tokens instead of hardcoding values: `import { colors, spacing } from '@goudchain/ui'`
+2. Use layout primitives for consistent spacing: `<Stack spacing={4}>` not `<div className="space-y-4">`
+3. Compose pages from atomic components: `<Card><CardHeader><CardTitle>` not raw HTML
+4. Test components in isolation via Storybook before integrating into pages
+5. Tailwind classes should map to design tokens (enforced by shared config)
+
+**Type Safety:**
+- Design token types in `@goudchain/types/design.ts` (branded types prevent mixing)
+- Component props strictly typed with TypeScript (compile-time validation)
+- Enum-based variants: `ButtonVariant.Primary` not `"primary"` strings
+
+**Accessibility Baseline:**
+- ARIA labels on all interactive elements (buttons, inputs, links)
+- Keyboard navigation support (Tab, Enter, Escape)
+- Focus indicators visible (focus:ring-2 focus:ring-white)
+- Semantic HTML (`<button>` not `<div onClick>`, `<nav>` not `<div>`)
+- High contrast colors (WCAG AA compliant: zinc-100 on zinc-950)
+
+**Monorepo Structure:**
+- `/web/packages/types` - Design token types (Layer 0: Foundation)
+- `/web/packages/ui` - Component library + tokens (Layer 5: Presentation)
+- `/web/packages/config/tailwind-config` - Shared Tailwind config generated from tokens
+- `/web/apps/dashboard` - Dashboard application composing UI components
+
+**Build System:**
+- Turborepo for caching and parallel builds
+- TypeScript strict mode enforced (no implicit any)
+- Prettier for consistent formatting
+- `pnpm validate` runs format check + type check + build (pre-commit requirement)
+
+**Documentation:**
+- `/web/packages/ui/README.md` - Comprehensive design system guide
+- Storybook stories - Interactive component documentation with controls
+- JSDoc comments - Type definitions and usage examples in code

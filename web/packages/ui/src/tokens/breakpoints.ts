@@ -1,6 +1,6 @@
 /**
  * Breakpoint Design Tokens
- * 
+ *
  * Mobile-first responsive breakpoint system
  * Following industry-standard device sizes
  */

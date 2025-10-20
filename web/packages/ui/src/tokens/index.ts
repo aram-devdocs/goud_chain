@@ -1,6 +1,6 @@
 /**
  * Design Token System
- * 
+ *
  * Centralized exports for all design tokens
  * Import from this file to access the complete token system
  */

@@ -1,11 +1,16 @@
 /**
  * Typography Design Tokens
- * 
+ *
  * Font scales, line heights, weights, and families
  * Clear hierarchy with large bold headers, medium subheaders, small body text
  */
 
-import type { FontSize, FontWeight, LineHeight, FontFamily } from '@goudchain/types'
+import type {
+  FontSize,
+  FontWeight,
+  LineHeight,
+  FontFamily,
+} from '@goudchain/types'
 
 // Font size scale
 export const fontSize: Record<FontSize, string> = {

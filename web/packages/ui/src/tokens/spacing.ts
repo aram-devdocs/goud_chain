@@ -1,6 +1,6 @@
 /**
  * Spacing Design Tokens
- * 
+ *
  * 4px base grid spacing scale for consistent rhythm
  * All spacing follows multiples of 4px for pixel-perfect alignment
  */
@@ -34,11 +34,11 @@ export const spacingPresets = {
   normal: spacing[4], // 16px
   comfortable: spacing[6], // 24px
   spacious: spacing[8], // 32px
-  
+
   // Layout spacing
   sectionGap: spacing[12], // 48px
   containerPadding: spacing[6], // 24px
-  
+
   // Element spacing
   elementGap: spacing[3], // 12px
   iconGap: spacing[2], // 8px

@@ -1,6 +1,6 @@
 /**
  * Color Design Tokens
- * 
+ *
  * Implements minimalist zinc grayscale aesthetic from CLAUDE.md
  * All colors follow the brand guidelines with semantic naming for consistent usage
  */
@@ -47,5 +47,7 @@ export function withOpacity(color: ColorToken, opacity: number): string {
     throw new Error('Opacity must be between 0 and 1')
   }
   // Tailwind classes will handle opacity, but this is for CSS custom properties
-  return `${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`
+  return `${color}${Math.round(opacity * 255)
+    .toString(16)
+    .padStart(2, '0')}`
 }

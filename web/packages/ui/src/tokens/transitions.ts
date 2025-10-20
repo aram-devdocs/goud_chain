@@ -1,6 +1,6 @@
 /**
  * Transition Design Tokens
- * 
+ *
  * Functional transitions for interactive elements
  * Per CLAUDE.md: "functional transitions only"
  */

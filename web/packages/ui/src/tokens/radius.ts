@@ -1,6 +1,6 @@
 /**
  * Border Radius Design Tokens
- * 
+ *
  * Consistent border radius values for rounded corners
  */
 

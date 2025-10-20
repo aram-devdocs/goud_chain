@@ -1,6 +1,6 @@
 /**
  * Shadow Design Tokens
- * 
+ *
  * Note: Per CLAUDE.md, we use "Borders only, no shadows" for the minimalist aesthetic
  * These tokens are provided for edge cases but should be used sparingly
  */
