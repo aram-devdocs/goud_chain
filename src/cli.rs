@@ -191,8 +191,7 @@ fn handle_create(description: &str) -> Result<()> {
     let migrations_dir = Path::new("src/migrations");
     if !migrations_dir.exists() {
         fs::create_dir_all(migrations_dir).map_err(|e| {
-            crate::types::GoudChainError::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            crate::types::GoudChainError::IoError(std::io::Error::other(
                 format!("Failed to create migrations directory: {}", e),
             ))
         })?;
@@ -211,8 +210,7 @@ fn handle_create(description: &str) -> Result<()> {
     let template = generate_migration_template(&version, description);
 
     fs::write(&filepath, template).map_err(|e| {
-        crate::types::GoudChainError::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        crate::types::GoudChainError::IoError(std::io::Error::other(
             format!("Failed to write migration file: {}", e),
         ))
     })?;
