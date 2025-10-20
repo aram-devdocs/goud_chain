@@ -42,6 +42,7 @@ web/
 - **TanStack Router** - File-based routing (planned)
 - **TanStack Query v5** - Data fetching & caching
 - **Tailwind CSS v3** - Utility-first styling
+- **Storybook 8** - Component development & documentation
 - **Turborepo 2.5** - Monorepo orchestration
 - **pnpm 9.15** - Fast package manager
 
@@ -50,16 +51,19 @@ web/
 ```bash
 # Development
 pnpm dev              # Start Vite dev server (:3001)
+pnpm --filter @goudchain/ui storybook  # Start Storybook (:6006)
 
 # Building
 pnpm build            # Build all packages + apps for production
 pnpm build:dashboard  # Build only dashboard app
+pnpm --filter @goudchain/ui build-storybook  # Build Storybook static site
 
 # Code Quality
 pnpm lint             # Run ESLint
 pnpm type-check       # Run TypeScript compiler
 pnpm format           # Run Prettier (fix mode)
 pnpm format:check     # Check formatting (CI mode)
+pnpm validate         # Run format check + type check + build (pre-commit)
 
 # Testing
 pnpm test             # Run tests (when implemented)
@@ -100,6 +104,82 @@ Dashboard shows:
 # Click "Submit"
 # Data is encrypted and stored on blockchain
 ```
+
+## Design System & Storybook
+
+### Design Tokens
+
+GoudChain uses a comprehensive design token system for consistent styling:
+
+```typescript
+import { colors, spacing, typography, breakpoints } from '@goudchain/ui'
+
+// Colors: Zinc grayscale + semantic accents
+colors.zinc[950] // Background (#09090b)
+colors.primary // Blue-500 (#3b82f6)
+colors.success // Green-500 (#22c55e)
+
+// Spacing: 4px base grid
+spacing[4] // 1rem (16px)
+spacing[6] // 1.5rem (24px)
+
+// Typography
+typography.h1 // Large bold header
+typography.body // Standard body text
+typography.code // Monospace for technical data
+```
+
+### Layout Primitives
+
+Responsive layout components for building consistent UIs:
+
+```tsx
+import { Container, Stack, Grid, Flex } from '@goudchain/ui'
+;<Container maxWidth="xl">
+  <Stack direction="vertical" spacing={6}>
+    <h1>Page Title</h1>
+    <Grid columns={{ sm: 2, md: 3, lg: 4 }} gap={4}>
+      <Card>Item 1</Card>
+      <Card>Item 2</Card>
+    </Grid>
+  </Stack>
+</Container>
+```
+
+### Atomic Components
+
+Pre-built components following the design system:
+
+```tsx
+import { Button, Card, Input } from '@goudchain/ui'
+import { ButtonVariant, ButtonSize } from '@goudchain/types'
+;<Card>
+  <Input label="Email" type="email" />
+  <Button variant={ButtonVariant.Primary} size={ButtonSize.Large}>
+    Submit
+  </Button>
+</Card>
+```
+
+### Storybook Development
+
+Interactive component playground for developing and testing components in isolation:
+
+```bash
+# Start Storybook
+pnpm --filter @goudchain/ui storybook
+
+# Open http://localhost:6006
+```
+
+Storybook includes:
+
+- **Interactive Controls**: Modify component props in real-time
+- **Accessibility Testing**: Built-in a11y addon for WCAG compliance
+- **Responsive Viewports**: Test mobile (375px), tablet (768px), desktop (1920px)
+- **Dark Theme**: Matches GoudChain aesthetic (zinc-950 background)
+
+See [packages/ui/README.md](packages/ui/README.md) for complete design system documentation.
 
 ## API Integration
 
@@ -286,6 +366,10 @@ Test infrastructure (Vitest + React Testing Library) is configured but no tests 
 - ✅ Data submission
 - ✅ Port conflict resolution
 - ✅ API type safety
+- ✅ Design token system
+- ✅ Storybook integration
+- ✅ Responsive layout primitives
+- ✅ Atomic component library
 
 **In Progress:**
 
@@ -294,6 +378,7 @@ Test infrastructure (Vitest + React Testing Library) is configured but no tests 
 - 🚧 Comprehensive test coverage
 - 🚧 Error boundaries
 - 🚧 Loading states improvements
+- 🚧 Page refactoring to use atomic components
 
 **Planned:**
 

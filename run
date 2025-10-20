@@ -37,6 +37,7 @@ case "$COMMAND" in
     echo ""
     echo "[API] http://localhost:8080 (Load Balancer)"
     echo "[WEB] http://localhost:3001 (Dashboard with hot reload)"
+    echo "[STORYBOOK] http://localhost:6006 (UI Component Library)"
     echo "[JUPYTER] http://localhost:8888"
     echo ""
     echo "[NODES] http://localhost:8081, 8082, 8083"
@@ -409,6 +410,7 @@ case "$COMMAND" in
     echo "Endpoints:"
     echo "  [API] http://localhost:8080 (Load Balancer)"
     echo "  [WEB] http://localhost:3000 (Dashboard)"
+    echo "  [STORYBOOK] http://localhost:6006 (UI Component Library, dev mode only)"
     echo "  [JUPYTER] http://localhost:8888 (dev mode only)"
     echo "  [NODES] http://localhost:8081, 8082, 8083"
     ;;

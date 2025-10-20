@@ -49,7 +49,7 @@ function RootComponent() {
   return (
     <>
       {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-md">
         {toasts.map((toast) => (
           <Toast
             key={toast.id}
@@ -130,31 +130,34 @@ function ProtectedLayout() {
   ]
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Header */}
-      <Header
-        title="Goud Chain"
-        subtitle="Encrypted Blockchain"
-        wsConnected={wsConnected}
-        accountId={accountId}
-        isRefreshing={isRefreshing}
-        onRefresh={handleRefresh}
-      >
-        <button
-          onClick={handleLogout}
-          className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-sm border border-zinc-700 transition"
+    <div className="relative min-h-screen bg-black">
+      {/* Content Layer */}
+      <div className="relative z-10">
+        {/* Header */}
+        <Header
+          title="Goud Chain"
+          subtitle="Encrypted Blockchain"
+          wsConnected={wsConnected}
+          accountId={accountId}
+          isRefreshing={isRefreshing}
+          onRefresh={handleRefresh}
         >
-          Logout
-        </button>
-      </Header>
+          <button
+            onClick={handleLogout}
+            className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-sm border border-zinc-700 transition"
+          >
+            Logout
+          </button>
+        </Header>
 
-      {/* Navigation */}
-      <Navigation items={navItems} />
+        {/* Navigation */}
+        <Navigation items={navItems} />
 
-      {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        <Outlet />
-      </main>
+        {/* Main Content */}
+        <main className="container mx-auto px-6 py-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useWebSocket } from '@goudchain/hooks'
@@ -40,8 +41,10 @@ interface WebSocketProviderProps {
 
 export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const queryClient = useQueryClient()
-  const { success, info } = useToast()
+  const { success, info, warning } = useToast()
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([])
+  const [wasConnected, setWasConnected] = useState(false)
+  const hasShownInitialConnection = useRef(false)
 
   // Get API key for WebSocket authentication
   const apiKey = localStorage.getItem('api_key')
@@ -52,6 +55,25 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     : ''
 
   const { isConnected, lastMessage, send } = useWebSocket(wsUrl, !!apiKey)
+
+  // Track connection state changes and show toasts
+  useEffect(() => {
+    if (isConnected && !wasConnected) {
+      // Just connected
+      if (hasShownInitialConnection.current) {
+        // Reconnection - show toast
+        success('WebSocket reconnected - real-time updates active')
+      } else {
+        // Initial connection - silent, just mark as shown
+        hasShownInitialConnection.current = true
+      }
+      setWasConnected(true)
+    } else if (!isConnected && wasConnected) {
+      // Just disconnected - show warning
+      warning('WebSocket disconnected - using polling fallback')
+      setWasConnected(false)
+    }
+  }, [isConnected, wasConnected, success, warning])
 
   // Subscribe to events when connected
   useEffect(() => {
@@ -114,6 +136,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
         case 'audit_log_update':
           // Don't invalidate audit logs query - let the audit page handle real-time events
           addActivity('audit', 'New audit log entry')
+          info('Audit event recorded')
           break
 
         case 'metrics_update':

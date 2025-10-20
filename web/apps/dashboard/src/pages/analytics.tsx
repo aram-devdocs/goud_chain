@@ -13,6 +13,15 @@ import {
   ValidatorPerformanceCard,
   RecentActivityTimeline,
   Spinner,
+  Stack,
+  Grid,
+  Heading,
+  Text,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  ProgressBar,
   type MetricData,
   type BlockCreationDataPoint,
   type DataGrowthPoint,
@@ -202,74 +211,65 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">
-          Analytics & Statistics
-        </h2>
-        <p className="text-zinc-500">
+        <Heading level={2}>Analytics & Statistics</Heading>
+        <Text size="sm" color="zinc-500" className="mt-2">
           Blockchain metrics and performance insights
-        </p>
+        </Text>
       </div>
 
       <AnalyticsMetricsGrid metrics={keyMetrics} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Grid columns={{ sm: 1, lg: 2 }} gap={6}>
         <BlockCreationChart data={blockCreationData} />
         <DataGrowthChart data={dataGrowthData} />
-      </div>
+      </Grid>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Grid columns={{ sm: 1, md: 2, lg: 3 }} gap={6}>
         <CollectionStatsCard stats={collectionStats} />
         <ValidatorPerformanceCard
           validators={validatorPerformance}
           totalBlocks={blocks.length}
         />
 
-        <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">
-            Performance Metrics
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-zinc-400">Cache Hit Rate</span>
-                <span className="text-sm font-mono text-white">
-                  {((metrics?.performance?.cache_hit_rate ?? 0) * 100).toFixed(
-                    1
-                  )}
-                  %
-                </span>
-              </div>
-              <div className="w-full bg-zinc-800 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-purple-500 to-purple-400 h-3 rounded-full transition-all"
-                  style={{
-                    width: `${(metrics?.performance?.cache_hit_rate ?? 0) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance Metrics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Stack direction="vertical" spacing={4}>
+              <ProgressBar
+                value={(metrics?.performance?.cache_hit_rate ?? 0) * 100}
+                variant="primary"
+                showLabel
+                label="Cache Hit Rate"
+              />
 
-            <div className="pt-4 border-t border-zinc-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-400">Total Operations</span>
-                <span className="text-sm font-mono font-bold text-white">
-                  {metrics?.performance?.operations_total ?? 0}
-                </span>
+              <div className="pt-4 border-t border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Text size="sm" color="zinc-400">
+                    Total Operations
+                  </Text>
+                  <Text size="sm" mono weight="bold" color="white">
+                    {metrics?.performance?.operations_total ?? 0}
+                  </Text>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Text size="sm" color="zinc-400">
+                    Network Peers
+                  </Text>
+                  <Text size="sm" mono weight="bold" color="white">
+                    {metrics?.network?.peer_count ?? 0}
+                  </Text>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-400">Network Peers</span>
-                <span className="text-sm font-mono font-bold text-white">
-                  {metrics?.network?.peer_count ?? 0}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
 
       <RecentActivityTimeline blocks={recentActivity} />
-    </div>
+    </Stack>
   )
 }

@@ -5,6 +5,7 @@ node_modules
 # Build artifacts - ALL dist folders
 **/dist
 **/build
+**/storybook-static
 .turbo
 .next
 out

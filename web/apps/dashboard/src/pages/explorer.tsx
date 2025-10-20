@@ -5,6 +5,10 @@ import {
   BlockTimeline,
   BlockDetailPanel,
   Spinner,
+  Stack,
+  Heading,
+  Card,
+  CardContent,
   type ChainHealth,
 } from '@goudchain/ui'
 import { SpinnerSize } from '@goudchain/types'
@@ -163,12 +167,10 @@ export default function ExplorerPage() {
       : null
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">
-          Blockchain Explorer
-        </h2>
-        <p className="text-zinc-500">
+        <Heading level={2}>Blockchain Explorer</Heading>
+        <p className="text-zinc-500 mt-2">
           Validate chain integrity and explore blocks
         </p>
       </div>
@@ -185,9 +187,11 @@ export default function ExplorerPage() {
 
       {/* Empty State */}
       {blocks.length === 0 ? (
-        <div className="bg-zinc-900 rounded-lg p-12 text-center border border-zinc-800">
-          <p className="text-zinc-500">No blocks in the chain yet.</p>
-        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-zinc-500">No blocks in the chain yet.</p>
+          </CardContent>
+        </Card>
       ) : (
         /* Block Explorer: Side-by-Side Layout (Desktop) / Stacked (Mobile) */
         <div className="flex flex-col lg:flex-row gap-6">
@@ -233,17 +237,19 @@ export default function ExplorerPage() {
                 }
               />
             ) : (
-              <div className="bg-zinc-900 rounded-lg p-12 text-center border border-zinc-800">
-                <p className="text-zinc-500 mb-2">No block selected</p>
-                <p className="text-xs text-zinc-600">
-                  Click on a block in the timeline to view its cryptographic
-                  details
-                </p>
-              </div>
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-zinc-500 mb-2">No block selected</p>
+                  <p className="text-xs text-zinc-600">
+                    Click on a block in the timeline to view its cryptographic
+                    details
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
       )}
-    </div>
+    </Stack>
   )
 }

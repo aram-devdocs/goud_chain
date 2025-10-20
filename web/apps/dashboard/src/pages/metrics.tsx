@@ -5,6 +5,11 @@ import {
   CardTitle,
   CardContent,
   Spinner,
+  Stack,
+  Grid,
+  Heading,
+  Text,
+  ProgressBar,
 } from '@goudchain/ui'
 import { formatNumber, formatDate } from '@goudchain/utils'
 import { SpinnerSize } from '@goudchain/types'
@@ -21,13 +26,15 @@ export default function MetricsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">System Metrics</h2>
-        <p className="text-zinc-500">Real-time system performance metrics</p>
+        <Heading level={2}>System Metrics</Heading>
+        <Text size="sm" color="zinc-500" className="mt-2">
+          Real-time system performance metrics
+        </Text>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Grid columns={{ sm: 1, md: 3 }} gap={6}>
         <Card>
           <CardHeader>
             <CardTitle className="text-sm text-zinc-400">
@@ -64,29 +71,19 @@ export default function MetricsPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </Grid>
 
       <Card>
         <CardHeader>
           <CardTitle>Performance Metrics</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-zinc-400">Cache Hit Rate</span>
-              <span className="text-sm font-mono text-white">
-                {((data?.performance?.cache_hit_rate ?? 0) * 100).toFixed(2)}%
-              </span>
-            </div>
-            <div className="w-full bg-zinc-800 rounded-full h-2">
-              <div
-                className="bg-green-500 h-2 rounded-full"
-                style={{
-                  width: `${(data?.performance?.cache_hit_rate ?? 0) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
+          <ProgressBar
+            value={(data?.performance?.cache_hit_rate ?? 0) * 100}
+            variant="success"
+            showLabel
+            label="Cache Hit Rate"
+          />
         </CardContent>
       </Card>
 
@@ -111,6 +108,6 @@ export default function MetricsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   )
 }

@@ -1,0 +1,5 @@
+**/storybook-static
+**/dist
+**/build
+**/.turbo
+pnpm-lock.yaml

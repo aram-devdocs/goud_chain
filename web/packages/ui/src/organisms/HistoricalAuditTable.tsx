@@ -200,7 +200,9 @@ export function HistoricalAuditTable({
                       {formatTimestamp(event.timestamp)}
                     </td>
                     <td className="py-3 px-4">
-                      <AuditEventBadge eventType={event.event_type as any} />
+                      <AuditEventBadge
+                        eventType={event.event_type as AuditEventType}
+                      />
                     </td>
                     <td className="py-3 px-4 text-sm text-zinc-400 font-mono">
                       {event.ip_address_hash.substring(0, 16)}...
@@ -222,7 +224,9 @@ export function HistoricalAuditTable({
                 className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800"
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <AuditEventBadge eventType={event.event_type as any} />
+                  <AuditEventBadge
+                    eventType={event.event_type as AuditEventType}
+                  />
                   <span className="text-xs text-zinc-500 font-mono">
                     {formatTimestamp(event.timestamp)}
                   </span>
