@@ -40,6 +40,10 @@ pub enum MigrateCommands {
     Down {
         #[arg(default_value = "1")]
         count: usize,
+
+        /// Skip confirmation prompt (for automation/CI)
+        #[arg(long)]
+        yes: bool,
     },
 
     /// Create a new migration file from template
@@ -65,7 +69,9 @@ pub fn handle_migrate_command(
     match command {
         MigrateCommands::Status => handle_status(store, available_migrations),
         MigrateCommands::Up => handle_up(store, available_migrations),
-        MigrateCommands::Down { count } => handle_down(store, *count, available_migrations),
+        MigrateCommands::Down { count, yes } => {
+            handle_down(store, *count, *yes, available_migrations)
+        }
         MigrateCommands::Create { description } => handle_create(description),
         MigrateCommands::Reset { confirm } => handle_reset(store, *confirm),
     }
@@ -75,16 +81,16 @@ fn handle_status(store: Arc<BlockchainStore>, available: &[Box<dyn Migration>]) 
     let runner = MigrationRunner::new(store.clone());
     let status = runner.get_status(available)?;
 
-    println!("\n📊 Migration Status\n");
+    println!("\n[STATUS] Migration Status\n");
     println!(
         "Current Schema: {}\n",
         status.current_schema.as_deref().unwrap_or("none")
     );
 
     if status.applied.is_empty() {
-        println!("✅ Applied Migrations: none");
+        println!("[OK] Applied Migrations: none");
     } else {
-        println!("✅ Applied Migrations ({}):", status.applied.len());
+        println!("[OK] Applied Migrations ({}):", status.applied.len());
         for meta in &status.applied {
             println!("   - {} ({})", meta.version, meta.description);
         }
@@ -93,11 +99,13 @@ fn handle_status(store: Arc<BlockchainStore>, available: &[Box<dyn Migration>]) 
     println!();
 
     if status.pending.is_empty() {
-        println!("⏸️  Pending Migrations: none");
+        println!("[PENDING] Pending Migrations: none");
     } else {
-        println!("⏸️  Pending Migrations ({}):", status.pending.len());
+        println!("[PENDING] Pending Migrations ({}):", status.pending.len());
         for version in &status.pending {
-            let migration = available.iter().find(|m| m.version() == version).unwrap();
+            let migration = available.iter().find(|m| m.version() == version).expect(
+                "Migration version found in pending list should exist in available migrations",
+            );
             println!("   - {} ({})", migration.version(), migration.description());
         }
     }
@@ -133,6 +141,7 @@ fn handle_up(store: Arc<BlockchainStore>, available: &[Box<dyn Migration>]) -> R
 fn handle_down(
     store: Arc<BlockchainStore>,
     count: usize,
+    yes: bool,
     available: &[Box<dyn Migration>],
 ) -> Result<()> {
     let runner = MigrationRunner::new(store.clone());
@@ -152,15 +161,17 @@ fn handle_down(
         println!("   - {} ({})", meta.version, meta.description);
     }
 
-    println!("\nProceed? [y/N]: ");
-    let mut input = String::new();
-    std::io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read user input from stdin");
+    if !yes {
+        println!("\nProceed? [y/N]: ");
+        let mut input = String::new();
+        std::io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read user input from stdin");
 
-    if input.trim().to_lowercase() != "y" {
-        println!("[CANCEL] Rollback cancelled\n");
-        return Ok(());
+        if input.trim().to_lowercase() != "y" {
+            println!("[CANCEL] Rollback cancelled\n");
+            return Ok(());
+        }
     }
 
     info!("Rolling back {} migration(s)...", to_rollback_count);
@@ -245,7 +256,7 @@ fn handle_reset(store: Arc<BlockchainStore>, confirm: bool) -> Result<()> {
 
     runner.reset()?;
 
-    println!("\n✅ Migration state reset (all migration records cleared)\n");
+    println!("\n[OK] Migration state reset (all migration records cleared)\n");
 
     Ok(())
 }
@@ -291,11 +302,20 @@ impl Migration for {} {{
     fn up(&self, store: &BlockchainStore) -> Result<()> {{
         // TODO: Implement migration up (apply schema changes)
         //
-        // Example:
-        // let db = store.db();
+        // IMPORTANT: Use a single WriteBatch for ALL RocksDB operations
+        // to ensure atomicity. If the migration fails, no partial state
+        // will be persisted.
+        //
+        // Example (GOOD - atomic):
+        // let db = store.get_db();
         // let mut batch = rocksdb::WriteBatch::default();
-        // batch.put(b"new:key", b"value");
-        // db.write(batch)?;
+        // batch.put(b"new:key1", b"value1");
+        // batch.put(b"new:key2", b"value2");
+        // db.write(batch)?; // Single atomic write
+        //
+        // Example (BAD - non-atomic):
+        // db.put(b"key1", b"value1")?; // Could succeed
+        // db.put(b"key2", b"value2")?; // Then fail, leaving partial state
 
         Ok(())
     }}
@@ -305,6 +325,8 @@ impl Migration for {} {{
         //
         // This MUST restore the database to its exact state before up() was called.
         // If down() is not implemented, the migration cannot be rolled back.
+        //
+        // Use a single WriteBatch for atomicity (same as up() method).
 
         Ok(())
     }}

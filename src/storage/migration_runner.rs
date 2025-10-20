@@ -46,6 +46,26 @@ impl MigrationRunner {
     ///
     /// Validates version format, executes the migration, and records metadata.
     /// If migration fails, the error is propagated but no state is saved.
+    ///
+    /// # Atomicity Requirements
+    ///
+    /// **CRITICAL**: Each migration's `up()` method MUST use a single `WriteBatch`
+    /// for all RocksDB operations. If a migration uses multiple `db.write()` calls,
+    /// partial state may persist on failure.
+    ///
+    /// Good (atomic):
+    /// ```ignore
+    /// let mut batch = WriteBatch::default();
+    /// batch.put(b"key1", b"value1");
+    /// batch.put(b"key2", b"value2");
+    /// db.write(batch)?; // Single atomic operation
+    /// ```
+    ///
+    /// Bad (non-atomic):
+    /// ```ignore
+    /// db.put(b"key1", b"value1")?; // Could succeed
+    /// db.put(b"key2", b"value2")?; // Then fail, leaving partial state
+    /// ```
     pub fn apply_migration(&self, migration: &dyn Migration) -> Result<()> {
         let version = migration.version();
         let description = migration.description();

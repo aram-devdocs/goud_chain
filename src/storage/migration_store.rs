@@ -101,6 +101,14 @@ impl<'a> MigrationStore<'a> {
     ///
     /// This removes the migration from applied list and updates current schema
     /// to the previous migration version (or empty if no migrations remain).
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is NOT thread-safe. It uses a read-then-write pattern that
+    /// could race if multiple processes call it simultaneously. This is acceptable
+    /// for the CLI use case (single-threaded) but should be documented.
+    ///
+    /// For production use, consider adding a migration lock mechanism.
     pub fn mark_unapplied(&self, version: &str) -> Result<()> {
         let key = format!("{}{}", MIGRATION_APPLIED_PREFIX, version);
         let db = self.store.get_db();

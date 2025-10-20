@@ -145,6 +145,10 @@ cargo run -- migrate up
 cargo run -- migrate down
 cargo run -- migrate down 3
 
+# Non-interactive rollback (for automation/CI)
+cargo run -- migrate down --yes
+cargo run -- migrate down 2 --yes
+
 # Create new migration template
 cargo run -- migrate create add_user_indexes
 
