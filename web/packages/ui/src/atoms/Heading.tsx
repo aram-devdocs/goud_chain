@@ -1,6 +1,6 @@
 /**
  * Heading Component
- * 
+ *
  * Semantic heading element with consistent typography
  * Supports all heading levels (h1-h6)
  */

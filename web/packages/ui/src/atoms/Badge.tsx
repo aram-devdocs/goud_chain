@@ -1,6 +1,6 @@
 /**
  * Badge Component
- * 
+ *
  * Small badge for displaying status, counts, or labels
  * Supports multiple color variants matching semantic colors
  */

@@ -1,6 +1,6 @@
 /**
  * Select Component
- * 
+ *
  * Dropdown select input with label support
  * Consistent styling matching design system
  */

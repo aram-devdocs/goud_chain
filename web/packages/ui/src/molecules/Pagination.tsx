@@ -1,6 +1,6 @@
 /**
  * Pagination Component
- * 
+ *
  * Navigation for paginated data
  * Displays current page and total pages with prev/next controls
  */

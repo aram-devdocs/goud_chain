@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useChainInfo, useMetrics, useListCollections } from '@goudchain/hooks'
-import { Card, CardHeader, CardTitle, CardContent, Button } from '@goudchain/ui'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  Button,
+  Stack,
+  Heading,
+  Text,
+} from '@goudchain/ui'
 import { ButtonVariant } from '@goudchain/types'
 
 export default function DebugPage() {
@@ -10,12 +19,12 @@ export default function DebugPage() {
   const { data: collections } = useListCollections()
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Debug</h2>
-        <p className="text-zinc-500">
+        <Heading level={2}>Debug</Heading>
+        <Text size="sm" color="zinc-500" className="mt-2">
           Development tools and raw data inspection
-        </p>
+        </Text>
       </div>
 
       <div className="flex gap-2">
@@ -91,6 +100,6 @@ export default function DebugPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   )
 }

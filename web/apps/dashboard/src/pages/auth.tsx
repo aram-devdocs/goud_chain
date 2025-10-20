@@ -5,10 +5,14 @@ import {
   Button,
   Input,
   Label,
+  Checkbox,
   Card,
   CardHeader,
   CardTitle,
   CardContent,
+  Stack,
+  ButtonGroup,
+  Text,
 } from '@goudchain/ui'
 import { ButtonVariant, ButtonSize } from '@goudchain/types'
 import { validateApiKey } from '@goudchain/utils'
@@ -117,7 +121,7 @@ export default function AuthPage() {
         </CardHeader>
         <CardContent>
           {/* Tab Selector */}
-          <div className="flex gap-2 mb-6">
+          <ButtonGroup direction="horizontal" spacing="tight" className="mb-6">
             <Button
               variant={
                 isLogin ? ButtonVariant.Primary : ButtonVariant.Secondary
@@ -144,7 +148,7 @@ export default function AuthPage() {
             >
               Create Account
             </Button>
-          </div>
+          </ButtonGroup>
 
           {/* Login Tab */}
           {isLogin ? (
@@ -238,23 +242,24 @@ export default function AuthPage() {
                   </div>
 
                   {/* Mandatory Confirmation Checkbox */}
-                  <div className="bg-zinc-900 border border-zinc-800 p-3 rounded-lg">
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-3">
+                      <Checkbox
+                        id="confirm-saved"
                         checked={apiKeyConfirmed}
                         onChange={(e) => setApiKeyConfirmed(e.target.checked)}
-                        className="mt-0.5 w-4 h-4"
+                        label={
+                          <span className="text-xs text-zinc-400">
+                            I have saved my API key. I understand that I{' '}
+                            <strong className="text-zinc-200">
+                              cannot recover my data without it
+                            </strong>
+                            .
+                          </span>
+                        }
                       />
-                      <span className="text-xs text-zinc-400">
-                        I have saved my API key. I understand that I{' '}
-                        <strong className="text-zinc-200">
-                          cannot recover my data without it
-                        </strong>
-                        .
-                      </span>
-                    </label>
-                  </div>
+                    </CardContent>
+                  </Card>
 
                   <Button
                     onClick={loginWithNewKey}

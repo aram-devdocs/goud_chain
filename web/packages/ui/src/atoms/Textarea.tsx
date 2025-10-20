@@ -1,6 +1,6 @@
 /**
  * Textarea Component
- * 
+ *
  * Multi-line text input with label support
  * Consistent styling matching design system
  */

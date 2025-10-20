@@ -1,6 +1,6 @@
 /**
  * ProgressBar Component
- * 
+ *
  * Visual progress indicator with percentage display
  * Supports different colors for different states
  */
@@ -51,7 +51,10 @@ export function ProgressBar({
       )}
       <div className="w-full bg-zinc-800 rounded-full h-2">
         <div
-          className={clsx('h-2 rounded-full transition-all', variantClasses[variant])}
+          className={clsx(
+            'h-2 rounded-full transition-all',
+            variantClasses[variant]
+          )}
           style={{ width: `${percentage}%` }}
           role="progressbar"
           aria-valuenow={value}

@@ -4,10 +4,17 @@ import {
   Button,
   Input,
   Label,
+  Select,
+  Textarea,
   Card,
   CardHeader,
   CardTitle,
   CardContent,
+  Stack,
+  Grid,
+  Heading,
+  EmptyState,
+  ButtonGroup,
 } from '@goudchain/ui'
 import { ButtonVariant, ButtonSize } from '@goudchain/types'
 import { encryptData } from '@goudchain/utils'
@@ -156,10 +163,10 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Submit Data</h2>
-        <p className="text-zinc-500">
+        <Heading level={2}>Submit Data</Heading>
+        <p className="text-zinc-500 mt-2">
           Encrypt and submit data to the blockchain
         </p>
       </div>
@@ -193,30 +200,32 @@ export default function SubmitPage() {
             {/* Mode Toggle */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-zinc-500">Mode:</span>
-              <Button
-                type="button"
-                variant={
-                  inputMode === 'form'
-                    ? ButtonVariant.Primary
-                    : ButtonVariant.Secondary
-                }
-                size={ButtonSize.Small}
-                onClick={() => switchMode('form')}
-              >
-                Form
-              </Button>
-              <Button
-                type="button"
-                variant={
-                  inputMode === 'json'
-                    ? ButtonVariant.Primary
-                    : ButtonVariant.Secondary
-                }
-                size={ButtonSize.Small}
-                onClick={() => switchMode('json')}
-              >
-                JSON
-              </Button>
+              <ButtonGroup direction="horizontal" spacing="tight">
+                <Button
+                  type="button"
+                  variant={
+                    inputMode === 'form'
+                      ? ButtonVariant.Primary
+                      : ButtonVariant.Secondary
+                  }
+                  size={ButtonSize.Small}
+                  onClick={() => switchMode('form')}
+                >
+                  Form
+                </Button>
+                <Button
+                  type="button"
+                  variant={
+                    inputMode === 'json'
+                      ? ButtonVariant.Primary
+                      : ButtonVariant.Secondary
+                  }
+                  size={ButtonSize.Small}
+                  onClick={() => switchMode('json')}
+                >
+                  JSON
+                </Button>
+              </ButtonGroup>
             </div>
 
             {/* Form Builder Mode */}
@@ -235,9 +244,10 @@ export default function SubmitPage() {
                 </div>
 
                 {formFields.length === 0 && (
-                  <div className="bg-zinc-800/50 rounded-lg p-6 text-center text-zinc-400 text-sm">
-                    No fields yet. Click "Add Field" to get started.
-                  </div>
+                  <EmptyState
+                    title="No fields yet"
+                    description='Click "Add Field" to get started.'
+                  />
                 )}
 
                 {formFields.map((field) => (
@@ -257,7 +267,7 @@ export default function SubmitPage() {
 
                       {/* Type Select */}
                       <div className="col-span-2">
-                        <select
+                        <Select
                           value={field.type}
                           onChange={(e) =>
                             updateField(field.id, {
@@ -266,12 +276,12 @@ export default function SubmitPage() {
                                 e.target.value === 'boolean' ? 'false' : '',
                             })
                           }
-                          className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+                          className="bg-zinc-700 border-zinc-600"
                         >
                           <option value="string">Text</option>
                           <option value="number">Number</option>
                           <option value="boolean">Boolean</option>
-                        </select>
+                        </Select>
                       </div>
 
                       {/* Value Input */}
@@ -287,28 +297,30 @@ export default function SubmitPage() {
                             className="bg-zinc-700 border-zinc-600"
                           />
                         ) : (
-                          <select
+                          <Select
                             value={String(field.value)}
                             onChange={(e) =>
                               updateField(field.id, { value: e.target.value })
                             }
-                            className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+                            className="bg-zinc-700 border-zinc-600"
                           >
                             <option value="true">true</option>
                             <option value="false">false</option>
-                          </select>
+                          </Select>
                         )}
                       </div>
 
                       {/* Remove Button */}
                       <div className="col-span-1 flex items-center justify-center">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => removeField(field.id)}
-                          className="text-red-400 hover:text-red-300 text-lg font-bold"
+                          variant={ButtonVariant.Danger}
+                          size={ButtonSize.Small}
+                          className="text-lg"
                         >
                           ×
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -322,13 +334,15 @@ export default function SubmitPage() {
                         <CardTitle className="text-xs text-zinc-400">
                           Preview
                         </CardTitle>
-                        <button
+                        <Button
                           type="button"
                           onClick={() => copyToClipboard(jsonPreview)}
+                          variant={ButtonVariant.Ghost}
+                          size={ButtonSize.Small}
                           className="text-xs text-blue-400 hover:text-blue-300"
                         >
                           Copy
-                        </button>
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -343,29 +357,23 @@ export default function SubmitPage() {
 
             {/* Raw JSON Mode */}
             {inputMode === 'json' && (
-              <div>
-                <Label htmlFor="jsonData">JSON Data</Label>
-                <textarea
-                  id="jsonData"
-                  value={jsonData}
-                  onChange={(e) => setJsonData(e.target.value)}
-                  placeholder='{"key": "value", "another": 42}'
-                  rows={12}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white focus:border-white mt-1 font-mono text-sm"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-zinc-500">
-                    Enter any valid JSON object
-                  </p>
-                  {jsonData && (
-                    <span
-                      className={`text-xs ${jsonValid ? 'text-green-400' : 'text-red-400'}`}
-                    >
-                      {jsonValid ? 'Valid JSON' : 'Invalid JSON'}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <Textarea
+                id="jsonData"
+                label="JSON Data"
+                value={jsonData}
+                onChange={(e) => setJsonData(e.target.value)}
+                placeholder='{"key": "value", "another": 42}'
+                rows={12}
+                fullWidth
+                helperText={
+                  jsonData
+                    ? jsonValid
+                      ? 'Valid JSON format'
+                      : 'Invalid JSON - check syntax'
+                    : 'Enter any valid JSON object'
+                }
+                className="font-mono text-sm"
+              />
             )}
 
             {/* Submit Button */}
@@ -379,6 +387,6 @@ export default function SubmitPage() {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </Stack>
   )
 }

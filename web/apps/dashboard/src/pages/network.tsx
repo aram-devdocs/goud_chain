@@ -12,6 +12,9 @@ import {
   PeerConnectivityTable,
   NetworkActions,
   Spinner,
+  Stack,
+  Heading,
+  Text,
   type NetworkHealth,
   type NodeStats,
   type PeerInfo,
@@ -153,12 +156,12 @@ export default function NetworkPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <Stack direction="vertical" spacing={6}>
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Network Status</h2>
-        <p className="text-zinc-500">
+        <Heading level={2}>Network Status</Heading>
+        <Text size="sm" color="zinc-500" className="mt-2">
           P2P network health and peer connectivity
-        </p>
+        </Text>
       </div>
 
       {/* Network Health Overview */}
@@ -182,6 +185,6 @@ export default function NetworkPage() {
         isSyncing={syncMutation.isPending}
         isRefreshing={isRefreshing}
       />
-    </div>
+    </Stack>
   )
 }

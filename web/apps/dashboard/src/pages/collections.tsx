@@ -4,6 +4,10 @@ import {
   TableToolbar,
   CollectionsTable,
   Spinner,
+  Stack,
+  Heading,
+  Text,
+  EmptyState,
   type SortOption,
 } from '@goudchain/ui'
 import { SpinnerSize } from '@goudchain/types'
@@ -172,22 +176,19 @@ export default function CollectionsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-2">
-            My Encrypted Collections
-          </h2>
-          <p className="text-zinc-500">Your encrypted data collections</p>
-        </div>
+    <Stack direction="vertical" spacing={6}>
+      <div>
+        <Heading level={2}>My Encrypted Collections</Heading>
+        <Text size="sm" color="zinc-500" className="mt-2">
+          Your encrypted data collections
+        </Text>
       </div>
 
       {!data?.collections || data.collections.length === 0 ? (
-        <div className="bg-zinc-900 rounded-lg p-12 text-center border border-zinc-800">
-          <p className="text-zinc-500">
-            No collections yet. Submit some data to get started!
-          </p>
-        </div>
+        <EmptyState
+          title="No collections yet"
+          description="Submit some data to get started!"
+        />
       ) : (
         <>
           <TableToolbar
@@ -217,6 +218,6 @@ export default function CollectionsPage() {
           />
         </>
       )}
-    </div>
+    </Stack>
   )
 }

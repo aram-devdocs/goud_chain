@@ -1,6 +1,6 @@
 /**
  * Text Component
- * 
+ *
  * Semantic text element with consistent typography
  * Supports different sizes and colors
  */

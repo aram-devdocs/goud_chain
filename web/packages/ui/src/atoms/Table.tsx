@@ -1,6 +1,6 @@
 /**
  * Table Components
- * 
+ *
  * Semantic table elements with consistent styling
  * Includes Table, Thead, Tbody, Tr, Th, Td
  */

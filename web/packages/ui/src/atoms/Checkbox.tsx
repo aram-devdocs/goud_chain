@@ -1,6 +1,6 @@
 /**
  * Checkbox Component
- * 
+ *
  * Checkbox input with label support
  * Consistent styling matching design system
  */
@@ -10,8 +10,8 @@ import { clsx } from 'clsx'
 
 export interface CheckboxProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  /** Label text */
-  label?: string
+  /** Label text or element */
+  label?: React.ReactNode
   /** Error message */
   error?: string
   /** Helper text */

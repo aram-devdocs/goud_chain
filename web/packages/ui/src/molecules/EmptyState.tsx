@@ -1,6 +1,6 @@
 /**
  * EmptyState Component
- * 
+ *
  * Display when no data is available
  * Actionable with optional button
  */

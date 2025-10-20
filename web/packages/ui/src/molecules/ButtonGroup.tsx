@@ -1,6 +1,6 @@
 /**
  * ButtonGroup Component
- * 
+ *
  * Group of buttons with consistent spacing
  * Supports horizontal and vertical layouts
  */
