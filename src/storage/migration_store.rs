@@ -70,22 +70,6 @@ impl<'a> MigrationStore<'a> {
         }
     }
 
-    /// Get metadata for a specific migration
-    #[allow(dead_code)]
-    pub fn get_migration(&self, version: &str) -> Result<Option<MigrationMetadata>> {
-        let key = format!("{}{}", MIGRATION_APPLIED_PREFIX, version);
-        let db = self.store.get_db();
-
-        match db.get(key.as_bytes()) {
-            Ok(Some(bytes)) => {
-                let metadata: MigrationMetadata = bincode::deserialize(&bytes)
-                    .map_err(|e| GoudChainError::DeserializationError(e.to_string()))?;
-                Ok(Some(metadata))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(GoudChainError::RocksDbError(e.to_string())),
-        }
-    }
 
     /// Mark a migration as applied (atomic operation)
     ///
@@ -226,11 +210,12 @@ mod tests {
         // Verify it's applied
         assert!(migration_store.is_applied("20240101120000").unwrap());
 
-        // Get metadata
-        let retrieved = migration_store
-            .get_migration("20240101120000")
-            .unwrap()
-            .unwrap();
+        // Get metadata from applied migrations list
+        let applied = migration_store.get_applied_migrations().unwrap();
+        let retrieved = applied
+            .iter()
+            .find(|m| m.version == "20240101120000")
+            .expect("Migration should be in applied list");
         assert_eq!(retrieved.version, metadata.version);
         assert_eq!(retrieved.description, metadata.description);
     }

@@ -114,11 +114,12 @@ fn handle_up(store: Arc<BlockchainStore>, available: &[Box<dyn Migration>]) -> R
     let (count, versions) = runner.apply_pending(available)?;
 
     if count == 0 {
-        println!("\n✅ No pending migrations to apply\n");
+        println!("\n[OK] No pending migrations to apply\n");
     } else {
-        println!("\n✅ Successfully applied {} migration(s):", count);
+        println!("\n[OK] Successfully applied {} migration(s):", count);
         for version in versions {
-            let migration = available.iter().find(|m| m.version() == version).unwrap();
+            let migration = available.iter().find(|m| m.version() == version)
+                .expect("Migration version in applied list should exist in available migrations");
             println!("   - {} ({})", version, migration.description());
         }
         println!();
@@ -137,24 +138,25 @@ fn handle_down(
     let applied = migration_store.get_applied_migrations()?;
 
     if applied.is_empty() {
-        println!("\n⚠️  No migrations to rollback\n");
+        println!("\n[WARN] No migrations to rollback\n");
         return Ok(());
     }
 
     let to_rollback_count = count.min(applied.len());
     let to_rollback: Vec<_> = applied.iter().rev().take(to_rollback_count).collect();
 
-    println!("\n⚠️  Rolling back {} migration(s):", to_rollback_count);
+    println!("\n[WARN] Rolling back {} migration(s):", to_rollback_count);
     for meta in &to_rollback {
         println!("   - {} ({})", meta.version, meta.description);
     }
 
     println!("\nProceed? [y/N]: ");
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
+    std::io::stdin().read_line(&mut input)
+        .expect("Failed to read user input from stdin");
 
     if input.trim().to_lowercase() != "y" {
-        println!("❌ Rollback cancelled\n");
+        println!("[CANCEL] Rollback cancelled\n");
         return Ok(());
     }
 
@@ -163,7 +165,7 @@ fn handle_down(
     let rolled_back = runner.rollback_last(count, available)?;
 
     println!(
-        "\n✅ Successfully rolled back {} migration(s)\n",
+        "\n[OK] Successfully rolled back {} migration(s)\n",
         rolled_back
     );
 
@@ -197,7 +199,7 @@ fn handle_create(description: &str) -> Result<()> {
     }
 
     // Generate migration filename
-    let filename = format!("{}_{}. rs", version, description);
+    let filename = format!("{}_{}.rs", version, description);
     let filepath = migrations_dir.join(&filename);
 
     if filepath.exists() {
@@ -215,10 +217,10 @@ fn handle_create(description: &str) -> Result<()> {
         ))
     })?;
 
-    println!("\n✅ Created migration: {}\n", filepath.display());
+    println!("\n[OK] Created migration: {}\n", filepath.display());
     println!("Next steps:");
     println!("  1. Implement up() and down() methods in {}", filename);
-    println!("  2. Register migration in src/migrations/mod.rs");
+    println!("  2. Register migration in src/migrations/mod.rs and src/main.rs");
     println!("  3. Run `cargo run -- migrate up` to apply\n");
 
     Ok(())
@@ -269,8 +271,7 @@ fn generate_migration_template(version: &str, description: &str) -> String {
 //! Safety: This migration has direct RocksDB access and runs with full privileges.
 //! Ensure all operations are idempotent and can be safely rolled back.
 
-use crate::domain::Migration;
-use crate::storage::BlockchainStore;
+use crate::storage::{{BlockchainStore, Migration}};
 use crate::types::Result;
 
 pub struct {};
