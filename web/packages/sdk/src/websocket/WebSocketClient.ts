@@ -1,6 +1,6 @@
 /**
  * WebSocket client for real-time Goud Chain blockchain events.
- * 
+ *
  * Features:
  * - Auto-reconnect with exponential backoff
  * - Typed event handlers
@@ -13,45 +13,45 @@ export type EventType =
   | 'collection_update'
   | 'peer_update'
   | 'audit_log_update'
-  | 'metrics_update';
+  | 'metrics_update'
 
 export interface WebSocketMessage {
-  type: 'event' | 'pong' | 'subscribed' | 'unsubscribed' | 'error';
-  event?: EventType;
-  data?: any;
-  message?: string;
+  type: 'event' | 'pong' | 'subscribed' | 'unsubscribed' | 'error'
+  event?: EventType
+  data?: any
+  message?: string
 }
 
-export type EventHandler<T = any> = (event: T) => void;
+export type EventHandler<T = any> = (event: T) => void
 
 interface SubscriptionHandlers {
-  [eventType: string]: Set<EventHandler>;
+  [eventType: string]: Set<EventHandler>
 }
 
 /**
  * WebSocket client for Goud Chain real-time updates.
  */
 export class WebSocketClient {
-  private ws: WebSocket | null = null;
-  private wsUrl: string;
-  private apiKey: string | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private reconnectTimer: NodeJS.Timeout | null = null;
-  private pingInterval: NodeJS.Timeout | null = null;
-  private subscriptions: SubscriptionHandlers = {};
-  private pendingSubscriptions: Set<EventType> = new Set();
-  private isManualDisconnect = false;
+  private ws: WebSocket | null = null
+  private wsUrl: string
+  private apiKey: string | null = null
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 10
+  private reconnectTimer: NodeJS.Timeout | null = null
+  private pingInterval: NodeJS.Timeout | null = null
+  private subscriptions: SubscriptionHandlers = {}
+  private pendingSubscriptions: Set<EventType> = new Set()
+  private isManualDisconnect = false
 
   constructor(wsUrl: string) {
-    this.wsUrl = wsUrl;
+    this.wsUrl = wsUrl
   }
 
   /**
    * Sets the API key for WebSocket authentication.
    */
   setApiKey(apiKey: string | null): void {
-    this.apiKey = apiKey;
+    this.apiKey = apiKey
   }
 
   /**
@@ -59,29 +59,29 @@ export class WebSocketClient {
    */
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
-      return;
+      console.log('WebSocket already connected')
+      return
     }
 
     if (!this.apiKey) {
-      console.error('Cannot connect: API key not set');
-      return;
+      console.error('Cannot connect: API key not set')
+      return
     }
 
-    this.isManualDisconnect = false;
+    this.isManualDisconnect = false
 
     try {
       // Authenticate via query parameter
-      const url = `${this.wsUrl}/ws?token=${encodeURIComponent(this.apiKey)}`;
-      this.ws = new WebSocket(url);
+      const url = `${this.wsUrl}/ws?token=${encodeURIComponent(this.apiKey)}`
+      this.ws = new WebSocket(url)
 
-      this.ws.onopen = this.handleOpen.bind(this);
-      this.ws.onmessage = this.handleMessage.bind(this);
-      this.ws.onerror = this.handleError.bind(this);
-      this.ws.onclose = this.handleClose.bind(this);
+      this.ws.onopen = this.handleOpen.bind(this)
+      this.ws.onmessage = this.handleMessage.bind(this)
+      this.ws.onerror = this.handleError.bind(this)
+      this.ws.onclose = this.handleClose.bind(this)
     } catch (error) {
-      console.error('WebSocket connection error:', error);
-      this.scheduleReconnect();
+      console.error('WebSocket connection error:', error)
+      this.scheduleReconnect()
     }
   }
 
@@ -89,22 +89,22 @@ export class WebSocketClient {
    * Disconnects from the WebSocket server.
    */
   disconnect(): void {
-    this.isManualDisconnect = true;
-    this.reconnectAttempts = 0;
+    this.isManualDisconnect = true
+    this.reconnectAttempts = 0
 
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
 
     if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
     }
 
     if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+      this.ws.close()
+      this.ws = null
     }
   }
 
@@ -113,17 +113,17 @@ export class WebSocketClient {
    */
   subscribe<T = any>(eventType: EventType, handler: EventHandler<T>): void {
     if (!this.subscriptions[eventType]) {
-      this.subscriptions[eventType] = new Set();
+      this.subscriptions[eventType] = new Set()
     }
 
-    this.subscriptions[eventType].add(handler);
+    this.subscriptions[eventType].add(handler)
 
     // If connected, send subscription message immediately
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.sendSubscribeMessage(eventType);
+      this.sendSubscribeMessage(eventType)
     } else {
       // Queue for when connection is established
-      this.pendingSubscriptions.add(eventType);
+      this.pendingSubscriptions.add(eventType)
     }
   }
 
@@ -132,15 +132,15 @@ export class WebSocketClient {
    */
   unsubscribe<T = any>(eventType: EventType, handler: EventHandler<T>): void {
     if (this.subscriptions[eventType]) {
-      this.subscriptions[eventType].delete(handler);
+      this.subscriptions[eventType].delete(handler)
 
       // If no more handlers for this event, unsubscribe on server
       if (
         this.subscriptions[eventType].size === 0 &&
         this.ws?.readyState === WebSocket.OPEN
       ) {
-        this.sendUnsubscribeMessage(eventType);
-        delete this.subscriptions[eventType];
+        this.sendUnsubscribeMessage(eventType)
+        delete this.subscriptions[eventType]
       }
     }
   }
@@ -149,23 +149,23 @@ export class WebSocketClient {
    * Handles WebSocket open event.
    */
   private handleOpen(): void {
-    console.log('WebSocket connected');
-    this.reconnectAttempts = 0;
+    console.log('WebSocket connected')
+    this.reconnectAttempts = 0
 
     // Start ping interval (keep-alive)
     this.pingInterval = setInterval(() => {
-      this.sendPing();
-    }, 30000); // 30 seconds
+      this.sendPing()
+    }, 30000) // 30 seconds
 
     // Resubscribe to pending subscriptions
     for (const eventType of this.pendingSubscriptions) {
-      this.sendSubscribeMessage(eventType);
+      this.sendSubscribeMessage(eventType)
     }
-    this.pendingSubscriptions.clear();
+    this.pendingSubscriptions.clear()
 
     // Resubscribe to existing subscriptions
     for (const eventType of Object.keys(this.subscriptions)) {
-      this.sendSubscribeMessage(eventType as EventType);
+      this.sendSubscribeMessage(eventType as EventType)
     }
   }
 
@@ -174,29 +174,29 @@ export class WebSocketClient {
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      const message: WebSocketMessage = JSON.parse(event.data);
+      const message: WebSocketMessage = JSON.parse(event.data)
 
       switch (message.type) {
         case 'event':
-          this.handleEventMessage(message);
-          break;
+          this.handleEventMessage(message)
+          break
         case 'pong':
           // Pong received, connection is alive
-          break;
+          break
         case 'subscribed':
-          console.log(`Subscribed to ${message.event}`);
-          break;
+          console.log(`Subscribed to ${message.event}`)
+          break
         case 'unsubscribed':
-          console.log(`Unsubscribed from ${message.event}`);
-          break;
+          console.log(`Unsubscribed from ${message.event}`)
+          break
         case 'error':
-          console.error('WebSocket error:', message.message);
-          break;
+          console.error('WebSocket error:', message.message)
+          break
         default:
-          console.warn('Unknown message type:', message.type);
+          console.warn('Unknown message type:', message.type)
       }
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
+      console.error('Failed to parse WebSocket message:', error)
     }
   }
 
@@ -204,15 +204,15 @@ export class WebSocketClient {
    * Handles event messages from server.
    */
   private handleEventMessage(message: WebSocketMessage): void {
-    if (!message.event) return;
+    if (!message.event) return
 
-    const handlers = this.subscriptions[message.event];
+    const handlers = this.subscriptions[message.event]
     if (handlers) {
       for (const handler of handlers) {
         try {
-          handler(message.data);
+          handler(message.data)
         } catch (error) {
-          console.error('Event handler error:', error);
+          console.error('Event handler error:', error)
         }
       }
     }
@@ -222,23 +222,23 @@ export class WebSocketClient {
    * Handles WebSocket error event.
    */
   private handleError(event: Event): void {
-    console.error('WebSocket error:', event);
+    console.error('WebSocket error:', event)
   }
 
   /**
    * Handles WebSocket close event.
    */
   private handleClose(event: CloseEvent): void {
-    console.log('WebSocket disconnected:', event.code, event.reason);
+    console.log('WebSocket disconnected:', event.code, event.reason)
 
     if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
     }
 
     // Reconnect unless manually disconnected
     if (!this.isManualDisconnect) {
-      this.scheduleReconnect();
+      this.scheduleReconnect()
     }
   }
 
@@ -247,19 +247,21 @@ export class WebSocketClient {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
-      return;
+      console.error('Max reconnection attempts reached')
+      return
     }
 
     // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+    this.reconnectAttempts++
 
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    console.log(
+      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+    )
 
     this.reconnectTimer = setTimeout(() => {
-      this.connect();
-    }, delay);
+      this.connect()
+    }, delay)
   }
 
   /**
@@ -269,7 +271,7 @@ export class WebSocketClient {
     this.sendMessage({
       type: 'subscribe',
       event: eventType,
-    });
+    })
   }
 
   /**
@@ -279,14 +281,14 @@ export class WebSocketClient {
     this.sendMessage({
       type: 'unsubscribe',
       event: eventType,
-    });
+    })
   }
 
   /**
    * Sends a ping message to keep connection alive.
    */
   private sendPing(): void {
-    this.sendMessage({ type: 'ping' });
+    this.sendMessage({ type: 'ping' })
   }
 
   /**
@@ -294,7 +296,7 @@ export class WebSocketClient {
    */
   private sendMessage(message: any): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+      this.ws.send(JSON.stringify(message))
     }
   }
 
@@ -302,13 +304,13 @@ export class WebSocketClient {
    * Checks if WebSocket is connected.
    */
   isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.ws?.readyState === WebSocket.OPEN
   }
 
   /**
    * Gets current subscription count.
    */
   getSubscriptionCount(): number {
-    return Object.keys(this.subscriptions).length;
+    return Object.keys(this.subscriptions).length
   }
 }

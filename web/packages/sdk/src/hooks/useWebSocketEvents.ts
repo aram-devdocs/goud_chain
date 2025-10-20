@@ -2,24 +2,24 @@
  * React hook for subscribing to WebSocket events.
  */
 
-import { useEffect } from 'react';
-import { useGoudChain } from './useGoudChain';
-import type { EventType, EventHandler } from '../websocket';
+import { useEffect } from 'react'
+import { useGoudChain } from './useGoudChain'
+import type { EventType, EventHandler } from '../websocket'
 
 export interface UseWebSocketEventsOptions<T = any> {
   /** Event type to subscribe to */
-  eventType: EventType;
+  eventType: EventType
   /** Event handler callback */
-  onEvent: EventHandler<T>;
+  onEvent: EventHandler<T>
   /** Whether to automatically connect (default: true) */
-  autoConnect?: boolean;
+  autoConnect?: boolean
   /** Whether the subscription is enabled (default: true) */
-  enabled?: boolean;
+  enabled?: boolean
 }
 
 /**
  * Hook for subscribing to WebSocket events with automatic cleanup.
- * 
+ *
  * @example
  * ```typescript
  * useWebSocketEvents({
@@ -34,22 +34,22 @@ export function useWebSocketEvents<T = any>({
   autoConnect = true,
   enabled = true,
 }: UseWebSocketEventsOptions<T>): void {
-  const sdk = useGoudChain();
+  const sdk = useGoudChain()
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return
 
     // Connect to WebSocket if not already connected
     if (autoConnect && !sdk.ws.isConnected()) {
-      sdk.ws.connect();
+      sdk.ws.connect()
     }
 
     // Subscribe to event
-    sdk.ws.subscribe(eventType, onEvent);
+    sdk.ws.subscribe(eventType, onEvent)
 
     // Cleanup: unsubscribe on unmount
     return () => {
-      sdk.ws.unsubscribe(eventType, onEvent);
-    };
-  }, [sdk, eventType, onEvent, autoConnect, enabled]);
+      sdk.ws.unsubscribe(eventType, onEvent)
+    }
+  }, [sdk, eventType, onEvent, autoConnect, enabled])
 }

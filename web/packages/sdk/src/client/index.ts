@@ -1,4 +1,4 @@
-export { GoudChain } from './GoudChain';
+export { GoudChain } from './GoudChain'
 export type {
   GoudChainConfig,
   CreateAccountRequest,
@@ -7,4 +7,4 @@ export type {
   SubmitDataResponse,
   CollectionListItem,
   DecryptCollectionResponse,
-} from './GoudChain';
+} from './GoudChain'

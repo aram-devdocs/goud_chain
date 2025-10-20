@@ -73,7 +73,7 @@
         "operationId": "submitData",
         "summary": "Submit encrypted data",
         "tags": ["Data Operations"],
-        "security": [{"api_key": []}],
+        "security": [{ "api_key": [] }],
         "requestBody": {
           "content": {
             "application/json": {
@@ -102,7 +102,7 @@
         "operationId": "listCollections",
         "summary": "List collections",
         "tags": ["Data Operations"],
-        "security": [{"bearer_token": []}],
+        "security": [{ "bearer_token": [] }],
         "responses": {
           "200": {
             "description": "Collections list",
@@ -122,7 +122,7 @@
         "operationId": "decryptCollection",
         "summary": "Decrypt collection",
         "tags": ["Data Operations"],
-        "security": [{"bearer_token": []}],
+        "security": [{ "bearer_token": [] }],
         "parameters": [
           {
             "name": "id",
@@ -307,7 +307,13 @@
       },
       "HealthCheckResponse": {
         "type": "object",
-        "required": ["status", "node_id", "chain_length", "peer_count", "latest_block"],
+        "required": [
+          "status",
+          "node_id",
+          "chain_length",
+          "peer_count",
+          "latest_block"
+        ],
         "properties": {
           "status": {
             "type": "string"

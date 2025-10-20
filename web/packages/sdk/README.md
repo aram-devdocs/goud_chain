@@ -22,35 +22,35 @@ pnpm install @goudchain/sdk
 ### Basic Setup
 
 ```typescript
-import { GoudChain } from '@goudchain/sdk';
+import { GoudChain } from '@goudchain/sdk'
 
 // Initialize SDK
 const sdk = new GoudChain({
   baseUrl: 'http://localhost:8080',
   wsUrl: 'ws://localhost:8080',
-});
+})
 
 // Create account
-const account = await sdk.auth.createAccount({ 
-  metadata: { username: 'alice' } 
-});
-console.log('Save this API key:', account.api_key);
+const account = await sdk.auth.createAccount({
+  metadata: { username: 'alice' },
+})
+console.log('Save this API key:', account.api_key)
 
 // Login with API key
-await sdk.auth.login(account.api_key);
+await sdk.auth.login(account.api_key)
 
 // Submit encrypted data
 const result = await sdk.data.submit({
   label: 'medical-records',
   data: JSON.stringify({ diagnosis: 'healthy' }),
-});
+})
 
 // List collections
-const collections = await sdk.data.listCollections();
+const collections = await sdk.data.listCollections()
 
 // Decrypt collection
-const decrypted = await sdk.data.decrypt(collections[0].collection_id);
-console.log('Decrypted data:', decrypted.data);
+const decrypted = await sdk.data.decrypt(collections[0].collection_id)
+console.log('Decrypted data:', decrypted.data)
 ```
 
 ### React with TanStack Query
@@ -80,15 +80,15 @@ function MyComponent() {
 
 ```typescript
 // Connect to WebSocket
-sdk.ws.connect();
+sdk.ws.connect()
 
 // Subscribe to blockchain updates
 sdk.ws.subscribe('blockchain_update', (event) => {
-  console.log('New block:', event.data);
-});
+  console.log('New block:', event.data)
+})
 
 // Disconnect when done
-sdk.ws.disconnect();
+sdk.ws.disconnect()
 ```
 
 ## Development

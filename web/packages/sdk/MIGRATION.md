@@ -22,9 +22,9 @@ The SDK is already available in the monorepo as `@goudchain/sdk`.
 
 ```tsx
 // apps/dashboard/src/providers/SDKProvider.tsx
-import { GoudChain, GoudChainProvider } from '@goudchain/sdk';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, useMemo } from 'react';
+import { GoudChain, GoudChainProvider } from '@goudchain/sdk'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactNode, useMemo } from 'react'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
       retry: 2,
     },
   },
-});
+})
 
 export function SDKProvider({ children }: { children: ReactNode }) {
   const sdk = useMemo(
@@ -43,13 +43,13 @@ export function SDKProvider({ children }: { children: ReactNode }) {
         wsUrl: 'ws://localhost:8080',
       }),
     []
-  );
+  )
 
   return (
     <QueryClientProvider client={queryClient}>
       <GoudChainProvider value={sdk}>{children}</GoudChainProvider>
     </QueryClientProvider>
-  );
+  )
 }
 ```
 
@@ -57,14 +57,10 @@ export function SDKProvider({ children }: { children: ReactNode }) {
 
 ```tsx
 // apps/dashboard/src/App.tsx
-import { SDKProvider } from './providers/SDKProvider';
+import { SDKProvider } from './providers/SDKProvider'
 
 function App() {
-  return (
-    <SDKProvider>
-      {/* Your app components */}
-    </SDKProvider>
-  );
+  return <SDKProvider>{/* Your app components */}</SDKProvider>
 }
 ```
 
@@ -73,90 +69,95 @@ function App() {
 ### Authentication
 
 **Before (using `useAuth` hook):**
+
 ```tsx
-import { useAuth } from '@goudchain/hooks';
+import { useAuth } from '@goudchain/hooks'
 
 function LoginComponent() {
-  const { login, logout, isAuthenticated } = useAuth();
+  const { login, logout, isAuthenticated } = useAuth()
 
   const handleLogin = async (apiKey: string) => {
     const response = await fetch('/api/account/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: apiKey }),
-    });
-    const data = await response.json();
-    login(data);
-  };
+    })
+    const data = await response.json()
+    login(data)
+  }
 }
 ```
 
 **After (using SDK):**
+
 ```tsx
-import { useGoudChain } from '@goudchain/sdk';
+import { useGoudChain } from '@goudchain/sdk'
 
 function LoginComponent() {
-  const sdk = useGoudChain();
+  const sdk = useGoudChain()
 
   const handleLogin = async (apiKey: string) => {
-    await sdk.auth.login(apiKey);
-  };
+    await sdk.auth.login(apiKey)
+  }
 
   const handleLogout = () => {
-    sdk.auth.logout();
-  };
+    sdk.auth.logout()
+  }
 
-  const isAuthenticated = sdk.auth.isAuthenticated();
+  const isAuthenticated = sdk.auth.isAuthenticated()
 }
 ```
 
 ### Data Submission
 
 **Before (using `useSubmitData` hook):**
+
 ```tsx
-import { useSubmitData } from '@goudchain/hooks';
-import { encryptData } from '@goudchain/utils';
+import { useSubmitData } from '@goudchain/hooks'
+import { encryptData } from '@goudchain/utils'
 
 function SubmitForm() {
-  const submitData = useSubmitData();
+  const submitData = useSubmitData()
 
   const handleSubmit = async (label: string, data: string) => {
-    const apiKey = localStorage.getItem('api_key');
-    const encrypted = await encryptData(data, apiKey);
-    
+    const apiKey = localStorage.getItem('api_key')
+    const encrypted = await encryptData(data, apiKey)
+
     await submitData.mutateAsync({
       label,
       data: encrypted,
-    });
-  };
+    })
+  }
 }
 ```
 
 **After (using SDK - encryption handled automatically):**
+
 ```tsx
-import { useSubmitData } from '@goudchain/sdk';
+import { useSubmitData } from '@goudchain/sdk'
 
 function SubmitForm() {
-  const submitData = useSubmitData();
+  const submitData = useSubmitData()
 
   const handleSubmit = async (label: string, data: string) => {
     // Encryption is handled automatically by the SDK
-    await submitData.mutateAsync({ label, data });
-  };
+    await submitData.mutateAsync({ label, data })
+  }
 }
 ```
 
 ### List Collections
 
 **Before:**
+
 ```tsx
-import { useListCollections } from '@goudchain/hooks';
+import { useListCollections } from '@goudchain/hooks'
 
 function CollectionsList() {
-  const { data: collections, isLoading, error } = useListCollections();
+  const { data: collections, isLoading, error } = useListCollections()
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
 
   return (
     <ul>
@@ -164,19 +165,20 @@ function CollectionsList() {
         <li key={c.collection_id}>{c.label}</li>
       ))}
     </ul>
-  );
+  )
 }
 ```
 
 **After (same API, but with automatic caching and invalidation):**
+
 ```tsx
-import { useListCollections } from '@goudchain/sdk';
+import { useListCollections } from '@goudchain/sdk'
 
 function CollectionsList() {
-  const { data: collections, isLoading, error } = useListCollections();
+  const { data: collections, isLoading, error } = useListCollections()
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
 
   return (
     <ul>
@@ -184,72 +186,76 @@ function CollectionsList() {
         <li key={c.collection_id}>{c.label}</li>
       ))}
     </ul>
-  );
+  )
 }
 ```
 
 ### Decrypt Collection
 
 **Before:**
+
 ```tsx
-import { useDecryptData } from '@goudchain/hooks';
-import { decryptData } from '@goudchain/utils';
+import { useDecryptData } from '@goudchain/hooks'
+import { decryptData } from '@goudchain/utils'
 
 function CollectionDetails({ collectionId }: { collectionId: string }) {
-  const { data, decrypt } = useDecryptData();
+  const { data, decrypt } = useDecryptData()
 
   const handleDecrypt = async () => {
-    const apiKey = localStorage.getItem('api_key');
-    const encrypted = await decrypt(collectionId);
-    const decrypted = await decryptData(encrypted.data, apiKey);
-    return decrypted;
-  };
+    const apiKey = localStorage.getItem('api_key')
+    const encrypted = await decrypt(collectionId)
+    const decrypted = await decryptData(encrypted.data, apiKey)
+    return decrypted
+  }
 }
 ```
 
 **After:**
+
 ```tsx
-import { useDecryptCollection } from '@goudchain/sdk';
+import { useDecryptCollection } from '@goudchain/sdk'
 
 function CollectionDetails({ collectionId }: { collectionId: string }) {
-  const { data, isLoading } = useDecryptCollection(collectionId);
+  const { data, isLoading } = useDecryptCollection(collectionId)
 
-  if (isLoading) return <div>Decrypting...</div>;
+  if (isLoading) return <div>Decrypting...</div>
 
-  return <div>{data?.data}</div>;
+  return <div>{data?.data}</div>
 }
 ```
 
 ### WebSocket Events
 
 **Before:**
+
 ```tsx
-import { useWebSocket } from '@goudchain/hooks';
+import { useWebSocket } from '@goudchain/hooks'
 
 function BlockchainUpdates() {
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useWebSocket()
 
   useEffect(() => {
     const unsubscribe = subscribe('blockchain_update', (data) => {
-      console.log('New block:', data);
-    });
+      console.log('New block:', data)
+    })
 
-    return unsubscribe;
-  }, [subscribe]);
+    return unsubscribe
+  }, [subscribe])
 }
 ```
 
 **After:**
+
 ```tsx
-import { useWebSocketEvents } from '@goudchain/sdk';
+import { useWebSocketEvents } from '@goudchain/sdk'
 
 function BlockchainUpdates() {
   useWebSocketEvents({
     eventType: 'blockchain_update',
     onEvent: (data) => {
-      console.log('New block:', data);
+      console.log('New block:', data)
     },
-  });
+  })
 }
 ```
 
@@ -276,10 +282,14 @@ The SDK manages both API keys and session tokens:
 The SDK provides typed error classes:
 
 ```tsx
-import { AuthenticationError, EncryptionError, NetworkError } from '@goudchain/sdk';
+import {
+  AuthenticationError,
+  EncryptionError,
+  NetworkError,
+} from '@goudchain/sdk'
 
 try {
-  await sdk.data.submit({ label: 'test', data: 'hello' });
+  await sdk.data.submit({ label: 'test', data: 'hello' })
 } catch (error) {
   if (error instanceof AuthenticationError) {
     // Handle authentication error

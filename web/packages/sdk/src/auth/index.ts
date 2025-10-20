@@ -1,2 +1,2 @@
-export { AuthManager } from './AuthManager';
-export type { AuthState, LoginResponse } from './AuthManager';
+export { AuthManager } from './AuthManager'
+export type { AuthState, LoginResponse } from './AuthManager'

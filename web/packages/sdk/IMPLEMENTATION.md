@@ -161,10 +161,12 @@ web/packages/sdk/
 ### Dependencies
 
 **Runtime Dependencies:**
+
 - `@hey-api/client-fetch` - Fetch client for OpenAPI
 - `@tanstack/react-query` - Data fetching and caching
 
 **Development Dependencies:**
+
 - `@hey-api/openapi-ts` - OpenAPI code generation
 - `@types/node` - Node.js type definitions
 - `@types/react` - React type definitions

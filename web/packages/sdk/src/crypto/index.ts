@@ -1,2 +1,2 @@
-export { encryptData, decryptData, isValidApiKey } from './encryption';
-export type { EncryptedPayload } from './encryption';
+export { encryptData, decryptData, isValidApiKey } from './encryption'
+export type { EncryptedPayload } from './encryption'
