@@ -70,7 +70,6 @@ impl<'a> MigrationStore<'a> {
         }
     }
 
-
     /// Mark a migration as applied (atomic operation)
     ///
     /// Uses WriteBatch to atomically update both migration metadata and current schema.

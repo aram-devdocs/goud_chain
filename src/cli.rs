@@ -118,7 +118,9 @@ fn handle_up(store: Arc<BlockchainStore>, available: &[Box<dyn Migration>]) -> R
     } else {
         println!("\n[OK] Successfully applied {} migration(s):", count);
         for version in versions {
-            let migration = available.iter().find(|m| m.version() == version)
+            let migration = available
+                .iter()
+                .find(|m| m.version() == version)
                 .expect("Migration version in applied list should exist in available migrations");
             println!("   - {} ({})", version, migration.description());
         }
@@ -152,7 +154,8 @@ fn handle_down(
 
     println!("\nProceed? [y/N]: ");
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input)
+    std::io::stdin()
+        .read_line(&mut input)
         .expect("Failed to read user input from stdin");
 
     if input.trim().to_lowercase() != "y" {
@@ -191,9 +194,10 @@ fn handle_create(description: &str) -> Result<()> {
     let migrations_dir = Path::new("src/migrations");
     if !migrations_dir.exists() {
         fs::create_dir_all(migrations_dir).map_err(|e| {
-            crate::types::GoudChainError::IoError(std::io::Error::other(
-                format!("Failed to create migrations directory: {}", e),
-            ))
+            crate::types::GoudChainError::IoError(std::io::Error::other(format!(
+                "Failed to create migrations directory: {}",
+                e
+            )))
         })?;
     }
 
@@ -210,9 +214,10 @@ fn handle_create(description: &str) -> Result<()> {
     let template = generate_migration_template(&version, description);
 
     fs::write(&filepath, template).map_err(|e| {
-        crate::types::GoudChainError::IoError(std::io::Error::other(
-            format!("Failed to write migration file: {}", e),
-        ))
+        crate::types::GoudChainError::IoError(std::io::Error::other(format!(
+            "Failed to write migration file: {}",
+            e
+        )))
     })?;
 
     println!("\n[OK] Created migration: {}\n", filepath.display());
