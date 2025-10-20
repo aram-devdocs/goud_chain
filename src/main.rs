@@ -40,6 +40,21 @@ async fn main() {
     // Parse CLI arguments
     let cli = Cli::parse();
 
+    // Handle migration create command early (doesn't need config or store)
+    if let Some(Commands::Migrate(cli::MigrateCommands::Create { description })) = &cli.command {
+        if let Err(e) = cli::handle_migrate_command(
+            &cli::MigrateCommands::Create {
+                description: description.clone(),
+            },
+            None, // Create command doesn't need store
+            &[],
+        ) {
+            error!(error = %e, "Migration command failed");
+            std::process::exit(1);
+        }
+        std::process::exit(0);
+    }
+
     // Load configuration
     let config = match Config::from_env() {
         Ok(cfg) => Arc::new(cfg),
@@ -64,11 +79,11 @@ async fn main() {
         }
     };
 
-    // Handle migration commands (if any) and exit
+    // Handle other migration commands (need store)
     if let Some(Commands::Migrate(migrate_cmd)) = &cli.command {
         let available_migrations = get_available_migrations();
         if let Err(e) =
-            cli::handle_migrate_command(migrate_cmd, blockchain_store, &available_migrations)
+            cli::handle_migrate_command(migrate_cmd, Some(blockchain_store), &available_migrations)
         {
             error!(error = %e, "Migration command failed");
             std::process::exit(1);

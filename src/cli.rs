@@ -63,17 +63,17 @@ pub enum MigrateCommands {
 /// Execute migration CLI command
 pub fn handle_migrate_command(
     command: &MigrateCommands,
-    store: Arc<BlockchainStore>,
+    store: Option<Arc<BlockchainStore>>,
     available_migrations: &[Box<dyn Migration>],
 ) -> Result<()> {
     match command {
-        MigrateCommands::Status => handle_status(store, available_migrations),
-        MigrateCommands::Up => handle_up(store, available_migrations),
+        MigrateCommands::Status => handle_status(store.unwrap(), available_migrations),
+        MigrateCommands::Up => handle_up(store.unwrap(), available_migrations),
         MigrateCommands::Down { count, yes } => {
-            handle_down(store, *count, *yes, available_migrations)
+            handle_down(store.unwrap(), *count, *yes, available_migrations)
         }
         MigrateCommands::Create { description } => handle_create(description),
-        MigrateCommands::Reset { confirm } => handle_reset(store, *confirm),
+        MigrateCommands::Reset { confirm } => handle_reset(store.unwrap(), *confirm),
     }
 }
 
