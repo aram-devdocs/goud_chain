@@ -31,6 +31,16 @@ export { Card, CardHeader, CardTitle, CardContent } from './molecules/Card'
 export type { CardProps } from './molecules/Card'
 export { Toast } from './molecules/Toast'
 export type { ToastProps } from './molecules/Toast'
+export { MetricCard } from './molecules/MetricCard'
+export type { MetricCardProps } from './molecules/MetricCard'
+export { ActivityFeed } from './molecules/ActivityFeed'
+export type {
+  ActivityFeedProps,
+  ActivityEvent,
+  ActivityEventType,
+} from './molecules/ActivityFeed'
+export { ActionCard } from './molecules/ActionCard'
+export type { ActionCardProps } from './molecules/ActionCard'
 
 // Organisms
 export { Header } from './organisms/Header'

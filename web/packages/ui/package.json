@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@goudchain/types": "workspace:*",
+    "@goudchain/utils": "workspace:*",
     "@tanstack/react-router": "^1.95.0",
     "clsx": "^2.1.1"
   },
