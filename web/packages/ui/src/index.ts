@@ -1,6 +1,9 @@
 // Design tokens (re-exported from ./tokens/index.ts)
 export * from './tokens'
 
+// Accessibility utilities
+export * from './utils/a11y'
+
 // Primitives
 export { Container } from './primitives/Container'
 export type { ContainerProps } from './primitives/Container'

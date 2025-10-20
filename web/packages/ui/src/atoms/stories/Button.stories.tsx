@@ -21,11 +21,47 @@ const meta = {
     disabled: {
       control: 'boolean',
     },
+    loading: {
+      control: 'boolean',
+    },
   },
 } satisfies Meta<typeof Button>
 
 export default meta
 type Story = StoryObj<typeof meta>
+
+// Simple icon components for demonstration
+const PlusIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 4v16m8-8H4"
+    />
+  </svg>
+)
+
+const ArrowRightIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M14 5l7 7m0 0l-7 7m7-7H3"
+    />
+  </svg>
+)
 
 export const Primary: Story = {
   args: {
@@ -81,6 +117,76 @@ export const Disabled: Story = {
     disabled: true,
     children: 'Disabled Button',
   },
+}
+
+export const Loading: Story = {
+  args: {
+    loading: true,
+    children: 'Loading...',
+  },
+}
+
+export const LoadingVariants: Story = {
+  render: () => (
+    <div className="flex gap-4">
+      <Button variant={ButtonVariant.Primary} loading>
+        Primary Loading
+      </Button>
+      <Button variant={ButtonVariant.Secondary} loading>
+        Secondary Loading
+      </Button>
+      <Button variant={ButtonVariant.Danger} loading>
+        Danger Loading
+      </Button>
+    </div>
+  ),
+}
+
+export const WithIconLeft: Story = {
+  args: {
+    iconLeft: <PlusIcon />,
+    children: 'Add Item',
+  },
+}
+
+export const WithIconRight: Story = {
+  args: {
+    iconRight: <ArrowRightIcon />,
+    children: 'Continue',
+  },
+}
+
+export const WithBothIcons: Story = {
+  args: {
+    iconLeft: <PlusIcon />,
+    iconRight: <ArrowRightIcon />,
+    children: 'Create and Continue',
+  },
+}
+
+export const IconVariants: Story = {
+  render: () => (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-4">
+        <Button variant={ButtonVariant.Primary} iconLeft={<PlusIcon />}>
+          Add Item
+        </Button>
+        <Button
+          variant={ButtonVariant.Secondary}
+          iconRight={<ArrowRightIcon />}
+        >
+          Continue
+        </Button>
+        <Button
+          variant={ButtonVariant.Danger}
+          iconLeft={<PlusIcon />}
+          size={ButtonSize.Small}
+        >
+          Small with Icon
+        </Button>
+      </div>
+    </div>
+  ),
 }
 
 export const AllVariants: Story = {

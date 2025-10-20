@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AuditLogEntry } from '@goudchain/types'
-import { AuditEventBadge } from '../atoms/AuditEventBadge'
+import { AuditEventBadge, type AuditEventType } from '../atoms/AuditEventBadge'
 
 export interface RealTimeAuditStreamProps {
   events: AuditLogEntry[]
@@ -86,7 +86,9 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <AuditEventBadge eventType={event.event_type as any} />
+                    <AuditEventBadge
+                      eventType={event.event_type as AuditEventType}
+                    />
                     <span className="text-xs text-zinc-500 font-mono">
                       {formatTimestamp(event.timestamp)}
                     </span>
