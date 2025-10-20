@@ -41,13 +41,40 @@ export const colors = {
   ...semantic,
 }
 
-// Helper function to get color with opacity
+/**
+ * Helper function to add opacity to a color value
+ *
+ * Converts a hex color and opacity value to a hex color with alpha channel.
+ * Useful for CSS custom properties when Tailwind's opacity utilities can't be used.
+ *
+ * @param color - A ColorToken (hex color value)
+ * @param opacity - Opacity value between 0 and 1
+ * @returns Hex color with alpha channel (e.g., #3b82f680 for 50% opacity)
+ *
+ * @example
+ * ```typescript
+ * import { colors, withOpacity } from '@goudchain/ui/tokens'
+ *
+ * // Add 50% opacity to primary color
+ * const semiTransparentPrimary = withOpacity(colors.primary, 0.5)
+ * // Result: '#3b82f680'
+ *
+ * // Use in CSS custom properties
+ * const style = {
+ *   backgroundColor: withOpacity(colors.zinc[950], 0.8)
+ * }
+ * ```
+ *
+ * Note: For Tailwind classes, prefer opacity utilities (e.g., bg-primary/50)
+ * This function is primarily for runtime styling or CSS-in-JS scenarios.
+ */
 export function withOpacity(color: ColorToken, opacity: number): string {
   if (opacity < 0 || opacity > 1) {
     throw new Error('Opacity must be between 0 and 1')
   }
-  // Tailwind classes will handle opacity, but this is for CSS custom properties
-  return `${color}${Math.round(opacity * 255)
+  // Convert opacity (0-1) to hex (00-FF)
+  const alphaHex = Math.round(opacity * 255)
     .toString(16)
-    .padStart(2, '0')}`
+    .padStart(2, '0')
+  return `${color}${alphaHex}`
 }

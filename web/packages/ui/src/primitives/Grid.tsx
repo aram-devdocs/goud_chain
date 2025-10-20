@@ -3,6 +3,28 @@
  *
  * CSS Grid layout with responsive column support
  * Mobile-first with automatic column adjustment
+ *
+ * **Supported Responsive Columns:**
+ * - Fixed: 1, 2, 3, 4, 6, 12 columns (all breakpoints)
+ * - Responsive object:
+ *   - `sm`: 2, 3, 4
+ *   - `md`: 2, 3, 4, 6
+ *   - `lg`: 2, 3, 4, 6
+ *   - `xl`: 4, 6
+ *
+ * @example
+ * ```tsx
+ * // Fixed 3 columns at all sizes
+ * <Grid columns={3} gap={4}>
+ *   <Card>Item 1</Card>
+ *   <Card>Item 2</Card>
+ * </Grid>
+ *
+ * // Responsive: 1 col mobile → 2 small → 3 medium → 4 large
+ * <Grid columns={{ sm: 2, md: 3, lg: 4 }} gap={4}>
+ *   <Card>Item 1</Card>
+ * </Grid>
+ * ```
  */
 
 import { forwardRef, type HTMLAttributes } from 'react'
@@ -12,6 +34,8 @@ export interface GridProps extends HTMLAttributes<HTMLDivElement> {
   /**
    * Number of columns (responsive)
    * Can be a single number or object with breakpoints
+   *
+   * See component documentation for supported responsive combinations
    * @default 1
    */
   columns?:

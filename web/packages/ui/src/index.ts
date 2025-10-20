@@ -1,4 +1,4 @@
-// Design tokens
+// Design tokens (re-exported from ./tokens/index.ts)
 export * from './tokens'
 
 // Primitives
