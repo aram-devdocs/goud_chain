@@ -70,8 +70,8 @@ export function HistoricalAuditTable({
     const rows = events.map((event) => [
       formatTimestamp(event.timestamp),
       event.event_type,
-      event.ip_address_hash,
-      event.event_id,
+      event.ip_address_hash ?? 'N/A',
+      event.event_id ?? 'N/A',
       event.user_id,
     ])
 
@@ -205,10 +205,10 @@ export function HistoricalAuditTable({
                       />
                     </td>
                     <td className="py-3 px-4 text-sm text-zinc-400 font-mono">
-                      {event.ip_address_hash.substring(0, 16)}...
+                      {event.ip_address_hash?.substring(0, 16) ?? 'N/A'}...
                     </td>
                     <td className="py-3 px-4 text-sm text-zinc-300 truncate max-w-md">
-                      {event.event_id.substring(0, 16)}...
+                      {event.event_id?.substring(0, 16) ?? 'N/A'}...
                     </td>
                   </tr>
                 ))}
@@ -232,10 +232,10 @@ export function HistoricalAuditTable({
                   </span>
                 </div>
                 <div className="text-sm text-zinc-300 mb-2">
-                  {event.event_id.substring(0, 16)}...
+                  {event.event_id?.substring(0, 16) ?? 'N/A'}...
                 </div>
                 <div className="text-xs text-zinc-500 font-mono">
-                  IP: {event.ip_address_hash.substring(0, 16)}...
+                  IP: {event.ip_address_hash?.substring(0, 16) ?? 'N/A'}...
                 </div>
               </div>
             ))}

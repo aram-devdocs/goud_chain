@@ -12,7 +12,7 @@ export function useWebSocket(url: string, enabled: boolean = true) {
   const reconnectTimeoutRef = useRef<number | undefined>(undefined)
 
   const connect = useCallback(() => {
-    if (!enabled || wsRef.current?.readyState === WebSocket.OPEN) return
+    if (!enabled || !url || wsRef.current?.readyState === WebSocket.OPEN) return
 
     try {
       const ws = new WebSocket(url)
@@ -31,23 +31,31 @@ export function useWebSocket(url: string, enabled: boolean = true) {
       }
 
       ws.onerror = () => {
-        // Error will trigger onclose, which handles reconnection
+        // Suppress console errors - error will trigger onclose for reconnection
       }
 
       ws.onclose = () => {
         setIsConnected(false)
 
-        // Reconnect after 5 seconds
+        // Reconnect with exponential backoff (5s, 10s, 20s, max 30s)
         if (enabled) {
+          const retryCount = (wsRef.current as any)?._retryCount ?? 0
+          const delay = Math.min(5000 * Math.pow(2, retryCount), 30000)
+
           reconnectTimeoutRef.current = setTimeout(() => {
             connect()
-          }, 5000)
+          }, delay) as any
+
+          // Track retry count for backoff
+          if (ws as any) {
+            ;(ws as any)._retryCount = retryCount + 1
+          }
         }
       }
 
       wsRef.current = ws
     } catch {
-      // WebSocket creation failed, will retry via reconnect logic
+      // WebSocket creation failed - will retry via reconnect logic
     }
   }, [url, enabled])
 

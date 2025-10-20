@@ -1,9 +1,24 @@
 /**
  * Safely extract error message from API response
  * Handles JSON parsing failures, network errors, and malformed responses
+ * Triggers logout on 401 Unauthorized errors
  */
 export async function handleApiError(response: Response): Promise<never> {
   let errorMessage = `Request failed with status ${response.status}`
+
+  // Handle 401 Unauthorized - session expired
+  if (response.status === 401) {
+    // Clear invalid tokens
+    localStorage.removeItem('session_token')
+    localStorage.removeItem('api_key')
+
+    // Redirect to login if not already there
+    if (!window.location.pathname.includes('/login')) {
+      window.location.href = '/login'
+    }
+
+    errorMessage = 'Session expired. Please log in again.'
+  }
 
   try {
     const contentType = response.headers.get('content-type')

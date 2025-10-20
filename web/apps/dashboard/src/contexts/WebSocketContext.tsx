@@ -46,15 +46,15 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const [wasConnected, setWasConnected] = useState(false)
   const hasShownInitialConnection = useRef(false)
 
-  // Get API key for WebSocket authentication
-  const apiKey = localStorage.getItem('api_key')
+  // Get session token for WebSocket authentication (not api_key)
+  const sessionToken = localStorage.getItem('session_token')
 
   // Build WebSocket URL - use relative path in production, absolute in dev
-  const wsUrl = apiKey
-    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws?token=${encodeURIComponent(apiKey)}`
+  const wsUrl = sessionToken
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws?token=${encodeURIComponent(sessionToken)}`
     : ''
 
-  const { isConnected, lastMessage, send } = useWebSocket(wsUrl, !!apiKey)
+  const { isConnected, lastMessage, send } = useWebSocket(wsUrl, !!sessionToken)
 
   // Track connection state changes and show toasts
   useEffect(() => {
