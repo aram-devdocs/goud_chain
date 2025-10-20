@@ -100,8 +100,8 @@ jobs:
           cloudflare_api_token    = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
           cloudflare_zone_id      = "${{ secrets.CLOUDFLARE_ZONE_ID }}"
           enable_cloudflare_proxy = true
-          dashboard_subdomain     = "dashboard"
-          api_subdomain           = "api"
+          dashboard_subdomain     = ""  # Empty string creates dev.goudchain.com (single-domain architecture)
+          api_subdomain           = "api"  # Kept for backwards compatibility (not used for DNS)
 
           # Tags (GCP labels: lowercase, numbers, underscores, dashes only)
           tags = {
@@ -304,7 +304,7 @@ jobs:
       - name: Verify deployment
         run: |
           echo "Verifying deployment health..."
-          sleep 30
+          sleep 90  # Dashboard needs 90s for health checks to complete
 
           echo "=== Testing Direct IP Access ==="
 
@@ -328,24 +328,20 @@ jobs:
           echo ""
           echo "=== Testing Cloudflare DNS Endpoints ==="
 
-          # Test API via Cloudflare (with retries for DNS propagation)
-          echo "Testing API via dev-api.goudchain.com..."
+          # Test platform via Cloudflare (with retries for DNS propagation)
+          echo "Testing platform via dev.goudchain.com..."
           for i in {1..5}; do
-            if curl -f https://dev-api.goudchain.com/health 2>/dev/null; then
-              echo "✅ API endpoint accessible via Cloudflare"
-              break
-            else
-              echo "Retry $i/5 (DNS may still be propagating)..."
-              sleep 10
-            fi
-          done
+            # Test dashboard (home page)
+            if curl -f https://dev.goudchain.com 2>/dev/null; then
+              echo "✅ Dashboard accessible via Cloudflare (https://dev.goudchain.com)"
 
-          # Test dashboard via Cloudflare (with retries)
-          echo "Testing dashboard via dev-dashboard.goudchain.com..."
-          for i in {1..5}; do
-            if curl -f https://dev-dashboard.goudchain.com 2>/dev/null; then
-              echo "✅ Dashboard accessible via Cloudflare"
-              break
+              # Test API endpoint through dashboard domain
+              if curl -f https://dev.goudchain.com/health 2>/dev/null; then
+                echo "✅ API endpoint accessible via Cloudflare (https://dev.goudchain.com/health)"
+                break
+              else
+                echo "⚠️  Dashboard loads but API not responding yet..."
+              fi
             else
               echo "Retry $i/5 (DNS may still be propagating)..."
               sleep 10
