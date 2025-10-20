@@ -16,6 +16,7 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist storybook-static",
     "type-check": "tsc --noEmit",
+    "test-stories": "tsc --noEmit --skipLibCheck test-stories.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AuditLogEntry } from '@goudchain/types'
 import { AuditEventBadge, type AuditEventType } from '../atoms/AuditEventBadge'
+import { visuallyHidden } from '../utils/a11y'
 
 export interface RealTimeAuditStreamProps {
   events: AuditLogEntry[]
@@ -37,6 +38,17 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
 
   return (
     <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-6">
+      {/* ARIA live region for screen readers */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={visuallyHidden}
+      >
+        {displayEvents.length > 0 &&
+          `${displayEvents.length} audit events displayed`}
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-white">
