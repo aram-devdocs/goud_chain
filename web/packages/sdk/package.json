@@ -1,0 +1,42 @@
+{
+  "name": "@goudchain/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm generate && tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist src/generated",
+    "type-check": "tsc --noEmit",
+    "generate": "node scripts/generate-openapi.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@hey-api/client-fetch": "^0.4.1",
+    "@tanstack/react-query": "^5.62.14"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@goudchain/typescript-config": "workspace:*",
+    "@hey-api/openapi-ts": "^0.54.0",
+    "@types/node": "^24.8.1",
+    "@types/react": "^19.0.6",
+    "@vitest/ui": "^3.2.4",
+    "jsdom": "^27.0.1",
+    "react": "^19.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  }
+}
