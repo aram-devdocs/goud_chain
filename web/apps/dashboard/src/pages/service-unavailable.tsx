@@ -1,68 +1,100 @@
+import {
+  Button,
+  Card,
+  CardContent,
+  Heading,
+  Text,
+  Container,
+  Stack,
+  ButtonGroup,
+} from '@goudchain/ui'
+import { ButtonVariant, ButtonSize } from '@goudchain/types'
+import { EXTERNAL_URLS, ROUTES } from '@goudchain/utils'
+
 export default function ServiceUnavailablePage() {
   const handleRetry = () => {
-    window.location.href = '/'
+    window.location.href = ROUTES.HOME
   }
 
   const handleCheckStatus = () => {
-    window.open('https://status.goudchain.com', '_blank')
+    const statusWindow = window.open(EXTERNAL_URLS.STATUS_PAGE, '_blank')
+    if (statusWindow) {
+      statusWindow.opener = null
+    }
   }
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
-      <div className="max-w-2xl w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-6xl font-bold text-white mb-4">503</h1>
-          <p className="text-2xl text-zinc-300 mb-2">Service Temporarily Unavailable</p>
-          <p className="text-zinc-400">
-            The service is currently experiencing high load or maintenance.
-          </p>
-        </div>
+      <Container maxWidth="2xl">
+        <Stack spacing={8}>
+          <div className="text-center">
+            <Heading level={1} className="text-6xl mb-4">
+              503
+            </Heading>
+            <Heading level={2} className="text-2xl text-zinc-300 mb-2">
+              Service Temporarily Unavailable
+            </Heading>
+            <Text color="muted">
+              The service is currently experiencing high load or maintenance.
+            </Text>
+          </div>
 
-        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-8 mb-6">
-          <h2 className="text-lg font-semibold text-white mb-4">What happened?</h2>
-          <p className="text-zinc-400 mb-6">
-            The Goud Chain service is temporarily unavailable due to high load or ongoing
-            maintenance. Your data is safe and the blockchain continues to operate.
-          </p>
+          <Card>
+            <CardContent className="p-8">
+              <Stack spacing={6}>
+                <div>
+                  <Heading level={3} className="text-lg mb-4">
+                    What happened?
+                  </Heading>
+                  <Text color="muted">
+                    The Goud Chain service is temporarily unavailable due to high load or ongoing
+                    maintenance. Your data is safe and the blockchain continues to operate.
+                  </Text>
+                </div>
 
-          <h2 className="text-lg font-semibold text-white mb-4">What can you do?</h2>
-          <ul className="space-y-3 text-zinc-400">
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              <span>Wait a few minutes and try again</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              <span>Check the service status page for updates</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              <span>If the issue persists, contact support</span>
-            </li>
-          </ul>
-        </div>
+                <div>
+                  <Heading level={3} className="text-lg mb-4">
+                    What can you do?
+                  </Heading>
+                  <Stack spacing={3} as="ul">
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      <Text color="muted">Wait a few minutes and try again</Text>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      <Text color="muted">Check the service status page for updates</Text>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      <Text color="muted">If the issue persists, contact support</Text>
+                    </li>
+                  </Stack>
+                </div>
+              </Stack>
+            </CardContent>
+          </Card>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={handleRetry}
-            className="px-6 py-3 bg-white text-black rounded-lg hover:bg-zinc-200 transition-colors font-medium"
-          >
-            Try Again
-          </button>
-          <button
-            onClick={handleCheckStatus}
-            className="px-6 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 border border-zinc-700 transition-colors font-medium"
-          >
-            Check Status
-          </button>
-        </div>
+          <ButtonGroup align="center">
+            <Button onClick={handleRetry} variant={ButtonVariant.Primary} size={ButtonSize.Large}>
+              Try Again
+            </Button>
+            <Button
+              onClick={handleCheckStatus}
+              variant={ButtonVariant.Secondary}
+              size={ButtonSize.Large}
+            >
+              Check Status
+            </Button>
+          </ButtonGroup>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-zinc-500">
-            Technical details: Service returned a 5xx error indicating server-side issues.
-          </p>
-        </div>
-      </div>
+          <div className="text-center">
+            <Text size="sm" color="muted">
+              Technical details: Service returned a 5xx error indicating server-side issues.
+            </Text>
+          </div>
+        </Stack>
+      </Container>
     </div>
   )
 }
