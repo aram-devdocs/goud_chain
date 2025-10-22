@@ -114,6 +114,35 @@ if [ -d "web" ] && git diff --cached --name-only | grep -q "^web/"; then
     cd ..
 fi
 
+# E2E smoke tests (if web/e2e exists and has changes)
+if [ -d "web/e2e" ] && git diff --cached --name-only | grep -qE "^web/(e2e|apps|packages)/"; then
+    echo "Running E2E smoke tests..."
+
+    # Verify Docker Compose backend is running
+    if ! docker compose -f docker-compose.local.yml ps 2>/dev/null | grep -q "Up"; then
+        echo "Warning: Docker Compose backend not running. Start with: ./run dev"
+        echo "Skipping E2E tests (run manually: cd web && pnpm test:e2e:smoke)"
+    else
+        cd web
+
+        # Install Playwright browsers if needed
+        if [ ! -d "$HOME/.cache/ms-playwright" ]; then
+            echo "Installing Playwright browsers (one-time setup)..."
+            pnpm exec playwright install chromium --with-deps
+        fi
+
+        # Run smoke tests (Chromium only, ~30s)
+        pnpm test:e2e:smoke || {
+            echo "Error: E2E smoke tests failed."
+            echo "Run 'cd web && pnpm test:e2e:debug' to debug locally."
+            cd ..
+            exit 1
+        }
+
+        cd ..
+    fi
+fi
+
 # Terraform checks
 if [ -d "terraform" ] && command -v terraform >/dev/null 2>&1; then
     echo "Running Terraform format check..."

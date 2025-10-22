@@ -13,6 +13,7 @@
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test e2e/tests/smoke.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
