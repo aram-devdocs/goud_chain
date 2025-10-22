@@ -162,7 +162,7 @@ export function SubmitDataForm({
   }
 
   return (
-    <Card className="max-w-4xl mx-auto">
+    <Card className="max-w-4xl md:min-w-form mx-auto">
       <CardHeader>
         <CardTitle>Submit Encrypted Data</CardTitle>
       </CardHeader>
