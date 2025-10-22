@@ -106,11 +106,11 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
                     </span>
                   </div>
                   <div className="text-sm text-zinc-300 truncate">
-                    {event.event_id}
+                    {event.collection_id || 'N/A'}
                   </div>
                 </div>
                 <div className="flex-shrink-0 text-xs text-zinc-500 font-mono">
-                  {event.ip_address_hash.substring(0, 8)}...
+                  {event.ip_hash?.substring(0, 8) ?? 'N/A'}...
                 </div>
               </div>
             </div>
