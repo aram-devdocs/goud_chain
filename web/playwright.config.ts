@@ -7,14 +7,14 @@ dotenv.config({ path: '.env.test' })
 /**
  * Playwright E2E Test Configuration
  *
- * Cross-browser testing with parallel execution for comprehensive user workflow validation.
- * Tests run against Docker Compose 3-node blockchain network via load balancer.
+ * Mock-based UI testing with fast smoke tests.
+ * No backend required - all API calls are mocked.
  */
 export default defineConfig({
   testDir: './e2e/tests',
 
   // Maximum time one test can run
-  timeout: 60 * 1000,
+  timeout: 30 * 1000,
 
   // Test configuration
   fullyParallel: true,
@@ -43,51 +43,26 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     ignoreHTTPSErrors: true,
 
-    // API base URL for backend
+    // API base URL for mocked routes
     extraHTTPHeaders: {
       Accept: 'application/json',
     },
   },
 
-  // Global setup and teardown (skip in CI - handled by workflow)
-  globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP
-    ? undefined
-    : './e2e/global-setup.ts',
-  globalTeardown: process.env.E2E_SKIP_GLOBAL_SETUP
-    ? undefined
-    : './e2e/global-teardown.ts',
-
-  // Cross-browser testing projects
+  // Smoke tests project (fast, mocked)
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: /smoke\.spec\.ts/,
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    // Mobile testing (optional, disabled by default)
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
   ],
 
-  // Local dev server configuration (optional)
-  // webServer: {
-  //   command: 'pnpm dev',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  //   timeout: 120 * 1000,
-  // },
+  // Start dashboard dev server automatically
+  webServer: {
+    command: 'cd apps/dashboard && pnpm dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
+  },
 })

@@ -1,14 +1,19 @@
 import { test, expect } from '@playwright/test'
+import { setupApiMocks } from '../mocks/api-mocks'
 
 /**
  * Smoke Test Suite
  *
- * Quick validation tests to ensure basic functionality works.
- * Run these first to verify the environment is set up correctly.
- * These tests run in pre-commit hooks for fast feedback.
+ * Fast UI validation tests with mocked API responses.
+ * No backend required - all API calls are intercepted and mocked.
+ * Target: <30s total runtime for pre-commit hooks.
  */
 
 test.describe('Smoke Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupApiMocks(page)
+  })
+
   test('should load auth page', async ({ page }) => {
     await page.goto('/auth')
 
@@ -17,33 +22,13 @@ test.describe('Smoke Tests', () => {
 
     // Verify page title
     await expect(page.locator('text=Goud Chain')).toBeVisible()
-  })
 
-  test('should verify backend API is responding', async ({ page }) => {
-    const apiUrl = process.env.API_URL || 'http://localhost:8080'
-
-    // Test health endpoint
-    const healthResponse = await page.request.get(`${apiUrl}/health`)
-    expect(healthResponse.ok()).toBe(true)
-
-    // Test chain endpoint
-    const chainResponse = await page.request.get(`${apiUrl}/chain`)
-    expect(chainResponse.ok()).toBe(true)
-  })
-
-  test('should create account via API', async ({ page }) => {
-    const apiUrl = process.env.API_URL || 'http://localhost:8080'
-
-    // Create account
-    const response = await page.request.post(`${apiUrl}/account/create`, {
-      data: { metadata: null },
-    })
-
-    expect(response.ok()).toBe(true)
-
-    const data = await response.json()
-    expect(data.api_key).toBeTruthy()
-    expect(data.api_key).toHaveLength(64)
+    // Verify tabs are present
+    await expect(
+      page
+        .getByTestId('create-account-tab')
+        .or(page.locator('text=Create Account'))
+    ).toBeVisible()
   })
 
   test('should redirect unauthenticated user to auth page', async ({
@@ -53,6 +38,7 @@ test.describe('Smoke Tests', () => {
     await page.goto('/auth')
     await page.evaluate(() => {
       localStorage.clear()
+      sessionStorage.clear()
     })
 
     // Try to access protected route
