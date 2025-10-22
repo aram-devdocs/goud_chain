@@ -248,6 +248,9 @@ generate_dashboard_server_block() {
 
             # CORS
             include /etc/nginx/cors.conf;
+
+            # Cache RapiDoc UI (1 hour)
+            add_header Cache-Control "public, max-age=${NGINX_CACHE_MAX_AGE_DOCS}" always;
         }
 
         # OpenAPI spec JSON endpoint
@@ -266,7 +269,7 @@ generate_dashboard_server_block() {
             include /etc/nginx/cors.conf;
 
             # Cache OpenAPI spec (1 hour)
-            add_header Cache-Control "public, max-age=3600" always;
+            add_header Cache-Control "public, max-age=${NGINX_CACHE_MAX_AGE_DOCS}" always;
         }
     }
 
