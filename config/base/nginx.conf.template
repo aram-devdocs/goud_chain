@@ -245,7 +245,7 @@ http {
             include /etc/nginx/cors.conf;
 
             # Cache static RapiDoc assets (1 hour)
-            add_header Cache-Control "public, max-age=3600" always;
+            add_header Cache-Control "public, max-age={{NGINX_CACHE_MAX_AGE_DOCS}}" always;
         }
 
         # Internal metrics endpoint - Monitoring only (block external access)
