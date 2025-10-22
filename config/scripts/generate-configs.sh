@@ -233,6 +233,41 @@ generate_dashboard_server_block() {
             # CORS
             include /etc/nginx/cors.conf;
         }
+
+        # RapiDoc - OpenAPI documentation interface
+        location /rapidoc {
+            proxy_pass http://blockchain_readers;
+
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # CORS
+            include /etc/nginx/cors.conf;
+        }
+
+        # OpenAPI spec JSON endpoint
+        location /api-docs/ {
+            proxy_pass http://blockchain_readers;
+
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            # CORS
+            include /etc/nginx/cors.conf;
+
+            # Cache OpenAPI spec (1 hour)
+            add_header Cache-Control "public, max-age=3600" always;
+        }
     }
 
 EOF
