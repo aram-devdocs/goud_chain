@@ -5,6 +5,7 @@
 ### Issue 1: Docker Compose Command Not Found
 
 **Error:**
+
 ```
 docker-compose: command not found
 ```
@@ -17,17 +18,21 @@ GitHub Actions uses Docker Compose v2, which uses `docker compose` (space) inste
 ### Issue 2: Backend Services Not Starting
 
 **Symptoms:**
+
 - Health check fails after 30 attempts
 - Backend returns connection refused
 
 **Debug Steps:**
+
 1. Check Docker Compose logs:
+
    ```yaml
    - name: Check Docker logs
      run: docker compose -f docker-compose.local.yml logs
    ```
 
 2. Check service status:
+
    ```yaml
    - name: Check service status
      run: docker compose -f docker-compose.local.yml ps
@@ -40,6 +45,7 @@ GitHub Actions uses Docker Compose v2, which uses `docker compose` (space) inste
    ```
 
 **Solutions:**
+
 - Increase health check timeout to 60 attempts
 - Build images explicitly before docker compose up
 - Add `--build` flag to docker compose command
@@ -47,11 +53,14 @@ GitHub Actions uses Docker Compose v2, which uses `docker compose` (space) inste
 ### Issue 3: Dashboard Dev Server Not Starting
 
 **Symptoms:**
+
 - Dashboard health check times out
 - Port 3000 not responding
 
 **Debug Steps:**
+
 1. Check dashboard logs:
+
    ```yaml
    - name: Upload dashboard logs
      uses: actions/upload-artifact@v4
@@ -68,6 +77,7 @@ GitHub Actions uses Docker Compose v2, which uses `docker compose` (space) inste
    ```
 
 **Solutions:**
+
 - Build shared packages before starting dashboard
 - Use `nohup` to properly background the process
 - Increase startup timeout to 90 seconds
@@ -76,17 +86,20 @@ GitHub Actions uses Docker Compose v2, which uses `docker compose` (space) inste
 ### Issue 4: Global Setup/Teardown Conflicts
 
 **Symptoms:**
+
 - Tests try to start Docker Compose twice
 - Docker Compose already running errors
 
 **Solution:**
 Skip global setup in CI by setting environment variable:
+
 ```yaml
 env:
   E2E_SKIP_GLOBAL_SETUP: true
 ```
 
 This is handled in `playwright.config.ts`:
+
 ```typescript
 globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-setup.ts',
 ```
@@ -94,16 +107,20 @@ globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-setup
 ### Issue 5: Test Timeouts
 
 **Symptoms:**
+
 - Individual tests timeout after 60 seconds
 - Suite takes longer than 30 minutes
 
 **Solutions:**
+
 1. Reduce parallel workers in CI:
+
    ```typescript
    workers: process.env.CI ? 2 : 4
    ```
 
 2. Enable retries:
+
    ```typescript
    retries: process.env.CI ? 2 : 0
    ```
@@ -116,17 +133,21 @@ globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-setup
 ### Issue 6: Storybook Build Failures
 
 **Symptoms:**
+
 - Visual regression tests fail
 - Storybook build errors
 
 **Solutions:**
+
 1. Install http-server globally:
+
    ```yaml
    - name: Install http-server
      run: npm install -g http-server
    ```
 
 2. Build dependencies first:
+
    ```bash
    pnpm --filter @goudchain/types build
    pnpm --filter @goudchain/utils build
@@ -145,11 +166,13 @@ globalSetup: process.env.E2E_SKIP_GLOBAL_SETUP ? undefined : './e2e/global-setup
 ### Issue 7: Playwright Browser Installation
 
 **Symptoms:**
+
 - Browser not found errors
 - Chromium/Firefox/WebKit missing
 
 **Solution:**
 Install browsers with system dependencies:
+
 ```yaml
 - name: Install Playwright browsers
   run: pnpm exec playwright install --with-deps chromium
@@ -158,30 +181,34 @@ Install browsers with system dependencies:
 ### Issue 8: Race Conditions
 
 **Symptoms:**
+
 - Flaky tests that pass locally but fail in CI
 - Intermittent failures
 
 **Solutions:**
+
 1. Use explicit waits in tests:
+
    ```typescript
-   await page.waitForLoadState('networkidle');
-   await element.waitFor({ state: 'visible' });
+   await page.waitForLoadState('networkidle')
+   await element.waitFor({ state: 'visible' })
    ```
 
 2. Avoid arbitrary timeouts:
+
    ```typescript
    // Bad
-   await page.waitForTimeout(5000);
-   
+   await page.waitForTimeout(5000)
+
    // Good
-   await page.waitForSelector('[data-testid="element"]');
+   await page.waitForSelector('[data-testid="element"]')
    ```
 
 3. Wait for API responses:
    ```typescript
-   await page.waitForResponse(response => 
-     response.url().includes('/api/endpoint') && response.ok()
-   );
+   await page.waitForResponse(
+     (response) => response.url().includes('/api/endpoint') && response.ok()
+   )
    ```
 
 ## CI Workflow Execution Order
@@ -224,17 +251,19 @@ Install browsers with system dependencies:
 ## Environment Variables
 
 ### Required in CI
+
 ```yaml
-CI: true                      # Enables CI mode in Playwright
-E2E_SKIP_GLOBAL_SETUP: true  # Skips Docker Compose in global setup
+CI: true # Enables CI mode in Playwright
+E2E_SKIP_GLOBAL_SETUP: true # Skips Docker Compose in global setup
 DASHBOARD_URL: http://localhost:3000
 API_URL: http://localhost:8080
 WS_URL: ws://localhost:8080/ws
 ```
 
 ### Optional
+
 ```yaml
-VISUAL_THRESHOLD: 0.1        # Visual regression threshold (10%)
+VISUAL_THRESHOLD: 0.1 # Visual regression threshold (10%)
 STORYBOOK_URL: http://localhost:6006
 ```
 
@@ -326,11 +355,13 @@ pnpm test:e2e:headed e2e/tests/auth.spec.ts
 ### Before Committing
 
 1. Run tests locally with CI env:
+
    ```bash
    CI=true E2E_SKIP_GLOBAL_SETUP=true pnpm test:e2e
    ```
 
 2. Test Docker Compose startup:
+
    ```bash
    docker compose -f docker-compose.local.yml up -d
    docker compose -f docker-compose.local.yml ps
@@ -363,10 +394,11 @@ If tests still fail:
    - Easier to debug
 
 2. **Disable problematic tests temporarily:**
+
    ```typescript
    test.skip('flaky test', async () => {
      // Will be fixed later
-   });
+   })
    ```
 
 3. **Increase timeouts:**
@@ -395,6 +427,7 @@ If tests still fail:
 ## Contact
 
 For CI issues, check:
+
 1. This troubleshooting guide
 2. Playwright documentation
 3. GitHub Actions logs

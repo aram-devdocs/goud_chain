@@ -157,7 +157,19 @@ jobs:
           name: dashboard-logs-${{ matrix.browser }}
           path: web/apps/dashboard/dashboard.log
           retention-days: 7
-      
+
+      - name: Collect Docker logs
+        if: failure()
+        run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
+
+      - name: Upload Docker logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs-${{ matrix.browser }}
+          path: docker-logs.txt
+          retention-days: 7
+
       - name: Stop dashboard
         if: always()
         working-directory: web/apps/dashboard
@@ -166,22 +178,10 @@ jobs:
             kill $(cat dashboard.pid) || true
             rm dashboard.pid
           fi
-      
-      - name: Collect Docker logs
-        if: failure()
-        run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
-      
+
       - name: Stop Docker Compose services
         if: always()
         run: docker compose -f docker-compose.local.yml down -v
-      
-      - name: Upload Docker logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-logs-${{ matrix.browser }}
-          path: docker-logs.txt
-          retention-days: 7
   
   visual-regression:
     name: Visual Regression Tests

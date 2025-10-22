@@ -1,11 +1,11 @@
 /**
  * Test Helper Utilities
- * 
+ *
  * Common utilities for E2E tests including wait functions, data generation,
  * and validation helpers.
  */
 
-import { Page } from '@playwright/test';
+import { Page } from '@playwright/test'
 
 /**
  * Wait for API response with specific status code
@@ -18,17 +18,18 @@ export async function waitForApiResponse(
 ): Promise<any> {
   const response = await page.waitForResponse(
     (response) => {
-      const url = response.url();
-      const matches = typeof urlPattern === 'string' 
-        ? url.includes(urlPattern)
-        : urlPattern.test(url);
-      
-      return matches && response.status() === expectedStatus;
+      const url = response.url()
+      const matches =
+        typeof urlPattern === 'string'
+          ? url.includes(urlPattern)
+          : urlPattern.test(url)
+
+      return matches && response.status() === expectedStatus
     },
     { timeout }
-  );
-  
-  return await response.json();
+  )
+
+  return await response.json()
 }
 
 /**
@@ -38,35 +39,35 @@ export async function waitForElementWithRetry(
   page: Page,
   selector: string,
   options: {
-    timeout?: number;
-    retries?: number;
-    retryDelay?: number;
+    timeout?: number
+    retries?: number
+    retryDelay?: number
   } = {}
 ): Promise<boolean> {
-  const { timeout = 5000, retries = 3, retryDelay = 1000 } = options;
-  
+  const { timeout = 5000, retries = 3, retryDelay = 1000 } = options
+
   for (let i = 0; i < retries; i++) {
     try {
-      await page.waitForSelector(selector, { timeout, state: 'visible' });
-      return true;
+      await page.waitForSelector(selector, { timeout, state: 'visible' })
+      return true
     } catch (error) {
       if (i === retries - 1) {
-        return false;
+        return false
       }
-      await page.waitForTimeout(retryDelay);
+      await page.waitForTimeout(retryDelay)
     }
   }
-  
-  return false;
+
+  return false
 }
 
 /**
  * Generate unique test identifier
  */
 export function generateTestId(prefix: string = 'test'): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `${prefix}_${timestamp}_${random}`;
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 8)
+  return `${prefix}_${timestamp}_${random}`
 }
 
 /**
@@ -76,39 +77,39 @@ export async function waitForWebSocketConnection(
   page: Page,
   timeout: number = 10000
 ): Promise<boolean> {
-  const startTime = Date.now();
-  
+  const startTime = Date.now()
+
   while (Date.now() - startTime < timeout) {
     const isConnected = await page.evaluate(() => {
-      const statusElement = document.querySelector('[data-testid="ws-status"]');
-      return statusElement?.textContent?.includes('Connected') || false;
-    });
-    
+      const statusElement = document.querySelector('[data-testid="ws-status"]')
+      return statusElement?.textContent?.includes('Connected') || false
+    })
+
     if (isConnected) {
-      return true;
+      return true
     }
-    
-    await page.waitForTimeout(500);
+
+    await page.waitForTimeout(500)
   }
-  
-  return false;
+
+  return false
 }
 
 /**
  * Capture console logs for debugging
  */
 export function setupConsoleCapture(page: Page): string[] {
-  const logs: string[] = [];
-  
+  const logs: string[] = []
+
   page.on('console', (msg) => {
-    logs.push(`[${msg.type()}] ${msg.text()}`);
-  });
-  
+    logs.push(`[${msg.type()}] ${msg.text()}`)
+  })
+
   page.on('pageerror', (error) => {
-    logs.push(`[error] ${error.message}`);
-  });
-  
-  return logs;
+    logs.push(`[error] ${error.message}`)
+  })
+
+  return logs
 }
 
 /**
@@ -119,12 +120,12 @@ export async function takeTimestampedScreenshot(
   name: string,
   directory: string = 'screenshots'
 ): Promise<string> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `${directory}/${name}_${timestamp}.png`;
-  
-  await page.screenshot({ path: filename, fullPage: true });
-  
-  return filename;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const filename = `${directory}/${name}_${timestamp}.png`
+
+  await page.screenshot({ path: filename, fullPage: true })
+
+  return filename
 }
 
 /**
@@ -135,7 +136,7 @@ export async function waitForNetworkIdle(
   timeout: number = 10000
 ): Promise<void> {
   try {
-    await page.waitForLoadState('networkidle', { timeout });
+    await page.waitForLoadState('networkidle', { timeout })
   } catch (error) {
     // Ignore timeout, network may be busy
   }
@@ -150,17 +151,17 @@ export async function elementContainsText(
   expectedText: string,
   caseInsensitive: boolean = true
 ): Promise<boolean> {
-  const elementText = await page.locator(selector).textContent();
-  
+  const elementText = await page.locator(selector).textContent()
+
   if (!elementText) {
-    return false;
+    return false
   }
-  
+
   if (caseInsensitive) {
-    return elementText.toLowerCase().includes(expectedText.toLowerCase());
+    return elementText.toLowerCase().includes(expectedText.toLowerCase())
   }
-  
-  return elementText.includes(expectedText);
+
+  return elementText.includes(expectedText)
 }
 
 /**
@@ -171,27 +172,27 @@ export async function getTableData(
   tableSelector: string = 'table'
 ): Promise<Record<string, string>[]> {
   return await page.evaluate((selector) => {
-    const table = document.querySelector(selector);
-    
+    const table = document.querySelector(selector)
+
     if (!table) {
-      return [];
+      return []
     }
-    
+
     const headers = Array.from(table.querySelectorAll('thead th')).map(
       (th) => th.textContent?.trim() || ''
-    );
-    
-    const rows = Array.from(table.querySelectorAll('tbody tr'));
-    
+    )
+
+    const rows = Array.from(table.querySelectorAll('tbody tr'))
+
     return rows.map((row) => {
-      const cells = Array.from(row.querySelectorAll('td'));
-      const rowData: Record<string, string> = {};
-      
+      const cells = Array.from(row.querySelectorAll('td'))
+      const rowData: Record<string, string> = {}
+
       cells.forEach((cell, index) => {
-        rowData[headers[index]] = cell.textContent?.trim() || '';
-      });
-      
-      return rowData;
-    });
-  }, tableSelector);
+        rowData[headers[index]] = cell.textContent?.trim() || ''
+      })
+
+      return rowData
+    })
+  }, tableSelector)
 }

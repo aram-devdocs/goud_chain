@@ -137,7 +137,10 @@ export function LoginForm({
           </ButtonGroup>
 
           {error && (
-            <div className="mb-4 bg-red-900/20 border border-red-700 p-3 rounded text-sm text-red-400" data-testid="login-error">
+            <div
+              className="mb-4 bg-red-900/20 border border-red-700 p-3 rounded text-sm text-red-400"
+              data-testid="login-error"
+            >
               {error}
             </div>
           )}

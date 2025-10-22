@@ -1,46 +1,50 @@
-import { FullConfig } from '@playwright/test';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { FullConfig } from '@playwright/test'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+import * as path from 'path'
 
-const execAsync = promisify(exec);
+const execAsync = promisify(exec)
 
 /**
  * Global Teardown for E2E Tests
- * 
+ *
  * Responsibilities:
  * 1. Clean up test data (optional - tests should clean up after themselves)
  * 2. Stop Docker Compose services (optional - keep running for development)
  * 3. Archive test artifacts
- * 
+ *
  * Note: In CI, Docker Compose cleanup is handled by the workflow.
  */
 async function globalTeardown(config: FullConfig) {
-  console.log('Starting E2E test environment teardown...');
-  
-  const shouldStopDocker = process.env.E2E_STOP_DOCKER === 'true';
-  const isCI = process.env.CI === 'true';
-  
+  console.log('Starting E2E test environment teardown...')
+
+  const shouldStopDocker = process.env.E2E_STOP_DOCKER === 'true'
+  const isCI = process.env.CI === 'true'
+
   // Skip Docker cleanup in CI (handled by workflow)
   if (isCI) {
-    console.log('Skipping Docker Compose cleanup (running in CI)');
-    return;
+    console.log('Skipping Docker Compose cleanup (running in CI)')
+    return
   }
-  
+
   if (shouldStopDocker) {
-    console.log('Stopping Docker Compose services...');
+    console.log('Stopping Docker Compose services...')
     try {
-      await execAsync('cd .. && docker compose -f docker-compose.local.yml down', {
-        cwd: process.cwd(),
-      });
-      console.log('Docker Compose services stopped');
+      const projectRoot = path.resolve(__dirname, '../..')
+      await execAsync('docker compose -f docker-compose.local.yml down', {
+        cwd: projectRoot,
+      })
+      console.log('Docker Compose services stopped')
     } catch (error) {
-      console.error('Failed to stop Docker Compose:', error);
+      console.error('Failed to stop Docker Compose:', error)
     }
   } else {
-    console.log('Keeping Docker Compose services running (set E2E_STOP_DOCKER=true to stop)');
+    console.log(
+      'Keeping Docker Compose services running (set E2E_STOP_DOCKER=true to stop)'
+    )
   }
-  
-  console.log('E2E test environment teardown complete!');
+
+  console.log('E2E test environment teardown complete!')
 }
 
-export default globalTeardown;
+export default globalTeardown

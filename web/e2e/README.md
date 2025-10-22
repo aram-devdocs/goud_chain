@@ -7,6 +7,7 @@ Comprehensive E2E testing infrastructure for the Goud Chain dashboard using Play
 **Purpose:** Automated validation of critical user journeys to ensure frontend-backend integration, catch regressions pre-deployment, and enable safe refactoring.
 
 **Technology Stack:**
+
 - Playwright 1.56+ with TypeScript
 - Page Object Model pattern
 - Fixtures-based state management
@@ -103,11 +104,13 @@ STORYBOOK_URL=http://localhost:6006
 ### Local Development
 
 **Run all E2E tests:**
+
 ```bash
 pnpm test:e2e
 ```
 
 **Run specific browser:**
+
 ```bash
 pnpm test:e2e --project=chromium
 pnpm test:e2e --project=firefox
@@ -115,31 +118,37 @@ pnpm test:e2e --project=webkit
 ```
 
 **Run specific test file:**
+
 ```bash
 pnpm test:e2e e2e/tests/auth.spec.ts
 ```
 
 **Run with UI mode (interactive):**
+
 ```bash
 pnpm test:e2e:ui
 ```
 
 **Debug mode (step through tests):**
+
 ```bash
 pnpm test:e2e:debug
 ```
 
 **Headed mode (see browser):**
+
 ```bash
 pnpm test:e2e:headed
 ```
 
 **Visual regression tests only:**
+
 ```bash
 pnpm test:e2e:visual
 ```
 
 **View test report:**
+
 ```bash
 pnpm test:e2e:report
 ```
@@ -147,18 +156,21 @@ pnpm test:e2e:report
 ### Prerequisites for Running Tests
 
 **Start Docker Compose environment:**
+
 ```bash
 cd .. # Go to workspace root
 docker-compose -f docker-compose.local.yml up -d
 ```
 
 **Start dashboard dev server:**
+
 ```bash
 cd web/apps/dashboard
 pnpm dev
 ```
 
 **Start Storybook (for visual regression):**
+
 ```bash
 cd web/packages/ui
 pnpm storybook
@@ -167,11 +179,13 @@ pnpm storybook
 ### CI/CD Integration
 
 Tests run automatically on GitHub Actions for:
+
 - Push to `main` or `develop` branches
 - Pull requests targeting `main` or `develop`
 - Manual workflow dispatch
 
 **CI workflow features:**
+
 - Cross-browser parallel execution (Chromium, Firefox, WebKit)
 - Docker Compose orchestration (3-node blockchain network)
 - Artifact collection (reports, screenshots, videos, logs)
@@ -179,14 +193,16 @@ Tests run automatically on GitHub Actions for:
 - Test result aggregation
 
 **Available workflows:**
+
 1. **e2e-tests.yml** - Full test suite (all browsers, all tests)
 2. **e2e-tests-simple.yml** - Quick validation (Chromium only, auth tests)
 
 **CI-specific configuration:**
+
 ```yaml
 env:
-  CI: true                      # Enables CI mode
-  E2E_SKIP_GLOBAL_SETUP: true  # Skips Docker in global setup
+  CI: true # Enables CI mode
+  E2E_SKIP_GLOBAL_SETUP: true # Skips Docker in global setup
   DASHBOARD_URL: http://localhost:3000
   API_URL: http://localhost:8080
 ```
@@ -201,23 +217,23 @@ Page objects encapsulate page-specific selectors and actions:
 
 ```typescript
 // Example: SubmitDataPage
-import { Page, Locator } from '@playwright/test';
-import { BasePage } from './BasePage';
+import { Page, Locator } from '@playwright/test'
+import { BasePage } from './BasePage'
 
 export class SubmitDataPage extends BasePage {
   constructor(page: Page) {
-    super(page);
+    super(page)
   }
-  
+
   get dataInput(): Locator {
-    return this.page.locator('textarea[name="data"]');
+    return this.page.locator('textarea[name="data"]')
   }
-  
+
   async submitData(data: string): Promise<string> {
-    await this.dataInput.fill(data);
-    await this.submitButton.click();
-    await this.successMessage.waitFor({ state: 'visible' });
-    return await this.dataIdDisplay.textContent() || '';
+    await this.dataInput.fill(data)
+    await this.submitButton.click()
+    await this.successMessage.waitFor({ state: 'visible' })
+    return (await this.dataIdDisplay.textContent()) || ''
   }
 }
 ```
@@ -228,19 +244,20 @@ Fixtures provide reusable test state:
 
 ```typescript
 // Example: Using auth fixture
-import { test, expect } from '../fixtures/auth.fixture';
-import { SubmitDataPage } from '../pages/SubmitDataPage';
+import { test, expect } from '../fixtures/auth.fixture'
+import { SubmitDataPage } from '../pages/SubmitDataPage'
 
 test('should submit data', async ({ authenticatedPage, apiKey }) => {
-  const submitPage = new SubmitDataPage(authenticatedPage);
-  await submitPage.goto();
-  
-  const dataId = await submitPage.submitData('Test data');
-  expect(dataId).toBeTruthy();
-});
+  const submitPage = new SubmitDataPage(authenticatedPage)
+  await submitPage.goto()
+
+  const dataId = await submitPage.submitData('Test data')
+  expect(dataId).toBeTruthy()
+})
 ```
 
 **Available fixtures:**
+
 - `authenticatedPage`: Pre-authenticated user session
 - `apiKey`: API key for authenticated user
 - `accountName`: Account name for authenticated user
@@ -256,11 +273,12 @@ Tests follow clear naming conventions:
 test.describe('Feature Area', () => {
   test('should [expected behavior] when [scenario]', async ({ page }) => {
     // Test implementation
-  });
-});
+  })
+})
 ```
 
 **Test coverage:**
+
 1. **Authentication** (`auth.spec.ts`): Login, logout, session persistence, error handling
 2. **Data Submission** (`submit-data.spec.ts`): Form validation, encryption, blockchain confirmation
 3. **Collections** (`collections.spec.ts`): List, search, decrypt, verify data
@@ -278,17 +296,20 @@ test.describe('Feature Area', () => {
 Visual tests compare UI screenshots against baseline images:
 
 **Update baseline images:**
+
 ```bash
 pnpm test:e2e:visual --update-snapshots
 ```
 
 **Review visual changes:**
+
 1. Run tests: `pnpm test:e2e:visual`
 2. Check `web/e2e/visual/diff/` for pixel differences
 3. Approve changes: `pnpm test:e2e:visual --update-snapshots`
 4. Commit updated baselines to git
 
 **Threshold configuration:**
+
 - Default: 0.1 (10% pixel difference allowed)
 - Adjust via `VISUAL_THRESHOLD` environment variable
 - Accounts for font rendering differences across systems
@@ -320,21 +341,25 @@ pnpm test:e2e:visual --update-snapshots
 ### Debugging
 
 **View test execution:**
+
 ```bash
 pnpm test:e2e:headed
 ```
 
 **Step through tests:**
+
 ```bash
 pnpm test:e2e:debug
 ```
 
 **Interactive UI:**
+
 ```bash
 pnpm test:e2e:ui
 ```
 
 **Inspect artifacts:**
+
 - Screenshots: `web/test-results/`
 - Videos: `web/test-results/`
 - Traces: `web/test-results/`
@@ -345,18 +370,21 @@ pnpm test:e2e:ui
 ### Docker Compose Issues
 
 **Services not starting:**
+
 ```bash
 docker-compose -f docker-compose.local.yml down -v
 docker-compose -f docker-compose.local.yml up -d
 ```
 
 **Check service health:**
+
 ```bash
 docker-compose -f docker-compose.local.yml ps
 curl http://localhost:8080/health
 ```
 
 **View logs:**
+
 ```bash
 docker-compose -f docker-compose.local.yml logs
 ```
@@ -364,16 +392,19 @@ docker-compose -f docker-compose.local.yml logs
 ### Test Failures
 
 **Timeouts:**
+
 - Increase timeout in `playwright.config.ts`
 - Check Docker services are healthy
 - Verify dashboard is running
 
 **Flaky tests:**
+
 - Use explicit waits instead of `waitForTimeout()`
 - Wait for network idle: `await page.waitForLoadState('networkidle')`
 - Check for race conditions
 
 **Authentication failures:**
+
 - Clear browser storage: `await page.context().clearCookies()`
 - Regenerate test accounts
 - Check API key format
@@ -381,15 +412,18 @@ docker-compose -f docker-compose.local.yml logs
 ### CI/CD Issues
 
 **Artifact upload failures:**
+
 - Check disk space on runner
 - Reduce artifact retention days
 - Compress large artifacts
 
 **Browser installation:**
+
 - Use `--with-deps` flag
 - Verify Playwright version matches CI
 
 **Docker conflicts:**
+
 - Ensure ports 8080-8083 available
 - Clean up containers between runs
 
@@ -421,6 +455,7 @@ docker-compose -f docker-compose.local.yml logs
 ## Performance Metrics
 
 **Test execution times (approximate):**
+
 - Authentication suite: 30-60 seconds
 - Data submission suite: 45-90 seconds
 - Collections suite: 60-120 seconds
@@ -462,6 +497,7 @@ docker-compose -f docker-compose.local.yml logs
 ## Support
 
 For issues or questions:
+
 1. Check troubleshooting section
 2. Review Playwright documentation
 3. Inspect test artifacts (screenshots, videos, traces)
