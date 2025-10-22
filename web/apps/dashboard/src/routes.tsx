@@ -16,6 +16,7 @@ import {
 } from '@goudchain/hooks'
 import { useWebSocketContext } from './contexts/WebSocketContext'
 import AuthPage from './pages/auth'
+import ServiceUnavailablePage from './pages/service-unavailable'
 import DashboardPage from './pages/dashboard'
 import SubmitPage from './pages/submit'
 import CollectionsPage from './pages/collections'
@@ -198,6 +199,13 @@ const authRoute = createRoute({
   },
 })
 
+// Service unavailable route (public) - accessible without authentication
+const serviceUnavailableRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/service-unavailable',
+  component: ServiceUnavailablePage,
+})
+
 // Protected layout route - redirects to /auth if not authenticated
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -268,6 +276,7 @@ const debugRoute = createRoute({
 // Create route tree
 const routeTree = rootRoute.addChildren([
   authRoute,
+  serviceUnavailableRoute,
   protectedRoute.addChildren([
     indexRoute,
     submitRoute,

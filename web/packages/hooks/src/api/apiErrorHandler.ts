@@ -2,6 +2,7 @@
  * Safely extract error message from API response
  * Handles JSON parsing failures, network errors, and malformed responses
  * Triggers logout on 401 Unauthorized errors
+ * Redirects to service issues page on 5xx errors
  */
 export async function handleApiError(response: Response): Promise<never> {
   let errorMessage = `Request failed with status ${response.status}`
@@ -11,13 +12,24 @@ export async function handleApiError(response: Response): Promise<never> {
     // Clear invalid tokens
     localStorage.removeItem('session_token')
     localStorage.removeItem('api_key')
+    localStorage.removeItem('user_id')
 
-    // Redirect to login if not already there
-    if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login'
+    // Redirect to auth page if not already there
+    if (!window.location.pathname.includes('/auth')) {
+      window.location.href = '/auth'
     }
 
     errorMessage = 'Session expired. Please log in again.'
+  }
+
+  // Handle 5xx Server Errors - service overload or issues
+  if (response.status >= 500 && response.status < 600) {
+    // Redirect to service unavailable page if not already there
+    if (!window.location.pathname.includes('/service-unavailable')) {
+      window.location.href = '/service-unavailable'
+    }
+
+    errorMessage = 'Service temporarily unavailable. Please try again later.'
   }
 
   try {
