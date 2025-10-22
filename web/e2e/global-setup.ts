@@ -19,7 +19,8 @@ const execAsync = promisify(exec)
 async function globalSetup(config: FullConfig) {
   console.log('Starting E2E test environment setup...')
 
-  const dashboardUrl = config.use.baseURL || 'http://localhost:3000'
+  const dashboardUrl =
+    config.use?.baseURL || process.env.DASHBOARD_URL || 'http://localhost:3000'
   const apiUrl = process.env.API_URL || 'http://localhost:8080'
   const isCI = process.env.CI === 'true'
 

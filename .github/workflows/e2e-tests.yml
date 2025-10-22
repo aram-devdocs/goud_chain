@@ -95,10 +95,10 @@ jobs:
       - name: Build packages
         working-directory: web
         run: |
-          pnpm --filter @goudchain/ui build
-          pnpm --filter @goudchain/hooks build
           pnpm --filter @goudchain/types build
           pnpm --filter @goudchain/utils build
+          pnpm --filter @goudchain/hooks build
+          pnpm --filter @goudchain/ui build
       
       - name: Start dashboard dev server
         working-directory: web/apps/dashboard
