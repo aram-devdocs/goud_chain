@@ -7,6 +7,7 @@ import {
   Container,
   Stack,
   ButtonGroup,
+  Flex,
 } from '@goudchain/ui'
 import { ButtonVariant, ButtonSize } from '@goudchain/types'
 import { EXTERNAL_URLS, ROUTES } from '@goudchain/utils'
@@ -24,53 +25,55 @@ export default function ServiceUnavailablePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+    <Flex
+      direction="col"
+      align="center"
+      justify="center"
+      className="min-h-screen bg-black px-4"
+    >
       <Container maxWidth="2xl">
         <Stack spacing={8}>
-          <div className="text-center">
-            <Heading level={1} className="text-6xl mb-4">
+          <Stack spacing={4} align="center">
+            <Heading level={1} className="text-6xl">
               503
             </Heading>
-            <Heading level={2} className="text-2xl text-zinc-300 mb-2">
+            <Heading level={2} as={3} className="text-zinc-300">
               Service Temporarily Unavailable
             </Heading>
-            <Text color="muted">
+            <Text color="zinc-400">
               The service is currently experiencing high load or maintenance.
             </Text>
-          </div>
+          </Stack>
 
           <Card>
-            <CardContent className="p-8">
+            <CardContent>
               <Stack spacing={6}>
-                <div>
-                  <Heading level={3} className="text-lg mb-4">
+                <Stack spacing={4}>
+                  <Heading level={3}>
                     What happened?
                   </Heading>
-                  <Text color="muted">
+                  <Text color="zinc-400">
                     The Goud Chain service is temporarily unavailable due to high load or ongoing
                     maintenance. Your data is safe and the blockchain continues to operate.
                   </Text>
-                </div>
+                </Stack>
 
-                <div>
-                  <Heading level={3} className="text-lg mb-4">
+                <Stack spacing={4}>
+                  <Heading level={3}>
                     What can you do?
                   </Heading>
-                  <Stack spacing={3} as="ul">
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <Text color="muted">Wait a few minutes and try again</Text>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <Text color="muted">Check the service status page for updates</Text>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <Text color="muted">If the issue persists, contact support</Text>
-                    </li>
+                  <Stack spacing={3}>
+                    <Text color="zinc-400">
+                      • Wait a few minutes and try again
+                    </Text>
+                    <Text color="zinc-400">
+                      • Check the service status page for updates
+                    </Text>
+                    <Text color="zinc-400">
+                      • If the issue persists, contact support
+                    </Text>
                   </Stack>
-                </div>
+                </Stack>
               </Stack>
             </CardContent>
           </Card>
@@ -88,13 +91,13 @@ export default function ServiceUnavailablePage() {
             </Button>
           </ButtonGroup>
 
-          <div className="text-center">
-            <Text size="sm" color="muted">
+          <Stack align="center">
+            <Text size="sm" color="zinc-500">
               Technical details: Service returned a 5xx error indicating server-side issues.
             </Text>
-          </div>
+          </Stack>
         </Stack>
       </Container>
-    </div>
+    </Flex>
   )
 }
