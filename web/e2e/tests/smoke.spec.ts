@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test'
  *
  * Quick validation tests to ensure basic functionality works.
  * Run these first to verify the environment is set up correctly.
+ * These tests run in pre-commit hooks for fast feedback.
  */
 
 test.describe('Smoke Tests', () => {
