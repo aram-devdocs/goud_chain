@@ -166,15 +166,11 @@ jobs:
             kill $(cat dashboard.pid) || true
             rm dashboard.pid
           fi
-      
+
       - name: Collect Docker logs
         if: failure()
         run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
-      
-      - name: Stop Docker Compose services
-        if: always()
-        run: docker compose -f docker-compose.local.yml down -v
-      
+
       - name: Upload Docker logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -182,6 +178,10 @@ jobs:
           name: docker-logs-${{ matrix.browser }}
           path: docker-logs.txt
           retention-days: 7
+
+      - name: Stop Docker Compose services
+        if: always()
+        run: docker compose -f docker-compose.local.yml down -v
   
   visual-regression:
     name: Visual Regression Tests

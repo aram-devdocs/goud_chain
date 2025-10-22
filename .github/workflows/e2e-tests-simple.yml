@@ -163,7 +163,11 @@ jobs:
           name: dashboard-logs
           path: web/apps/dashboard/dashboard.log
           retention-days: 7
-      
+
+      - name: Collect Docker logs
+        if: always()
+        run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
+
       - name: Upload Docker logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -171,11 +175,7 @@ jobs:
           name: docker-logs
           path: docker-logs.txt
           retention-days: 7
-      
-      - name: Collect Docker logs
-        if: always()
-        run: docker compose -f docker-compose.local.yml logs > docker-logs.txt
-      
+
       - name: Stop dashboard
         if: always()
         working-directory: web/apps/dashboard
@@ -183,7 +183,7 @@ jobs:
           if [ -f dashboard.pid ]; then
             kill $(cat dashboard.pid) || true
           fi
-      
+
       - name: Stop Docker Compose services
         if: always()
         run: docker compose -f docker-compose.local.yml down -v
