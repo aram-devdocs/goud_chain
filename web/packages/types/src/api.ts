@@ -54,12 +54,12 @@ export interface DecryptDataResponse {
 }
 
 export interface AuditLogEntry {
-  event_id: string
-  user_id: string
   event_type: string
-  ip_address_hash: string
   timestamp: number
-  metadata?: Record<string, unknown>
+  collection_id?: string
+  ip_hash: string
+  metadata: Record<string, unknown>
+  invalidated: boolean
 }
 
 export interface AuditLogsResponse {
