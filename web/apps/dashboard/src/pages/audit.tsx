@@ -111,11 +111,11 @@ export default function AuditPage() {
     setEventTypeFilter(filters.eventType === 'all' ? 'all' : filters.eventType)
     if (filters.startTs) {
       setStartDate(
-        new Date(filters.startTs * 1000).toISOString().split('T')[0]!
+        new Date(filters.startTs).toISOString().split('T')[0] ?? ''
       )
     }
     if (filters.endTs) {
-      setEndDate(new Date(filters.endTs * 1000).toISOString().split('T')[0]!)
+      setEndDate(new Date(filters.endTs).toISOString().split('T')[0] ?? '')
     }
     setQueryEnabled(true)
     setPage(0)

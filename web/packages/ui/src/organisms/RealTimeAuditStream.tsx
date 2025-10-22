@@ -110,7 +110,7 @@ export function RealTimeAuditStream({ events }: RealTimeAuditStreamProps) {
                   </div>
                 </div>
                 <div className="flex-shrink-0 text-xs text-zinc-500 font-mono">
-                  {event.ip_hash.substring(0, 8)}...
+                  {event.ip_hash?.substring(0, 8) ?? 'N/A'}...
                 </div>
               </div>
             </div>

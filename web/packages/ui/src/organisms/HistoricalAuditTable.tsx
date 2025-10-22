@@ -70,8 +70,8 @@ export function HistoricalAuditTable({
     const rows = events.map((event) => [
       formatTimestamp(event.timestamp),
       event.event_type,
-      event.ip_hash ?? 'N/A',
-      event.collection_id ?? 'N/A',
+      event.ip_hash || 'N/A',
+      event.collection_id || 'N/A',
       event.invalidated.toString(),
     ])
 
