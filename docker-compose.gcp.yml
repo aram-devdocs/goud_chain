@@ -102,6 +102,7 @@ services:
     <<: *node-base
     container_name: goud_node1
     environment:
+      - ENV=gcp
       - NODE_ID=node1
       - HTTP_PORT=8080
       - P2P_PORT=9000
@@ -127,6 +128,7 @@ services:
     <<: *node-base
     container_name: goud_node2
     environment:
+      - ENV=gcp
       - NODE_ID=node2
       - HTTP_PORT=8080
       - P2P_PORT=9000

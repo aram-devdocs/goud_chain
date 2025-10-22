@@ -1,3 +1,6 @@
+use crate::constants::{
+    API_SERVER_URL_GCP, API_SERVER_URL_LOCAL, ENVIRONMENT_GCP, ENVIRONMENT_LOCAL,
+};
 use std::env;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::openapi::{Server, ServerBuilder};
@@ -80,16 +83,105 @@ impl Modify for ApiModifier {
 
 /// Get API server URLs based on environment
 fn get_api_servers() -> Vec<Server> {
-    let environment = env::var("ENV").unwrap_or_else(|_| "gcp".to_string());
+    let environment = env::var("ENV").unwrap_or_else(|_| {
+        eprintln!("ENV environment variable not set, defaulting to '{}'", ENVIRONMENT_GCP);
+        ENVIRONMENT_GCP.to_string()
+    });
 
     match environment.as_str() {
-        "local" => vec![ServerBuilder::new()
-            .url("http://localhost:8080")
+        ENVIRONMENT_LOCAL => vec![ServerBuilder::new()
+            .url(API_SERVER_URL_LOCAL)
             .description(Some("Load balancer (local development)"))
             .build()],
-        "gcp" | _ => vec![ServerBuilder::new()
-            .url("https://dev.goudchain.com")
+        ENVIRONMENT_GCP => vec![ServerBuilder::new()
+            .url(API_SERVER_URL_GCP)
             .description(Some("Development environment"))
             .build()],
+        _ => {
+            eprintln!(
+                "Unknown environment '{}', defaulting to '{}'",
+                environment, ENVIRONMENT_GCP
+            );
+            vec![ServerBuilder::new()
+                .url(API_SERVER_URL_GCP)
+                .description(Some("Development environment"))
+                .build()]
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_api_servers_local_environment() {
+        // Set environment to local
+        env::set_var("ENV", ENVIRONMENT_LOCAL);
+
+        let servers = get_api_servers();
+
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].url, API_SERVER_URL_LOCAL);
+        assert_eq!(
+            servers[0].description,
+            Some("Load balancer (local development)".to_string())
+        );
+
+        // Clean up
+        env::remove_var("ENV");
+    }
+
+    #[test]
+    fn test_get_api_servers_gcp_environment() {
+        // Set environment to gcp
+        env::set_var("ENV", ENVIRONMENT_GCP);
+
+        let servers = get_api_servers();
+
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].url, API_SERVER_URL_GCP);
+        assert_eq!(
+            servers[0].description,
+            Some("Development environment".to_string())
+        );
+
+        // Clean up
+        env::remove_var("ENV");
+    }
+
+    #[test]
+    fn test_get_api_servers_default_environment() {
+        // Ensure ENV is not set
+        env::remove_var("ENV");
+
+        let servers = get_api_servers();
+
+        // Should default to GCP
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].url, API_SERVER_URL_GCP);
+        assert_eq!(
+            servers[0].description,
+            Some("Development environment".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_api_servers_unknown_environment() {
+        // Set environment to an unknown value
+        env::set_var("ENV", "production");
+
+        let servers = get_api_servers();
+
+        // Should default to GCP
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].url, API_SERVER_URL_GCP);
+        assert_eq!(
+            servers[0].description,
+            Some("Development environment".to_string())
+        );
+
+        // Clean up
+        env::remove_var("ENV");
     }
 }
