@@ -84,7 +84,10 @@ impl Modify for ApiModifier {
 /// Get API server URLs based on environment
 fn get_api_servers() -> Vec<Server> {
     let environment = env::var("ENV").unwrap_or_else(|_| {
-        eprintln!("ENV environment variable not set, defaulting to '{}'", ENVIRONMENT_GCP);
+        eprintln!(
+            "ENV environment variable not set, defaulting to '{}'",
+            ENVIRONMENT_GCP
+        );
         ENVIRONMENT_GCP.to_string()
     });
 
