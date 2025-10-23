@@ -5,10 +5,10 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.test' })
 
 /**
- * Playwright E2E Test Configuration
+ * Playwright Visual Regression Test Configuration
  *
- * Mock-based UI testing with fast smoke tests.
- * No backend required - all API calls are mocked.
+ * Standalone config for visual regression tests against Storybook.
+ * No backend or dashboard needed - only Storybook server.
  */
 export default defineConfig({
   testDir: './e2e/tests',
@@ -31,8 +31,8 @@ export default defineConfig({
 
   // Shared test configuration
   use: {
-    // Base URL for dashboard application
-    baseURL: process.env.DASHBOARD_URL || 'http://localhost:3000',
+    // Base URL for Storybook
+    baseURL: process.env.STORYBOOK_URL || 'http://localhost:6006',
 
     // Screenshot/video configuration
     screenshot: 'only-on-failure',
@@ -42,27 +42,16 @@ export default defineConfig({
     // Browser configuration
     viewport: { width: 1280, height: 720 },
     ignoreHTTPSErrors: true,
-
-    // API base URL for mocked routes
-    extraHTTPHeaders: {
-      Accept: 'application/json',
-    },
   },
 
-  // Smoke tests project (fast, mocked)
+  // Visual regression tests only
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /smoke\.spec\.ts/,
+      testMatch: /visual-regression\.spec\.ts/,
     },
   ],
 
-  // Start dashboard dev server automatically (smoke tests only)
-  webServer: {
-    command: 'cd apps/dashboard && pnpm dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // No webServer - Storybook is started by CI workflow
 })
