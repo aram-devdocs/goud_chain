@@ -114,6 +114,29 @@ if [ -d "web" ] && git diff --cached --name-only | grep -q "^web/"; then
     cd ..
 fi
 
+# E2E smoke tests (if web/e2e exists and has changes)
+if [ -d "web/e2e" ] && git diff --cached --name-only | grep -qE "^web/(e2e|apps|packages)/"; then
+    echo "Running E2E smoke tests (mock-based, no backend required)..."
+    cd web
+
+    # Install Playwright browsers if needed
+    if [ ! -d "$HOME/.cache/ms-playwright" ]; then
+        echo "Installing Playwright browsers (one-time setup)..."
+        pnpm exec playwright install chromium --with-deps
+    fi
+
+    # Run smoke tests with 60s timeout (uses mocked API, no Docker needed)
+    timeout 60s pnpm test:e2e:smoke || {
+        echo "Error: E2E smoke tests failed."
+        echo "Run 'cd web && pnpm test:e2e:smoke' to debug locally."
+        echo "Note: Tests use mocked API responses, no backend required."
+        cd ..
+        exit 1
+    }
+
+    cd ..
+fi
+
 # Terraform checks
 if [ -d "terraform" ] && command -v terraform >/dev/null 2>&1; then
     echo "Running Terraform format check..."
