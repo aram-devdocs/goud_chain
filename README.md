@@ -681,11 +681,21 @@ Enforces strict layered architecture with automatic circular dependency detectio
 
 ### Running Tests
 
+**Backend:**
 ```bash
 cargo test
 cargo clippy
 cargo fmt -- --check
 ```
+
+**Frontend E2E:**
+```bash
+cd web
+pnpm test:e2e              # All browsers (chromium, firefox, webkit)
+pnpm test:e2e:visual       # Visual regression (Storybook components)
+```
+
+E2E tests require Docker Compose backend running. Tests validate complete user workflows across authentication, data operations, blockchain explorer, and real-time updates.
 
 ### Running with Hot Reload
 

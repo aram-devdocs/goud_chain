@@ -162,7 +162,8 @@ export function SubmitDataForm({
   }
 
   return (
-    <Card className="max-w-4xl mx-auto">
+    // Minimum width maintains 12-column grid layout (FORM_LAYOUT.minWidth from @goudchain/types/layout)
+    <Card className="max-w-4xl min-w-form mx-auto">
       <CardHeader>
         <CardTitle>Submit Encrypted Data</CardTitle>
       </CardHeader>

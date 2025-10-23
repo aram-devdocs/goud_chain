@@ -50,12 +50,12 @@ export default function AuditPage() {
 
     if (message.type === 'event' && message.event === 'audit_log_update') {
       const auditEntry: AuditLogEntry = {
-        event_id: `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        user_id: message.metadata?.user_id || 'WebSocket Event',
         event_type: message.event_type || 'Unknown',
-        ip_address_hash: message.metadata?.ip_address_hash || '(pending)',
-        timestamp: message.timestamp || Math.floor(Date.now() / 1000),
-        metadata: message.metadata,
+        timestamp: message.timestamp || Date.now(),
+        collection_id: message.collection_id,
+        ip_hash: message.metadata?.ip_hash || '(pending)',
+        metadata: message.metadata || {},
+        invalidated: false,
       }
 
       setLiveEvents((prev) => [auditEntry, ...prev].slice(0, 100))
@@ -86,13 +86,13 @@ export default function AuditPage() {
     }
 
     const csv = [
-      ['Timestamp', 'Event Type', 'IP Hash', 'Event ID', 'User ID'],
+      ['Timestamp', 'Event Type', 'IP Hash', 'Collection ID', 'Invalidated'],
       ...events.map((event) => [
-        new Date(event.timestamp * 1000).toISOString(),
+        new Date(event.timestamp).toISOString(),
         event.event_type,
-        event.ip_address_hash,
-        event.event_id,
-        event.user_id,
+        event.ip_hash,
+        event.collection_id || '',
+        event.invalidated.toString(),
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(','))
@@ -110,12 +110,10 @@ export default function AuditPage() {
   const handleApplyQueryFilters = (filters: AuditFilters) => {
     setEventTypeFilter(filters.eventType === 'all' ? 'all' : filters.eventType)
     if (filters.startTs) {
-      setStartDate(
-        new Date(filters.startTs * 1000).toISOString().split('T')[0]!
-      )
+      setStartDate(new Date(filters.startTs).toISOString().split('T')[0] ?? '')
     }
     if (filters.endTs) {
-      setEndDate(new Date(filters.endTs * 1000).toISOString().split('T')[0]!)
+      setEndDate(new Date(filters.endTs).toISOString().split('T')[0] ?? '')
     }
     setQueryEnabled(true)
     setPage(0)

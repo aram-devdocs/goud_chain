@@ -146,22 +146,23 @@ export function mockAuditLog(): AuditLogEntry {
   const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)]!
 
   return {
-    event_id: 'evt_' + Math.random().toString(36).substring(2, 15),
-    user_id: 'user_' + Math.random().toString(36).substring(2, 10),
     event_type: eventType,
-    ip_address_hash: Array(64)
+    timestamp: Date.now() - Math.floor(Math.random() * 3600000), // Last hour in milliseconds
+    collection_id:
+      eventType === 'DataSubmit'
+        ? 'col_' + Math.random().toString(36).substring(2, 10)
+        : undefined,
+    ip_hash: Array(64)
       .fill(0)
       .map(() => Math.floor(Math.random() * 16).toString(16))
       .join(''),
-    timestamp: Math.floor(
-      (Date.now() - Math.floor(Math.random() * 3600000)) / 1000
-    ), // Last hour
     metadata: {
       collection_id:
         eventType === 'DataSubmit'
           ? 'col_' + Math.random().toString(36).substring(2, 10)
           : undefined,
     },
+    invalidated: false,
   }
 }
 

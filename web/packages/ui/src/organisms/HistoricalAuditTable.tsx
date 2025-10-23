@@ -32,12 +32,12 @@ export function HistoricalAuditTable({
   const [expandedRow, setExpandedRow] = useState<number | null>(null)
 
   const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp * 1000)
+    const date = new Date(timestamp)
     return date.toLocaleString()
   }
 
   const formatDateForInput = (timestamp: number) => {
-    const date = new Date(timestamp * 1000)
+    const date = new Date(timestamp)
     return date.toISOString().split('T')[0]
   }
 
@@ -47,13 +47,13 @@ export function HistoricalAuditTable({
     }
 
     if (startDate) {
-      filters.startTs = Math.floor(new Date(startDate).getTime() / 1000)
+      filters.startTs = new Date(startDate).getTime()
     }
     if (endDate) {
       // Set end date to end of day (23:59:59)
       const endDateTime = new Date(endDate)
       endDateTime.setHours(23, 59, 59, 999)
-      filters.endTs = Math.floor(endDateTime.getTime() / 1000)
+      filters.endTs = endDateTime.getTime()
     }
 
     onApplyFilters(filters)
@@ -63,16 +63,16 @@ export function HistoricalAuditTable({
     const headers = [
       'Timestamp',
       'Event Type',
-      'IP Address Hash',
-      'Event ID',
-      'User ID',
+      'IP Hash',
+      'Collection ID',
+      'Invalidated',
     ]
     const rows = events.map((event) => [
       formatTimestamp(event.timestamp),
       event.event_type,
-      event.ip_address_hash ?? 'N/A',
-      event.event_id ?? 'N/A',
-      event.user_id,
+      event.ip_hash || 'N/A',
+      event.collection_id || 'N/A',
+      event.invalidated.toString(),
     ])
 
     const csvContent = [headers, ...rows]
@@ -183,10 +183,10 @@ export function HistoricalAuditTable({
                     Event Type
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-zinc-400">
-                    IP Address Hash
+                    IP Hash
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-zinc-400">
-                    Event ID
+                    Collection ID
                   </th>
                 </tr>
               </thead>
@@ -205,10 +205,10 @@ export function HistoricalAuditTable({
                       />
                     </td>
                     <td className="py-3 px-4 text-sm text-zinc-400 font-mono">
-                      {event.ip_address_hash?.substring(0, 16) ?? 'N/A'}...
+                      {event.ip_hash?.substring(0, 16) ?? 'N/A'}...
                     </td>
                     <td className="py-3 px-4 text-sm text-zinc-300 truncate max-w-md">
-                      {event.event_id?.substring(0, 16) ?? 'N/A'}...
+                      {event.collection_id?.substring(0, 16) ?? 'N/A'}...
                     </td>
                   </tr>
                 ))}
@@ -232,10 +232,10 @@ export function HistoricalAuditTable({
                   </span>
                 </div>
                 <div className="text-sm text-zinc-300 mb-2">
-                  {event.event_id?.substring(0, 16) ?? 'N/A'}...
+                  {event.collection_id?.substring(0, 16) ?? 'N/A'}...
                 </div>
                 <div className="text-xs text-zinc-500 font-mono">
-                  IP: {event.ip_address_hash?.substring(0, 16) ?? 'N/A'}...
+                  IP: {event.ip_hash?.substring(0, 16) ?? 'N/A'}...
                 </div>
               </div>
             ))}

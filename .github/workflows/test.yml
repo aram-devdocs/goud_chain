@@ -5,9 +5,9 @@ name: Test
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, staging, develop ]
   push:
-    branches: [ main, develop ]
+    branches: [ main, staging, develop ]
 
 env:
   CARGO_TERM_COLOR: always
