@@ -23,12 +23,8 @@ test.describe('Smoke Tests', () => {
     // Verify page title
     await expect(page.locator('text=Goud Chain')).toBeVisible()
 
-    // Verify tabs are present
-    await expect(
-      page
-        .getByTestId('create-account-tab')
-        .or(page.locator('text=Create Account'))
-    ).toBeVisible()
+    // Verify create account tab is present
+    await expect(page.getByTestId('create-account-tab')).toBeVisible()
   })
 
   test('should redirect unauthenticated user to auth page', async ({

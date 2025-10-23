@@ -89,33 +89,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-      
+
       - name: Install dependencies
         working-directory: web
         run: pnpm install --frozen-lockfile
-      
+
       - name: Install http-server
         run: npm install -g http-server
-      
+
       - name: Build packages
         working-directory: web
         run: |
           pnpm --filter @goudchain/types build
           pnpm --filter @goudchain/utils build
+          pnpm --filter @goudchain/hooks build
       
       - name: Build Storybook
         working-directory: web/packages/ui
