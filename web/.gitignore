@@ -53,6 +53,10 @@ lerna-debug.log*
 # Testing
 coverage
 .nyc_output
+playwright-report
+test-results
+e2e/visual/actual
+e2e/visual/diff
 
 # OS
 .DS_Store

@@ -88,6 +88,10 @@ module.exports = {
         xl: '1rem',
         full: '9999px',
       },
+      // Minimum widths for layout constraints
+      minWidth: {
+        form: '640px', // Accommodates 12-column grid layout
+      },
       // Transitions
       transitionDuration: {
         fast: '150ms',

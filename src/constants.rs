@@ -92,4 +92,10 @@ pub const AUDIT_IP_HASH_LENGTH: usize = 8; // Store truncated SHA256(IP) for pri
 pub const REQUEST_TIMESTAMP_TOLERANCE_SECONDS: i64 = 300; // 5-minute window for request freshness
 pub const NONCE_CLEANUP_INTERVAL_SECONDS: u64 = 600; // Clean up expired nonces every 10 minutes
 
+// Environment Configuration - API Documentation
+pub const ENVIRONMENT_LOCAL: &str = "local";
+pub const ENVIRONMENT_GCP: &str = "gcp";
+pub const API_SERVER_URL_LOCAL: &str = "http://localhost:8080";
+pub const API_SERVER_URL_GCP: &str = "https://dev.goudchain.com";
+
 // Metrics - Operational Security

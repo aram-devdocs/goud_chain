@@ -66,11 +66,46 @@ pnpm format:check     # Check formatting (CI mode)
 pnpm validate         # Run format check + type check + build (pre-commit)
 
 # Testing
-pnpm test             # Run tests (when implemented)
+pnpm test:e2e                 # Run E2E tests (all browsers)
+pnpm test:e2e --project=chromium  # Run specific browser
+pnpm test:e2e:visual          # Visual regression (Storybook)
+pnpm test:e2e:ui              # Interactive test UI
+pnpm test:e2e:debug           # Debug mode with browser
 
 # Cleanup
 pnpm clean            # Remove all node_modules and dist folders
 ```
+
+## E2E Testing
+
+Playwright-based end-to-end tests validate complete user workflows:
+
+**Test Coverage:**
+
+- Authentication (create account, login, logout, session persistence)
+- Data operations (submit, list, decrypt)
+- Blockchain explorer (blocks, transactions, Merkle trees)
+- Network monitoring (peers, validator rotation)
+- Real-time updates (WebSocket events)
+- Visual regression (Storybook component screenshots)
+
+**Running Tests:**
+
+```bash
+# Requires Docker Compose backend running
+cd web
+pnpm test:e2e                     # Cross-browser (chromium, firefox, webkit)
+pnpm test:e2e --project=chromium  # Single browser
+pnpm test:e2e:visual              # Visual regression only
+```
+
+**Test Architecture:**
+
+- Page Object Model for maintainable selectors
+- Fixtures for authentication and blockchain state
+- Parallel execution across browsers
+- Visual regression baseline comparison
+- Automatic retry on failure (CI only)
 
 ## Development Workflow
 

@@ -97,6 +97,7 @@ services:
     <<: *node-base
     container_name: node1
     environment:
+      - ENV=local
       - NODE_ID=node1
       - HTTP_PORT=8080
       - P2P_PORT=9000
@@ -123,6 +124,7 @@ services:
     <<: *node-base
     container_name: node2
     environment:
+      - ENV=local
       - NODE_ID=node2
       - HTTP_PORT=8080
       - P2P_PORT=9000
@@ -149,6 +151,7 @@ services:
     <<: *node-base
     container_name: node3
     environment:
+      - ENV=local
       - NODE_ID=node3
       - HTTP_PORT=8080
       - P2P_PORT=9000

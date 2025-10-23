@@ -374,3 +374,31 @@ Performance: skeleton loaders, optimistic updates, debounced search, virtualized
 - Business logic implementation (delegate to domain packages)
 - Direct API calls (use data layer abstractions)
 - Hardcoded values (import from constants packages)
+
+## E2E Testing
+
+**Framework:** Playwright with TypeScript for cross-browser testing (Chromium, Firefox, WebKit).
+
+**Architecture:**
+- Page Object Model for maintainable selectors
+- Fixtures for authentication, blockchain state, WebSocket connections
+- Global setup/teardown manages Docker Compose backend
+- Visual regression via Storybook component screenshots
+
+**Test Coverage:**
+- Authentication flows (create, login, logout, session persistence)
+- Data operations (submit, list, decrypt with API key)
+- Blockchain explorer (blocks, transactions, Merkle trees)
+- Network monitoring (peers, validator rotation, health checks)
+- Real-time updates (WebSocket events, auto-reconnect)
+- Visual regression (component snapshots, pixel diff threshold)
+
+**Running Tests:**
+```bash
+cd web
+pnpm test:e2e                     # All browsers
+pnpm test:e2e --project=chromium  # Single browser
+pnpm test:e2e:visual              # Visual regression only
+```
+
+**CI Integration:** GitHub Actions runs tests on PR/push. Docker Compose starts 3-node network, builds packages, runs tests in parallel, uploads artifacts on failure.
