@@ -15,7 +15,8 @@ export const EXTERNAL_URLS = {
  */
 export const ERROR_MESSAGES = {
   SESSION_EXPIRED: 'Session expired. Please log in again.',
-  SERVICE_UNAVAILABLE: 'Service temporarily unavailable. Please try again later.',
+  SERVICE_UNAVAILABLE:
+    'Service temporarily unavailable. Please try again later.',
 } as const
 
 /**

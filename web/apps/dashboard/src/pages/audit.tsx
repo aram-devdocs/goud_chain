@@ -110,9 +110,7 @@ export default function AuditPage() {
   const handleApplyQueryFilters = (filters: AuditFilters) => {
     setEventTypeFilter(filters.eventType === 'all' ? 'all' : filters.eventType)
     if (filters.startTs) {
-      setStartDate(
-        new Date(filters.startTs).toISOString().split('T')[0] ?? ''
-      )
+      setStartDate(new Date(filters.startTs).toISOString().split('T')[0] ?? '')
     }
     if (filters.endTs) {
       setEndDate(new Date(filters.endTs).toISOString().split('T')[0] ?? '')

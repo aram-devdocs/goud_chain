@@ -86,7 +86,9 @@ describe('handleApiError', () => {
       const response = new Response(null, { status: 401 })
       mockLocation.pathname = '/dashboard'
 
-      await expect(handleApiError(response)).rejects.toThrow(ERROR_MESSAGES.SESSION_EXPIRED)
+      await expect(handleApiError(response)).rejects.toThrow(
+        ERROR_MESSAGES.SESSION_EXPIRED
+      )
     })
   })
 
@@ -167,7 +169,9 @@ describe('handleApiError', () => {
         headers: { 'content-type': 'application/json' },
       })
 
-      await expect(handleApiError(response)).rejects.toThrow('Custom error message')
+      await expect(handleApiError(response)).rejects.toThrow(
+        'Custom error message'
+      )
     })
 
     it('should use default message when JSON parsing fails', async () => {
@@ -176,7 +180,9 @@ describe('handleApiError', () => {
         headers: { 'content-type': 'application/json' },
       })
 
-      await expect(handleApiError(response)).rejects.toThrow('Request failed with status 400')
+      await expect(handleApiError(response)).rejects.toThrow(
+        'Request failed with status 400'
+      )
     })
 
     it('should handle non-JSON responses', async () => {
@@ -195,7 +201,9 @@ describe('handleApiError', () => {
         headers: { 'content-type': 'text/plain' },
       })
 
-      await expect(handleApiError(response)).rejects.toThrow('Request failed with status 400')
+      await expect(handleApiError(response)).rejects.toThrow(
+        'Request failed with status 400'
+      )
     })
   })
 

@@ -38,13 +38,17 @@ describe('ServiceUnavailablePage', () => {
 
   it('should render service unavailable title', () => {
     render(<ServiceUnavailablePage />)
-    expect(screen.getByText('Service Temporarily Unavailable')).toBeInTheDocument()
+    expect(
+      screen.getByText('Service Temporarily Unavailable')
+    ).toBeInTheDocument()
   })
 
   it('should render explanation text', () => {
     render(<ServiceUnavailablePage />)
     expect(
-      screen.getByText(/service is currently experiencing high load or maintenance/i)
+      screen.getByText(
+        /service is currently experiencing high load or maintenance/i
+      )
     ).toBeInTheDocument()
   })
 
@@ -52,16 +56,24 @@ describe('ServiceUnavailablePage', () => {
     render(<ServiceUnavailablePage />)
     expect(screen.getByText('What happened?')).toBeInTheDocument()
     expect(
-      screen.getByText(/temporarily unavailable due to high load or ongoing maintenance/i)
+      screen.getByText(
+        /temporarily unavailable due to high load or ongoing maintenance/i
+      )
     ).toBeInTheDocument()
   })
 
   it('should render what can you do section with action items', () => {
     render(<ServiceUnavailablePage />)
     expect(screen.getByText('What can you do?')).toBeInTheDocument()
-    expect(screen.getByText(/Wait a few minutes and try again/i)).toBeInTheDocument()
-    expect(screen.getByText(/Check the service status page for updates/i)).toBeInTheDocument()
-    expect(screen.getByText(/If the issue persists, contact support/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Wait a few minutes and try again/i)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Check the service status page for updates/i)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/If the issue persists, contact support/i)
+    ).toBeInTheDocument()
   })
 
   it('should render Try Again button', () => {
@@ -99,7 +111,10 @@ describe('ServiceUnavailablePage', () => {
 
       fireEvent.click(checkStatusButton)
 
-      expect(mockWindowOpen).toHaveBeenCalledWith(EXTERNAL_URLS.STATUS_PAGE, '_blank')
+      expect(mockWindowOpen).toHaveBeenCalledWith(
+        EXTERNAL_URLS.STATUS_PAGE,
+        '_blank'
+      )
     })
 
     it('should set opener to null for security (prevent tabnapping)', () => {
@@ -134,7 +149,7 @@ describe('ServiceUnavailablePage', () => {
       expect(buttons.length).toBeGreaterThan(0)
 
       // Buttons should not have inline style attributes (would indicate non-design-system usage)
-      buttons.forEach((button) => {
+      buttons.forEach((button: Element) => {
         expect(button.getAttribute('style')).toBeFalsy()
       })
     })
@@ -143,7 +158,9 @@ describe('ServiceUnavailablePage', () => {
       const { container } = render(<ServiceUnavailablePage />)
 
       // Card component should be present (has specific design system classes)
-      const cards = container.querySelectorAll('[class*="border"][class*="rounded"]')
+      const cards = container.querySelectorAll(
+        '[class*="border"][class*="rounded"]'
+      )
       expect(cards.length).toBeGreaterThan(0)
     })
   })
@@ -165,7 +182,9 @@ describe('ServiceUnavailablePage', () => {
       render(<ServiceUnavailablePage />)
 
       const tryAgainButton = screen.getByRole('button', { name: /try again/i })
-      const checkStatusButton = screen.getByRole('button', { name: /check status/i })
+      const checkStatusButton = screen.getByRole('button', {
+        name: /check status/i,
+      })
 
       expect(tryAgainButton).toBeEnabled()
       expect(checkStatusButton).toBeEnabled()
