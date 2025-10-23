@@ -7,7 +7,7 @@ dotenv.config({ path: '.env.test' })
 /**
  * Playwright E2E Test Configuration
  *
- * Mock-based UI testing with fast smoke tests.
+ * Mock-based UI testing with fast smoke tests..å=
  * No backend required - all API calls are mocked.
  */
 export default defineConfig({
