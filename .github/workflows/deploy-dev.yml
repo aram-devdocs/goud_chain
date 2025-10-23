@@ -22,7 +22,7 @@ on:
     workflows: ["Build and Push Docker Images"]
     types:
       - completed
-    branches: [ main ]
+    branches: [ main, staging ]
 
 env:
   ENVIRONMENT: dev
@@ -36,7 +36,7 @@ jobs:
     # Only run if build succeeded (or if manually triggered)
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      (github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'staging'))
     name: Terraform Deploy
     runs-on: ubuntu-latest
     environment: dev
@@ -125,7 +125,7 @@ jobs:
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
         run: terraform apply -auto-approve tfplan
 
       - name: Get Terraform Outputs
@@ -212,14 +212,22 @@ jobs:
             cd /opt/goud-chain
 
             # Clone or update repository
+            # Determine which branch to use based on triggering event
+            DEPLOY_BRANCH="main"
+            if [ "${{ github.event.workflow_run.head_branch }}" = "staging" ]; then
+              DEPLOY_BRANCH="staging"
+            fi
+
             if [ -d .git ]; then
               echo "Updating existing repository..."
               # Reset generated configs (they'll be regenerated after pull)
               git reset --hard HEAD
-              git pull origin main
+              git fetch origin
+              git checkout $DEPLOY_BRANCH
+              git pull origin $DEPLOY_BRANCH
             else
               echo "Cloning repository..."
-              git clone ${{ github.server_url }}/${{ github.repository }} .
+              git clone -b $DEPLOY_BRANCH ${{ github.server_url }}/${{ github.repository }} .
             fi
 
             # Create data directory
